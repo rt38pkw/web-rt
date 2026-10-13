@@ -13,6 +13,13 @@ export default function AdminDashboard() {
   const [showPassModal, setShowPassModal] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  
+  // State Show/Hide Password
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
@@ -67,14 +74,25 @@ export default function AdminDashboard() {
     }
   }
 
-  // Handle Update Username & Password via Modal
+  // Handle Update Username & Password via Modal (dengan verifikasi)
   const handleUpdateProfil = async (e) => {
     e.preventDefault();
+
+    // Verifikasi pengetikan ulang password
+    if (newPassword && newPassword !== confirmPassword) {
+      alert('Password baru dan Konfirmasi Password tidak cocok!');
+      return;
+    }
+
     setIsUpdating(true);
 
     const updateData = {};
-    if (newUsername.trim()) updateData.username = newUsername.trim();
-    if (newPassword.trim()) updateData.password = newPassword.trim();
+    if (newUsername.trim() && newUsername.trim() !== user.username) {
+      updateData.username = newUsername.trim();
+    }
+    if (newPassword.trim()) {
+      updateData.password = newPassword.trim();
+    }
 
     if (Object.keys(updateData).length === 0) {
       alert('Tidak ada perubahan data.');
@@ -98,6 +116,7 @@ export default function AdminDashboard() {
       sessionStorage.setItem('pengurusSession', JSON.stringify(updatedUser));
       setShowPassModal(false);
       setNewPassword('');
+      setConfirmPassword('');
     }
   };
 
@@ -133,14 +152,23 @@ export default function AdminDashboard() {
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">Password</label>
-              <input
-                type="password"
-                className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm"
-                placeholder="••••••••"
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                required
-              />
+              <div className="relative">
+                <input
+                  type={showLoginPassword ? 'text' : 'password'}
+                  className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm"
+                  placeholder="••••••••"
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowLoginPassword(!showLoginPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition text-sm p-1"
+                >
+                  {showLoginPassword ? '👁️' : '🙈'}
+                </button>
+              </div>
             </div>
 
             <button
@@ -195,6 +223,8 @@ export default function AdminDashboard() {
             <button
               onClick={() => {
                 setNewUsername(user.username);
+                setNewPassword('');
+                setConfirmPassword('');
                 setShowPassModal(true);
               }}
               className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-medium transition active:scale-95 flex items-center gap-1"
@@ -348,7 +378,7 @@ export default function AdminDashboard() {
         </div>
       </main>
 
-      {/* Modal Pop-up Edit Profil & Password */}
+      {/* Modal Pop-up Edit Profil & Password dengan Verifikasi + Show/Hide Toggle */}
       {showPassModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
@@ -378,14 +408,54 @@ export default function AdminDashboard() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Password Baru</label>
-                <input
-                  type="password"
-                  placeholder="Kosongkan jika tidak ingin mengubah password"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    placeholder="Kosongkan jika tidak ubah password"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 pr-10 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition text-sm p-1"
+                  >
+                    {showNewPassword ? '👁️' : '🙈'}
+                  </button>
+                </div>
               </div>
+
+              {/* Input Verifikasi / Ulangi Password Baru */}
+              {newPassword.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Ulangi Password Baru</label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      placeholder="Ketik ulang password baru di atas"
+                      required
+                      className={`w-full bg-slate-950 border rounded-xl px-4 py-2.5 pr-10 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-2 ${
+                        confirmPassword.length > 0 && confirmPassword !== newPassword
+                          ? 'border-rose-500 focus:ring-rose-500'
+                          : 'border-slate-800 focus:ring-amber-500'
+                      }`}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition text-sm p-1"
+                    >
+                      {showConfirmPassword ? '👁️' : '🙈'}
+                    </button>
+                  </div>
+                  {confirmPassword.length > 0 && confirmPassword !== newPassword && (
+                    <p className="text-[10px] text-rose-400 mt-1">⚠️ Password tidak cocok!</p>
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-3 pt-2">
                 <button
@@ -401,12 +471,4 @@ export default function AdminDashboard() {
                   className="w-1/2 bg-amber-600 hover:bg-amber-500 text-white font-semibold py-2.5 rounded-xl text-xs transition shadow-lg shadow-amber-600/20"
                 >
                   {isUpdating ? 'Simpan...' : 'Simpan Perubahan'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+                </button
