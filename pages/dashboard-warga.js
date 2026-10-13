@@ -23,6 +23,7 @@ export default function DashboardWarga() {
   const [warga, setWarga] = useState(null);
   const [iuranList, setIuranList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('iuran'); // State Tab Active: 'iuran', 'pengumuman', 'surat', 'kontak'
   const router = useRouter();
 
   useEffect(() => {
@@ -112,7 +113,7 @@ export default function DashboardWarga() {
       {/* Main Content */}
       <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-6 my-1">
 
-        {/* Profil Warga Modern Minimalis */}
+        {/* Profil Warga Modern */}
         <section className="bg-slate-900/80 border border-slate-800/80 rounded-3xl p-5 sm:p-6 shadow-2xl relative overflow-hidden backdrop-blur-sm">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
@@ -145,101 +146,238 @@ export default function DashboardWarga() {
           </div>
         </section>
 
-        {/* Highlight Widget Ringkas */}
-        <section className="grid grid-cols-2 gap-3 sm:gap-4">
-          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
-            <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
-              Total Setor
-            </span>
-            <span className="text-lg sm:text-2xl font-black text-white mt-1">
-              Rp {totalDisetor.toLocaleString('id-ID')}
-            </span>
-          </div>
+        {/* NAVIGASI MENU UTAMA (GRID MENU) */}
+        <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <button
+            onClick={() => setActiveTab('iuran')}
+            className={`p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
+              activeTab === 'iuran'
+                ? 'bg-blue-600/20 border-blue-500 text-white shadow-lg shadow-blue-500/10'
+                : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:bg-slate-900/90'
+            }`}
+          >
+            <span className="text-2xl">💰</span>
+            <span className="text-xs font-bold tracking-wide">Status Iuran</span>
+          </button>
 
-          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
-            <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
-              Sisa Deposit
-            </span>
-            <span className="text-lg sm:text-2xl font-black text-emerald-400 mt-1">
-              Rp {sisaDeposit.toLocaleString('id-ID')}
-            </span>
-          </div>
+          <button
+            onClick={() => setActiveTab('pengumuman')}
+            className={`p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
+              activeTab === 'pengumuman'
+                ? 'bg-blue-600/20 border-blue-500 text-white shadow-lg shadow-blue-500/10'
+                : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:bg-slate-900/90'
+            }`}
+          >
+            <span className="text-2xl">📢</span>
+            <span className="text-xs font-bold tracking-wide">Pengumuman</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('surat')}
+            className={`p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
+              activeTab === 'surat'
+                ? 'bg-blue-600/20 border-blue-500 text-white shadow-lg shadow-blue-500/10'
+                : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:bg-slate-900/90'
+            }`}
+          >
+            <span className="text-2xl">📄</span>
+            <span className="text-xs font-bold tracking-wide">Surat Mandiri</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('kontak')}
+            className={`p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
+              activeTab === 'kontak'
+                ? 'bg-blue-600/20 border-blue-500 text-white shadow-lg shadow-blue-500/10'
+                : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:bg-slate-900/90'
+            }`}
+          >
+            <span className="text-2xl">📞</span>
+            <span className="text-xs font-bold tracking-wide">Pengurus RT</span>
+          </button>
         </section>
 
-        {/* Grid Pembayaran Modern & Simpel */}
-        <section className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-5 sm:p-6 shadow-xl">
-          <div className="flex justify-between items-center mb-5">
-            <div>
-              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                Iuran Bulanan 2026
-              </h3>
-              <p className="text-xs text-slate-400">Status kelunasan periode April – Desember</p>
+        {/* KONTEN DYNAMIC BERDASARKAN TAB YANG DIPILIH */}
+
+        {/* TAB 1: STATUS IURAN BULANAN */}
+        {activeTab === 'iuran' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Highlight Widget Ringkas */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
+                  Total Setor
+                </span>
+                <span className="text-lg sm:text-2xl font-black text-white mt-1">
+                  Rp {totalDisetor.toLocaleString('id-ID')}
+                </span>
+              </div>
+
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
+                  Sisa Deposit
+                </span>
+                <span className="text-lg sm:text-2xl font-black text-emerald-400 mt-1">
+                  Rp {sisaDeposit.toLocaleString('id-ID')}
+                </span>
+              </div>
             </div>
-            <span className="text-xs bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 font-medium">
-              9 Bulan
-            </span>
+
+            {/* Grid Pembayaran Per Bulan */}
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-5 sm:p-6 shadow-xl">
+              <div className="flex justify-between items-center mb-5">
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                    Grid Iuran Bulanan 2026
+                  </h3>
+                  <p className="text-xs text-slate-400">Rincian status pembayaran periode April – Desember</p>
+                </div>
+                <span className="text-xs bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 font-medium">
+                  9 Bulan
+                </span>
+              </div>
+
+              {loading ? (
+                <div className="py-12 text-center text-xs text-slate-500">Memuat data iuran...</div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                  {PERIODE_BULAN.map((bln, idx) => {
+                    const recordBulan = iuranList.find(i => i.bulan_tahun === bln.kode);
+                    const nominalLangsung = recordBulan ? Number(recordBulan.jumlah || 0) : 0;
+
+                    let isLunas = false;
+                    let isSebagian = false;
+                    let nominalTercoverBulanIni = 0;
+
+                    if (nominalLangsung >= tarifBulanan) {
+                      isLunas = true;
+                      nominalTercoverBulanIni = tarifBulanan;
+                      poolSaldo -= tarifBulanan;
+                    } else if (nominalLangsung > 0 && nominalLangsung < tarifBulanan) {
+                      isSebagian = true;
+                      nominalTercoverBulanIni = nominalLangsung;
+                      poolSaldo -= nominalLangsung;
+                    } else if (poolSaldo >= tarifBulanan) {
+                      isLunas = true;
+                      nominalTercoverBulanIni = tarifBulanan;
+                      poolSaldo -= tarifBulanan;
+                    } else if (poolSaldo > 0 && poolSaldo < tarifBulanan) {
+                      isSebagian = true;
+                      nominalTercoverBulanIni = poolSaldo;
+                      poolSaldo = 0;
+                    }
+
+                    const sisaKekurangan = tarifBulanan - nominalTercoverBulanIni;
+
+                    return (
+                      <div 
+                        key={idx} 
+                        className={`p-3.5 rounded-2xl border transition-all duration-200 flex items-center justify-between ${
+                          isLunas 
+                            ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-300' 
+                            : isSebagian
+                            ? 'bg-amber-950/20 border-amber-500/30 text-amber-300'
+                            : 'bg-slate-950/60 border-slate-800/60 text-slate-400'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-white tracking-wide">
+                              {bln.nama}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              2026
+                            </span>
+                          </div>
+                          <div className="text-[11px] mt-0.5 text-slate-400">
+                            {isLunas 
+                              ? `Rp ${tarifBulanan.toLocaleString('id-ID')}` 
+                              : isSebagian 
+                              ? `Terbayar Rp ${nominalTercoverBulanIni.toLocaleString('id-ID')}` 
+                              : `Rp 0 / ${tarifBulanan.toLocaleString('id-ID')}`}
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className={`inline-block text-[10px] px-2.5 py-1 rounded-xl font-semibold border ${
+                            isLunas 
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
+                              : isSebagian
+                              ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                              : 'bg-slate-800/80 text-slate-400 border-slate-700/60'
+                          }`}>
+                            {isLunas 
+                              ? '✓ Lunas' 
+                              : isSebagian 
+                              ? `- Rp ${sisaKekurangan.toLocaleString('id-ID')}` 
+                              : 'Belum'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
+        )}
 
-          {loading ? (
-            <div className="py-12 text-center text-xs text-slate-500">Memuat data iuran...</div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-              {PERIODE_BULAN.map((bln, idx) => {
-                const recordBulan = iuranList.find(i => i.bulan_tahun === bln.kode);
-                const nominalLangsung = recordBulan ? Number(recordBulan.jumlah || 0) : 0;
+        {/* TAB 2: PENGUMUMAN */}
+        {activeTab === 'pengumuman' && (
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-6 shadow-xl space-y-4 animate-in fade-in duration-200">
+            <h3 className="text-base font-bold text-white">📢 Pengumuman Lingkungan RT 38</h3>
+            <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
+              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
+                Penting
+              </span>
+              <h4 className="text-sm font-bold text-white">Peluncuran Portal Mandiri Warga RT 38</h4>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Selamat datang di Portal Digital RT 38 Puri Kencana Wagir! Warga dapat memantau riwayat pembayaran iuran bulanan dan informasi lingkungan secara real-time.
+              </p>
+              <span className="text-[10px] text-slate-500 block pt-1">Diunggah: Oktober 2026</span>
+            </div>
+          </div>
+        )}
 
-                let isLunas = false;
-                let isSebagian = false;
-                let nominalTercoverBulanIni = 0;
+        {/* TAB 3: SURAT MANDIRI */}
+        {activeTab === 'surat' && (
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-6 text-center space-y-3 animate-in fade-in duration-200">
+            <div className="text-4xl">📄</div>
+            <h3 className="text-base font-bold text-white">Pengajuan Surat Pengantar</h3>
+            <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+              Fitur pencetakan dan pengajuan Surat Pengantar RT online sedang dalam tahap pengembangan dan akan segera diaktifkan.
+            </p>
+            <button disabled className="px-4 py-2 bg-slate-800/60 text-slate-500 rounded-xl text-xs font-semibold cursor-not-allowed border border-slate-800">
+              Segera Hadir 🚧
+            </button>
+          </div>
+        )}
 
-                if (nominalLangsung >= tarifBulanan) {
-                  isLunas = true;
-                  nominalTercoverBulanIni = tarifBulanan;
-                  poolSaldo -= tarifBulanan;
-                } else if (nominalLangsung > 0 && nominalLangsung < tarifBulanan) {
-                  isSebagian = true;
-                  nominalTercoverBulanIni = nominalLangsung;
-                  poolSaldo -= nominalLangsung;
-                } else if (poolSaldo >= tarifBulanan) {
-                  isLunas = true;
-                  nominalTercoverBulanIni = tarifBulanan;
-                  poolSaldo -= tarifBulanan;
-                } else if (poolSaldo > 0 && poolSaldo < tarifBulanan) {
-                  isSebagian = true;
-                  nominalTercoverBulanIni = poolSaldo;
-                  poolSaldo = 0;
-                }
+        {/* TAB 4: KONTAK PENGURUS */}
+        {activeTab === 'kontak' && (
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-6 space-y-4 animate-in fade-in duration-200">
+            <h3 className="text-base font-bold text-white">📞 Kontak Pengurus RT 38</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800">
+                <span className="text-slate-400 block text-[10px]">Ketua RT 38</span>
+                <strong className="text-white text-sm block mt-0.5">Pengurus RT 38</strong>
+                <span className="text-blue-400 text-[11px] block mt-2">Puri Kencana Wagir</span>
+              </div>
+              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800">
+                <span className="text-slate-400 block text-[10px]">Bendahara RT 38</span>
+                <strong className="text-white text-sm block mt-0.5">Muhamad Ilyas</strong>
+                <span className="text-blue-400 text-[11px] block mt-2">Puri Kencana Wagir</span>
+              </div>
+            </div>
+          </div>
+        )}
 
-                const sisaKekurangan = tarifBulanan - nominalTercoverBulanIni;
+      </main>
 
-                return (
-                  <div 
-                    key={idx} 
-                    className={`p-3.5 rounded-2xl border transition-all duration-200 flex items-center justify-between ${
-                      isLunas 
-                        ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-300' 
-                        : isSebagian
-                        ? 'bg-amber-950/20 border-amber-500/30 text-amber-300'
-                        : 'bg-slate-950/60 border-slate-800/60 text-slate-400'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-white tracking-wide">
-                          {bln.nama}
-                        </span>
-                        <span className="text-[10px] text-slate-400">
-                          2026
-                        </span>
-                      </div>
-                      <div className="text-[11px] mt-0.5 text-slate-400">
-                        {isLunas 
-                          ? `Rp ${tarifBulanan.toLocaleString('id-ID')}` 
-                          : isSebagian 
-                          ? `Terbayar Rp ${nominalTercoverBulanIni.toLocaleString('id-ID')}` 
-                          : `Rp 0 / ${tarifBulanan.toLocaleString('id-ID')}`}
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <span className={`inline-block text-[10px] px-2.5 py-1 rounded-xl font-semibold border ${
+      {/* Footer */}
+      <footer className="p-4 text-center text-xs text-slate-500 border-t border-slate-900 bg-slate-950">
+        RT 38 Puri Kencana Wagir &copy; 2026 • Portal Mandiri Warga
+      </footer>
+    </div>
+  );
+}
