@@ -209,13 +209,16 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-full">
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
-              <span className="text-xs font-medium text-slate-200">{user.nama}</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-md">
-                {user.role}
-              </span>
-            </div>
+  <img 
+    src="/logo-rt38.png" 
+    alt="Logo RT 38 Puri Kencana Wagir" 
+    className="w-10 h-10 rounded-full object-cover border border-blue-500/30 shadow-md shadow-blue-500/20"
+  />
+  <div>
+    <h1 className="text-base font-bold text-white leading-tight">RT 38 Puri Kencana Wagir</h1>
+    <p className="text-xs text-slate-400">Rukun • Peduli • Bersama</p>
+  </div>
+</div>
 
             <button
               onClick={() => {
