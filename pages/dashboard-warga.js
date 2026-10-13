@@ -61,21 +61,23 @@ export default function DashboardWarga() {
 
   if (!warga) return null;
 
-  // Cek Kategori Usaha (Sesuai flag database atau nomor rumah A2 - 19)
+  // Cek Kategori Usaha (Berdasarkan kolom database atau rumah A2-19)
   const isUsaha = warga.kategori === 'Usaha' || warga.no_rumah?.trim() === 'A2 - 19';
   const tarifBulanan = isUsaha ? 30000 : 15000;
 
-  // Total akumulasi setoran yang tercatat
+  // Total akumulasi uang yang disetor warga
   const totalDisetor = iuranList.reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
 
-  // Total kewajiban 9 bulan (April - Desember)
-  const totalKewajibanPeriode = PERIODE_BULAN.length * tarifBulanan;
+  // Total kewajiban penuh selama 9 bulan (April - Desember)
+  const totalKewajibanSemuaBulan = PERIODE_BULAN.length * tarifBulanan;
 
-  // Hitung sisa deposit setelah melunasi kewajiban 9 bulan
-  const sisaDeposit = totalDisetor > totalKewajibanPeriode ? totalDisetor - totalKewajibanPeriode : 0;
+  // Sisa deposit dihitung dari kelebihan setoran di atas total kewajiban 9 bulan
+  const sisaDeposit = totalDisetor > totalKewajibanSemuaBulan 
+    ? totalDisetor - totalKewajibanSemuaBulan 
+    : 0;
 
-  // Variabel untuk melacak kecukupan saldo di grid bulan
-  let sisaSaldoUntukGrid = totalDisetor;
+  // Saldo berjalan untuk mewarnai grid bulan secara urut
+  let poolSaldo = totalDisetor;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-blue-500 selection:text-white">
@@ -181,11 +183,17 @@ export default function DashboardWarga() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {PERIODE_BULAN.map((bln, idx) => {
+                const recordBulan = iuranList.find(i => i.bulan_tahun === bln.kode);
+                const nominalLangsung = recordBulan ? Number(recordBulan.jumlah || 0) : 0;
+
                 let isLunas = false;
-                
-                if (sisaSaldoUntukGrid >= tarifBulanan) {
+
+                if (nominalLangsung >= tarifBulanan) {
                   isLunas = true;
-                  sisaSaldoUntukGrid -= tarifBulanan;
+                  poolSaldo -= tarifBulanan;
+                } else if (poolSaldo >= tarifBulanan) {
+                  isLunas = true;
+                  poolSaldo -= tarifBulanan;
                 }
 
                 return (
