@@ -59,8 +59,8 @@ export default function Home() {
             />
           </div>
           <div>
-            <h1 className="font-bold text-xs sm:text-sm tracking-wide text-white leading-tight">RT 38 PURI KENCANA</h1>
-            <p className="text-[10px] sm:text-xs text-slate-400">Wagir • Rukun • Peduli • Bersama</p>
+            <h1 className="font-bold text-xs sm:text-sm tracking-wide text-white leading-tight">RT 38 PURI KENCANA WAGIR</h1>
+            <p className="text-[10px] sm:text-xs text-slate-400">Rukun • Peduli • Bersama</p>
           </div>
         </div>
         <button 
