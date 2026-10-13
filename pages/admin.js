@@ -15,7 +15,7 @@ export default function AdminDashboard() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
-  // State Show/Hide Password untuk Login dan Modal
+  // State Show/Hide Password
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -74,7 +74,6 @@ export default function AdminDashboard() {
     }
   }
 
-  // Handle Update Username & Password via Modal
   const handleUpdateProfil = async (e) => {
     e.preventDefault();
 
@@ -119,7 +118,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Tampilan Form Login Modern dengan Toggle Password
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4 relative overflow-hidden font-sans">
@@ -128,11 +126,11 @@ export default function AdminDashboard() {
 
         <div className="bg-slate-800/80 backdrop-blur-xl border border-slate-700/60 p-8 rounded-2xl shadow-2xl w-full max-w-md z-10">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl text-white text-2xl shadow-lg shadow-blue-500/30 mb-3">
-              🏛️
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full overflow-hidden border border-blue-500/30 shadow-lg shadow-blue-500/30 mb-3 bg-slate-950">
+              <img src="/logo-rt38.png" alt="Logo RT 38" className="w-full h-full object-cover" />
             </div>
-            <h2 className="text-2xl font-bold text-white tracking-tight">Portal Pengurus RT</h2>
-            <p className="text-xs text-slate-400 mt-1">Masuk untuk mengelola administrasi lingkungan</p>
+            <h2 className="text-xl font-bold text-white tracking-tight">RT 38 Puri Kencana Wagir</h2>
+            <p className="text-xs text-slate-400 mt-1">Portal Masuk Pengurus Lingkungan</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
@@ -140,7 +138,7 @@ export default function AdminDashboard() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">Username</label>
               <input
                 type="text"
-                className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm"
+                className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-sm"
                 placeholder="Masukkan username"
                 value={usernameInput}
                 onChange={(e) => setUsernameInput(e.target.value)}
@@ -153,7 +151,7 @@ export default function AdminDashboard() {
               <div className="relative">
                 <input
                   type={showLoginPassword ? 'text' : 'password'}
-                  className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 pr-12 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm"
+                  className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 pr-12 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-sm"
                   placeholder="••••••••"
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
@@ -162,7 +160,7 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setShowLoginPassword(!showLoginPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition text-base px-2 py-1 select-none"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition text-base px-2 py-1"
                 >
                   {showLoginPassword ? '👁️' : '🙈'}
                 </button>
@@ -172,7 +170,7 @@ export default function AdminDashboard() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-3 rounded-xl shadow-lg shadow-blue-600/30 hover:shadow-blue-500/50 active:scale-[0.98] transition duration-200 text-sm"
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-3 rounded-xl shadow-lg shadow-blue-600/30 active:scale-[0.98] transition duration-200 text-sm"
             >
               {loading ? 'Memeriksa Akses...' : 'Masuk Dashboard'}
             </button>
@@ -188,37 +186,35 @@ export default function AdminDashboard() {
     );
   }
 
-  // Pengecekan Privilege Role
   const canAccessIuran = user.role === 'ketua' || user.role === 'bendahara';
   const canAccessSurat = user.role === 'ketua' || user.role === 'sekretaris';
   const canAccessWarga = user.role === 'ketua' || user.role === 'sekretaris';
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased font-sans">
-      {/* Header Admin Modern */}
+      {/* Header Admin dengan Logo RT 38 Puri Kencana Wagir */}
       <header className="bg-slate-900/70 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white text-lg shadow-md shadow-blue-500/20">
-              RT
-            </div>
+            <img 
+              src="/logo-rt38.png" 
+              alt="Logo RT 38 Puri Kencana Wagir" 
+              className="w-10 h-10 rounded-full object-cover border border-blue-500/30 shadow-md shadow-blue-500/20"
+            />
             <div>
-              <h1 className="text-base font-bold text-white leading-tight">Sistem Administrasi RT</h1>
-              <p className="text-xs text-slate-400">Dashboard Pengurus Terpadu</p>
+              <h1 className="text-base font-bold text-white leading-tight">RT 38 Puri Kencana Wagir</h1>
+              <p className="text-[11px] text-slate-400">Rukun • Peduli • Bersama</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-  <img 
-    src="/logo-rt38.png" 
-    alt="Logo RT 38 Puri Kencana Wagir" 
-    className="w-10 h-10 rounded-full object-cover border border-blue-500/30 shadow-md shadow-blue-500/20"
-  />
-  <div>
-    <h1 className="text-base font-bold text-white leading-tight">RT 38 Puri Kencana Wagir</h1>
-    <p className="text-xs text-slate-400">Rukun • Peduli • Bersama</p>
-  </div>
-</div>
+            <div className="hidden sm:flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-full">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-xs font-medium text-slate-200">{user.nama}</span>
+              <span className="text-[10px] uppercase font-bold tracking-wider bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-md">
+                {user.role}
+              </span>
+            </div>
 
             <button
               onClick={() => {
@@ -367,7 +363,7 @@ export default function AdminDashboard() {
         </div>
       </main>
 
-      {/* Modal Pop-up Edit Profil & Password dengan Show/Hide Toggle */}
+      {/* Modal Pop-up Edit Profil & Password */}
       {showPassModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
