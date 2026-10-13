@@ -9,13 +9,11 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({ warga: 0, pendingIuran: 0, pengumuman: 0 });
 
-  // State Modal Edit Profil / Password
   const [showPassModal, setShowPassModal] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
-  // State Show/Hide Password
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -192,7 +190,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased font-sans">
-      {/* Header Admin dengan Logo RT 38 Puri Kencana Wagir */}
       <header className="bg-slate-900/70 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -238,7 +235,6 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8 bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-slate-900 border border-blue-500/20 rounded-2xl p-6 relative overflow-hidden">
           <div className="relative z-10">
@@ -251,9 +247,8 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Metric / Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg hover:border-slate-700 transition">
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Warga</span>
               <span className="p-2 bg-blue-500/10 text-blue-400 rounded-xl text-lg">👥</span>
@@ -262,7 +257,7 @@ export default function AdminDashboard() {
             <p className="text-[11px] text-slate-500 mt-1">Terdaftar dalam sistem</p>
           </div>
 
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg hover:border-slate-700 transition">
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Verifikasi Iuran</span>
               <span className="p-2 bg-amber-500/10 text-amber-400 rounded-xl text-lg">💳</span>
@@ -271,7 +266,7 @@ export default function AdminDashboard() {
             <p className="text-[11px] text-slate-500 mt-1">Menunggu persetujuan</p>
           </div>
 
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg hover:border-slate-700 transition">
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Pengumuman</span>
               <span className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl text-lg">📢</span>
@@ -281,22 +276,17 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Menu Navigation Cards */}
         <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">Akses Layanan Admin</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {canAccessIuran ? (
             <Link href="/admin-iuran" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-blue-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
               <div>
-                <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition duration-300 mb-4 text-blue-400">
-                  💳
-                </div>
+                <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition mb-4 text-blue-400">💳</div>
                 <h4 className="text-lg font-bold text-white group-hover:text-blue-400 transition">Verifikasi Iuran</h4>
                 <p className="text-xs text-slate-400 mt-1">Cek bukti transfer QRIS dan setujui iuran bulanan warga.</p>
               </div>
-              <div className="mt-6 flex items-center text-xs font-semibold text-blue-400 group-hover:translate-x-1 transition">
-                Buka Layanan &rarr;
-              </div>
+              <div className="mt-6 flex items-center text-xs font-semibold text-blue-400 group-hover:translate-x-1 transition">Buka Layanan &rarr;</div>
             </Link>
           ) : (
             <div className="bg-slate-900/30 border border-slate-800/50 rounded-2xl p-6 opacity-40 cursor-not-allowed">
@@ -309,15 +299,11 @@ export default function AdminDashboard() {
           {canAccessWarga ? (
             <Link href="/warga" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
               <div>
-                <div className="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition duration-300 mb-4 text-indigo-400">
-                  👥
-                </div>
+                <div className="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition mb-4 text-indigo-400">👥</div>
                 <h4 className="text-lg font-bold text-white group-hover:text-indigo-400 transition">Data Warga</h4>
                 <p className="text-xs text-slate-400 mt-1">Kelola direktori data kependudukan dan Kepala Keluarga.</p>
               </div>
-              <div className="mt-6 flex items-center text-xs font-semibold text-indigo-400 group-hover:translate-x-1 transition">
-                Buka Layanan &rarr;
-              </div>
+              <div className="mt-6 flex items-center text-xs font-semibold text-indigo-400 group-hover:translate-x-1 transition">Buka Layanan &rarr;</div>
             </Link>
           ) : (
             <div className="bg-slate-900/30 border border-slate-800/50 rounded-2xl p-6 opacity-40 cursor-not-allowed">
@@ -330,15 +316,11 @@ export default function AdminDashboard() {
           {canAccessSurat ? (
             <Link href="/surat" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
               <div>
-                <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition duration-300 mb-4 text-emerald-400">
-                  📄
-                </div>
+                <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition mb-4 text-emerald-400">📄</div>
                 <h4 className="text-lg font-bold text-white group-hover:text-emerald-400 transition">Pengajuan Surat</h4>
                 <p className="text-xs text-slate-400 mt-1">Proses dan cetak surat pengantar permohonan warga.</p>
               </div>
-              <div className="mt-6 flex items-center text-xs font-semibold text-emerald-400 group-hover:translate-x-1 transition">
-                Buka Layanan &rarr;
-              </div>
+              <div className="mt-6 flex items-center text-xs font-semibold text-emerald-400 group-hover:translate-x-1 transition">Buka Layanan &rarr;</div>
             </Link>
           ) : (
             <div className="bg-slate-900/30 border border-slate-800/50 rounded-2xl p-6 opacity-40 cursor-not-allowed">
@@ -350,33 +332,23 @@ export default function AdminDashboard() {
 
           <Link href="/" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-600 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
             <div>
-              <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition duration-300 mb-4 text-slate-300">
-                🌐
-              </div>
+              <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition mb-4 text-slate-300">🌐</div>
               <h4 className="text-lg font-bold text-white group-hover:text-slate-300 transition">Web Utama</h4>
               <p className="text-xs text-slate-400 mt-1">Lihat tampilan beranda depan publik untuk warga.</p>
             </div>
-            <div className="mt-6 flex items-center text-xs font-semibold text-slate-400 group-hover:translate-x-1 transition">
-              Lihat Beranda &rarr;
-            </div>
+            <div className="mt-6 flex items-center text-xs font-semibold text-slate-400 group-hover:translate-x-1 transition">Lihat Beranda &rarr;</div>
           </Link>
         </div>
       </main>
 
-      {/* Modal Pop-up Edit Profil & Password */}
       {showPassModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-5">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <span>🔑</span> Ubah Username & Password
               </h3>
-              <button
-                onClick={() => setShowPassModal(false)}
-                className="text-slate-400 hover:text-white text-sm font-bold p-1"
-              >
-                ✕
-              </button>
+              <button onClick={() => setShowPassModal(false)} className="text-slate-400 hover:text-white text-sm font-bold p-1">✕</button>
             </div>
 
             <form onSubmit={handleUpdateProfil} className="space-y-4">
@@ -404,7 +376,7 @@ export default function AdminDashboard() {
                   <button
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition text-sm px-2 py-1"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-sm px-2 py-1"
                   >
                     {showNewPassword ? '👁️' : '🙈'}
                   </button>
@@ -430,7 +402,7 @@ export default function AdminDashboard() {
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition text-sm px-2 py-1"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-sm px-2 py-1"
                     >
                       {showConfirmPassword ? '👁️' : '🙈'}
                     </button>
