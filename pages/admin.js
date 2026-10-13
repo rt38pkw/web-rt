@@ -17,22 +17,24 @@ export default function AdminDashboard() {
       fetchStats();
     }
   }, []);
-
-  const handleLogin = async (e) => {
+const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     const { data, error } = await supabase
       .from('pengurus')
       .select('*')
-      .eq('username', usernameInput)
-      .eq('password', passwordInput)
-      .single();
+      .eq('username', usernameInput.trim())
+      .eq('password', passwordInput.trim())
+      .maybeSingle(); // Gunakan maybeSingle agar tidak melempar error jika data tidak ditemukan
 
     setLoading(false);
 
+    console.log("Data hasil query:", data);
+    console.log("Error Supabase:", error);
+
     if (error || !data) {
-      alert('Username atau Password Pengurus Salah!');
+      alert(`Login gagal! Error: ${error ? error.message : 'Username/Password tidak ditemukan di database'}`);
     } else {
       setUser(data);
       sessionStorage.setItem('pengurusSession', JSON.stringify(data));
