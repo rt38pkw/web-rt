@@ -22,8 +22,12 @@ const PERIODE_BULAN = [
 export default function DashboardWarga() {
   const [warga, setWarga] = useState(null);
   const [iuranList, setIuranList] = useState([]);
+  const [allWargaList, setAllWargaList] = useState([]);
+  const [allIuranList, setAllIuranList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('iuran'); // Default aktif di 'iuran'
+  const [loadingRekap, setLoadingRekap] = useState(false);
+  const [activeTab, setActiveTab] = useState('iuran'); // 'iuran', 'pengumuman', 'surat'
+  const [showRekapModal, setShowRekapModal] = useState(false); // State untuk buka modal rekap seluruh warga
   const router = useRouter();
 
   useEffect(() => {
@@ -52,6 +56,30 @@ export default function DashboardWarga() {
       console.error('Gagal mengambil data iuran:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fungsi untuk mengambil data seluruh warga & iuran untuk laporan rekap
+  const fetchAllWargaAndIuran = async () => {
+    if (allWargaList.length > 0) {
+      setShowRekapModal(true);
+      return;
+    }
+
+    setLoadingRekap(true);
+    try {
+      const [resWarga, resIuran] = await Promise.all([
+        supabase.from('warga').select('*').order('no_rumah', { ascending: true }),
+        supabase.from('iuran').select('*')
+      ]);
+
+      if (!resWarga.error && resWarga.data) setAllWargaList(resWarga.data);
+      if (!resIuran.error && resIuran.data) setAllIuranList(resIuran.data);
+      setShowRekapModal(true);
+    } catch (err) {
+      console.error('Gagal memuat rekap seluruh warga:', err);
+    } finally {
+      setLoadingRekap(false);
     }
   };
 
@@ -146,7 +174,7 @@ export default function DashboardWarga() {
           </div>
         </section>
 
-        {/* PEMISAH ELEGAN & NAVIGASI MENU MINI / MINIMALIS */}
+        {/* NAVIGASI MENU MINI / MINIMALIS */}
         <div className="pt-2">
           <div className="flex items-center justify-between mb-3 px-1">
             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
@@ -190,7 +218,7 @@ export default function DashboardWarga() {
           </div>
         </div>
 
-        {/* GARIS PEMISAH TIPIS ANTARA MENU DAN KONTEN */}
+        {/* GARIS PEMISAH TIPIS */}
         <div className="border-t border-slate-800/60 my-4"></div>
 
         {/* KONTEN DYNAMIC */}
@@ -198,6 +226,25 @@ export default function DashboardWarga() {
         {/* TAB 1: STATUS IURAN BULANAN */}
         {activeTab === 'iuran' && (
           <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Tombol Rekap Seluruh Warga */}
+            <div className="bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/30 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  📊 Transparansi Kas RT 38
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Lihat rekapitulasi pembayaran iuran seluruh warga secara lengkap.
+                </p>
+              </div>
+              <button
+                onClick={fetchAllWargaAndIuran}
+                disabled={loadingRekap}
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 shrink-0"
+              >
+                {loadingRekap ? 'Memuat Data...' : '📋 Lihat Rekap Seluruh Warga'}
+              </button>
+            </div>
+
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
                 <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
@@ -349,10 +396,10 @@ export default function DashboardWarga() {
 
       </main>
 
-      {/* Footer */}
-      <footer className="p-4 text-center text-xs text-slate-500 border-t border-slate-900 bg-slate-950">
-        RT 38 Puri Kencana Wagir &copy; 2026 • Portal Mandiri Warga
-      </footer>
-    </div>
-  );
-}
+      {/* MODAL LAPORAN REKAP SELURUH WARGA (SPREADSHEET VIEW) */}
+      {showRekapModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-5xl h-[90vh] rounded-3xl flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            
+            {/* Header Modal */}
+            <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-
