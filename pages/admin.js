@@ -9,6 +9,12 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({ warga: 0, pendingIuran: 0, pengumuman: 0 });
 
+  // State Modal Edit Profil / Password
+  const [showPassModal, setShowPassModal] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
+
   useEffect(() => {
     const savedUser = sessionStorage.getItem('pengurusSession');
     if (savedUser) {
@@ -61,11 +67,45 @@ export default function AdminDashboard() {
     }
   }
 
+  // Handle Update Username & Password via Modal
+  const handleUpdateProfil = async (e) => {
+    e.preventDefault();
+    setIsUpdating(true);
+
+    const updateData = {};
+    if (newUsername.trim()) updateData.username = newUsername.trim();
+    if (newPassword.trim()) updateData.password = newPassword.trim();
+
+    if (Object.keys(updateData).length === 0) {
+      alert('Tidak ada perubahan data.');
+      setIsUpdating(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('pengurus')
+      .update(updateData)
+      .eq('id', user.id);
+
+    setIsUpdating(false);
+
+    if (error) {
+      alert(`Gagal memperbarui profil: ${error.message}`);
+    } else {
+      alert('Profil/Password berhasil diperbarui! Gunakan kredensial baru saat login berikutnya.');
+      const updatedUser = { ...user, ...updateData };
+      setUser(updatedUser);
+      sessionStorage.setItem('pengurusSession', JSON.stringify(updatedUser));
+      setShowPassModal(false);
+      setNewPassword('');
+    }
+  };
+
   // Tampilan Form Login Modern
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4 relative overflow-hidden">
-        {/* Glowing Background Decorative Circles */}
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4 relative overflow-hidden font-sans">
+        {/* Background Glow */}
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-600/30 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-indigo-600/30 rounded-full blur-3xl pointer-events-none"></div>
 
@@ -111,20 +151,26 @@ export default function AdminDashboard() {
               {loading ? 'Memeriksa Akses...' : 'Masuk Dashboard'}
             </button>
           </form>
+
+          <div className="mt-6 text-center">
+            <Link href="/" className="text-xs text-slate-400 hover:text-white transition">
+              &larr; Kembali ke Halaman Utama Warga
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
-  // Pengecekan Privilege
+  // Pengecekan Privilege Role
   const canAccessIuran = user.role === 'ketua' || user.role === 'bendahara';
   const canAccessSurat = user.role === 'ketua' || user.role === 'sekretaris';
   const canAccessWarga = user.role === 'ketua' || user.role === 'sekretaris';
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased font-sans">
       {/* Header Admin Modern */}
-      <header className="bg-slate-900/70 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
+      <header className="bg-slate-900/70 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white text-lg shadow-md shadow-blue-500/20">
@@ -136,14 +182,25 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-3 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-full">
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-full">
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
               <span className="text-xs font-medium text-slate-200">{user.nama}</span>
               <span className="text-[10px] uppercase font-bold tracking-wider bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-md">
                 {user.role}
               </span>
             </div>
+
+            {/* Tombol Modal Edit Profil / Password */}
+            <button
+              onClick={() => {
+                setNewUsername(user.username);
+                setShowPassModal(true);
+              }}
+              className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-medium transition active:scale-95 flex items-center gap-1"
+            >
+              🔑 Edit Akun
+            </button>
 
             <button
               onClick={handleLogout}
@@ -157,14 +214,14 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
+        {/* Welcome Banner */}
         <div className="mb-8 bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-slate-900 border border-blue-500/20 rounded-2xl p-6 relative overflow-hidden">
           <div className="relative z-10">
             <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">
               Selamat Datang Kembali, {user.nama}! 👋
             </h2>
             <p className="text-xs sm:text-sm text-slate-300">
-              Anda masuk sebagai <strong className="text-blue-400 uppercase">{user.role}</strong>. Silakan pilih menu di bawah ini untuk mengelola aktivitas RT.
+              Anda masuk sebagai <strong className="text-blue-400 uppercase">{user.role}</strong>. Silakan pilih layanan di bawah ini untuk mengelola administrasi lingkungan.
             </p>
           </div>
         </div>
@@ -275,7 +332,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* Card Web Publik */}
+          {/* Card Web Utama Publik */}
           <Link href="/" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-600 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
             <div>
               <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition duration-300 mb-4 text-slate-300">
@@ -290,6 +347,66 @@ export default function AdminDashboard() {
           </Link>
         </div>
       </main>
+
+      {/* Modal Pop-up Edit Profil & Password */}
+      {showPassModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <span>🔑</span> Ubah Username & Password
+              </h3>
+              <button
+                onClick={() => setShowPassModal(false)}
+                className="text-slate-400 hover:text-white text-sm font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateProfil} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Username Login</label>
+                <input
+                  type="text"
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Password Baru</label>
+                <input
+                  type="password"
+                  placeholder="Kosongkan jika tidak ingin mengubah password"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPassModal(false)}
+                  className="w-1/2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdating}
+                  className="w-1/2 bg-amber-600 hover:bg-amber-500 text-white font-semibold py-2.5 rounded-xl text-xs transition shadow-lg shadow-amber-600/20"
+                >
+                  {isUpdating ? 'Simpan...' : 'Simpan Perubahan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
