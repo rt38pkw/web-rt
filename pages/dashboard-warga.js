@@ -61,22 +61,22 @@ export default function DashboardWarga() {
 
   if (!warga) return null;
 
-  // Cek Kategori Usaha (Berdasarkan kolom database atau rumah A2-19)
+  // Cek Kategori Usaha
   const isUsaha = warga.kategori === 'Usaha' || warga.no_rumah?.trim() === 'A2 - 19';
   const tarifBulanan = isUsaha ? 30000 : 15000;
 
-  // Total akumulasi uang yang disetor warga
+  // Total akumulasi setoran yang tercatat
   const totalDisetor = iuranList.reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
 
   // Total kewajiban penuh selama 9 bulan (April - Desember)
   const totalKewajibanSemuaBulan = PERIODE_BULAN.length * tarifBulanan;
 
-  // Sisa deposit dihitung dari kelebihan setoran di atas total kewajiban 9 bulan
+  // Sisa deposit adalah kelebihan setoran melebihi kewajiban 9 bulan
   const sisaDeposit = totalDisetor > totalKewajibanSemuaBulan 
     ? totalDisetor - totalKewajibanSemuaBulan 
     : 0;
 
-  // Saldo berjalan untuk mewarnai grid bulan secara urut
+  // Saldo berjalan untuk alokasi status per bulan
   let poolSaldo = totalDisetor;
 
   return (
@@ -187,14 +187,28 @@ export default function DashboardWarga() {
                 const nominalLangsung = recordBulan ? Number(recordBulan.jumlah || 0) : 0;
 
                 let isLunas = false;
+                let isSebagian = false;
+                let nominalTercoverBulanIni = 0;
 
                 if (nominalLangsung >= tarifBulanan) {
                   isLunas = true;
+                  nominalTercoverBulanIni = tarifBulanan;
                   poolSaldo -= tarifBulanan;
+                } else if (nominalLangsung > 0 && nominalLangsung < tarifBulanan) {
+                  isSebagian = true;
+                  nominalTercoverBulanIni = nominalLangsung;
+                  poolSaldo -= nominalLangsung;
                 } else if (poolSaldo >= tarifBulanan) {
                   isLunas = true;
+                  nominalTercoverBulanIni = tarifBulanan;
                   poolSaldo -= tarifBulanan;
+                } else if (poolSaldo > 0 && poolSaldo < tarifBulanan) {
+                  isSebagian = true;
+                  nominalTercoverBulanIni = poolSaldo;
+                  poolSaldo = 0;
                 }
+
+                const sisaKekurangan = tarifBulanan - nominalTercoverBulanIni;
 
                 return (
                   <div 
@@ -202,6 +216,8 @@ export default function DashboardWarga() {
                     className={`p-4 rounded-2xl border flex flex-col justify-between transition ${
                       isLunas 
                         ? 'bg-emerald-500/5 border-emerald-500/30 text-emerald-300' 
+                        : isSebagian
+                        ? 'bg-amber-500/5 border-amber-500/30 text-amber-300'
                         : 'bg-slate-950/80 border-slate-800/80 text-slate-400'
                     }`}
                   >
@@ -212,21 +228,27 @@ export default function DashboardWarga() {
                       <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold border ${
                         isLunas 
                           ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+                          : isSebagian
+                          ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
                           : 'bg-slate-800 text-slate-400 border-slate-700'
                       }`}>
-                        {isLunas ? 'Lunas' : 'Belum Bayar'}
+                        {isLunas ? 'Lunas' : isSebagian ? 'Kurang Sebagian' : 'Belum Bayar'}
                       </span>
                     </div>
 
                     <div className="mt-2 pt-2 border-t border-slate-800/60 flex justify-between items-end">
                       <div>
-                        <span className="text-[10px] text-slate-400 block">Kewajiban:</span>
+                        <span className="text-[10px] text-slate-400 block">Terbayar / Wajib:</span>
                         <span className="text-sm font-extrabold text-white">
-                          Rp {tarifBulanan.toLocaleString('id-ID')}
+                          Rp {nominalTercoverBulanIni.toLocaleString('id-ID')} <span className="text-xs font-normal text-slate-400">/ {tarifBulanan.toLocaleString('id-ID')}</span>
                         </span>
                       </div>
                       <span className="text-[10px] font-medium text-slate-400">
-                        {isLunas ? 'Tercover Kas/Deposit' : 'Belum Setor'}
+                        {isLunas 
+                          ? 'Lunas' 
+                          : isSebagian 
+                          ? `Kurang Rp ${sisaKekurangan.toLocaleString('id-ID')}` 
+                          : 'Belum Setor'}
                       </span>
                     </div>
                   </div>
