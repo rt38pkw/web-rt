@@ -15,7 +15,7 @@ export default function AdminDashboard() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
-  // State Show/Hide Password
+  // State Show/Hide Password untuk Login dan Modal
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -74,11 +74,10 @@ export default function AdminDashboard() {
     }
   }
 
-  // Handle Update Username & Password via Modal (dengan verifikasi)
+  // Handle Update Username & Password via Modal
   const handleUpdateProfil = async (e) => {
     e.preventDefault();
 
-    // Verifikasi pengetikan ulang password
     if (newPassword && newPassword !== confirmPassword) {
       alert('Password baru dan Konfirmasi Password tidak cocok!');
       return;
@@ -120,11 +119,10 @@ export default function AdminDashboard() {
     }
   };
 
-  // Tampilan Form Login Modern
+  // Tampilan Form Login Modern dengan Toggle Password
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4 relative overflow-hidden font-sans">
-        {/* Background Glow */}
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-600/30 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-indigo-600/30 rounded-full blur-3xl pointer-events-none"></div>
 
@@ -155,7 +153,7 @@ export default function AdminDashboard() {
               <div className="relative">
                 <input
                   type={showLoginPassword ? 'text' : 'password'}
-                  className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm"
+                  className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 pr-12 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm"
                   placeholder="••••••••"
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
@@ -164,7 +162,7 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setShowLoginPassword(!showLoginPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition text-sm p-1"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition text-base px-2 py-1 select-none"
                 >
                   {showLoginPassword ? '👁️' : '🙈'}
                 </button>
@@ -219,7 +217,6 @@ export default function AdminDashboard() {
               </span>
             </div>
 
-            {/* Tombol Modal Edit Profil / Password */}
             <button
               onClick={() => {
                 setNewUsername(user.username);
@@ -244,7 +241,6 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Banner */}
         <div className="mb-8 bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-slate-900 border border-blue-500/20 rounded-2xl p-6 relative overflow-hidden">
           <div className="relative z-10">
             <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">
@@ -290,7 +286,6 @@ export default function AdminDashboard() {
         <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">Akses Layanan Admin</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {/* Card Iuran */}
           {canAccessIuran ? (
             <Link href="/admin-iuran" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-blue-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
               <div>
@@ -306,15 +301,12 @@ export default function AdminDashboard() {
             </Link>
           ) : (
             <div className="bg-slate-900/30 border border-slate-800/50 rounded-2xl p-6 opacity-40 cursor-not-allowed">
-              <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-xl mb-4 text-slate-500">
-                🔒
-              </div>
+              <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-xl mb-4 text-slate-500">🔒</div>
               <h4 className="text-lg font-bold text-slate-500">Verifikasi Iuran</h4>
               <p className="text-xs text-slate-600 mt-1">Khusus akses Ketua & Bendahara.</p>
             </div>
           )}
 
-          {/* Card Data Warga */}
           {canAccessWarga ? (
             <Link href="/warga" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
               <div>
@@ -330,15 +322,12 @@ export default function AdminDashboard() {
             </Link>
           ) : (
             <div className="bg-slate-900/30 border border-slate-800/50 rounded-2xl p-6 opacity-40 cursor-not-allowed">
-              <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-xl mb-4 text-slate-500">
-                🔒
-              </div>
+              <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-xl mb-4 text-slate-500">🔒</div>
               <h4 className="text-lg font-bold text-slate-500">Data Warga</h4>
               <p className="text-xs text-slate-600 mt-1">Khusus akses Ketua & Sekretaris.</p>
             </div>
           )}
 
-          {/* Card Surat Pengantar */}
           {canAccessSurat ? (
             <Link href="/surat" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
               <div>
@@ -354,15 +343,12 @@ export default function AdminDashboard() {
             </Link>
           ) : (
             <div className="bg-slate-900/30 border border-slate-800/50 rounded-2xl p-6 opacity-40 cursor-not-allowed">
-              <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-xl mb-4 text-slate-500">
-                🔒
-              </div>
+              <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-xl mb-4 text-slate-500">🔒</div>
               <h4 className="text-lg font-bold text-slate-500">Pengajuan Surat</h4>
               <p className="text-xs text-slate-600 mt-1">Khusus akses Ketua & Sekretaris.</p>
             </div>
           )}
 
-          {/* Card Web Utama Publik */}
           <Link href="/" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-600 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
             <div>
               <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition duration-300 mb-4 text-slate-300">
@@ -378,7 +364,7 @@ export default function AdminDashboard() {
         </div>
       </main>
 
-      {/* Modal Pop-up Edit Profil & Password dengan Verifikasi + Show/Hide Toggle */}
+      {/* Modal Pop-up Edit Profil & Password dengan Show/Hide Toggle */}
       {showPassModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
@@ -412,21 +398,20 @@ export default function AdminDashboard() {
                   <input
                     type={showNewPassword ? 'text' : 'password'}
                     placeholder="Kosongkan jika tidak ubah password"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 pr-10 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 pr-12 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                   />
                   <button
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition text-sm p-1"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition text-sm px-2 py-1"
                   >
                     {showNewPassword ? '👁️' : '🙈'}
                   </button>
                 </div>
               </div>
 
-              {/* Input Verifikasi / Ulangi Password Baru */}
               {newPassword.length > 0 && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Ulangi Password Baru</label>
@@ -435,7 +420,7 @@ export default function AdminDashboard() {
                       type={showConfirmPassword ? 'text' : 'password'}
                       placeholder="Ketik ulang password baru di atas"
                       required
-                      className={`w-full bg-slate-950 border rounded-xl px-4 py-2.5 pr-10 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-2 ${
+                      className={`w-full bg-slate-950 border rounded-xl px-4 py-2.5 pr-12 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-2 ${
                         confirmPassword.length > 0 && confirmPassword !== newPassword
                           ? 'border-rose-500 focus:ring-rose-500'
                           : 'border-slate-800 focus:ring-amber-500'
@@ -446,7 +431,7 @@ export default function AdminDashboard() {
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition text-sm p-1"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition text-sm px-2 py-1"
                     >
                       {showConfirmPassword ? '👁️' : '🙈'}
                     </button>
@@ -471,4 +456,12 @@ export default function AdminDashboard() {
                   className="w-1/2 bg-amber-600 hover:bg-amber-500 text-white font-semibold py-2.5 rounded-xl text-xs transition shadow-lg shadow-amber-600/20"
                 >
                   {isUpdating ? 'Simpan...' : 'Simpan Perubahan'}
-                </button
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
