@@ -1,126 +1,140 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import Link from 'next/link';
 
 export default function IuranWarga() {
-  const [nik, setNik] = useState('');
-  const [bulan, setBulan] = useState('2026-10');
+  const [nama, setNama] = useState('');
+  const [blok, setBlok] = useState('');
+  const [bulan, setBulan] = useState('Januari');
+  const [nominal, setNominal] = useState('50000');
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [pesan, setPesan] = useState('');
 
-  async function handleUpload(e) {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!file || !nik) return alert('Lengkapi NIK dan unggah bukti transfer!');
-
     setLoading(true);
-    setPesan('');
 
     try {
-      const { data: wargaData, error: wargaErr } = await supabase
-        .from('warga')
-        .select('id')
-        .eq('nik', nik)
-        .single();
+      let buktiUrl = '';
+      if (file) {
+        const fileName = `${Date.now()}_${file.name}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('bukti_iuran')
+          .upload(fileName, file);
 
-      if (wargaErr || !wargaData) {
-        setLoading(false);
-        return alert('NIK tidak ditemukan dalam data warga! Silakan mendaftar terlebih dahulu.');
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage.from('bukti_iuran').getPublicUrl(fileName);
+        buktiUrl = publicUrlData.publicUrl;
       }
 
-      const fileName = `${Date.now()}_${file.name}`;
-      const { data: storageData, error: storageErr } = await supabase.storage
-        .from('bukti-transfer')
-        .upload(fileName, file);
-
-      if (storageErr) throw storageErr;
-
-      const { data: publicUrlData } = supabase.storage
-        .from('bukti-transfer')
-        .getPublicUrl(fileName);
-
-      const buktiUrl = publicUrlData.publicUrl;
-
-      const { error: insertErr } = await supabase.from('iuran').insert([
+      const { error } = await supabase.from('iuran').insert([
         {
-          warga_id: wargaData.id,
-          bulan_tahun: bulan,
-          jumlah: 50000,
-          bukti_transfer_url: buktiUrl,
-          status: 'Pending'
-        }
+          nama,
+          blok_rumah: blok,
+          bulan,
+          nominal: parseInt(nominal),
+          bukti_url: buktiUrl,
+          status: 'Pending',
+        },
       ]);
 
-      if (insertErr) throw insertErr;
+      if (error) throw error;
 
-      setPesan('✅ Bukti pembayaran berhasil dikirim! Menunggu konfirmasi bendahara.');
+      alert('Bukti pembayaran berhasil dikirim! Menunggu konfirmasi Bendahara.');
+      setNama('');
+      setBlok('');
       setFile(null);
     } catch (err) {
-      alert('Gagal mengirim bukti bayar: ' + err.message);
+      alert(`Gagal mengirim: ${err.message}`);
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 md:p-8">
-      <div className="max-w-md mx-auto bg-white p-6 rounded-xl shadow-md">
-        <h2 className="text-xl font-bold mb-4 text-center text-blue-700">💳 Pembayaran Iuran Kas RT</h2>
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-8 antialiased">
+      <div className="max-w-xl mx-auto space-y-6">
+        <Link href="/" className="inline-flex items-center text-xs text-slate-400 hover:text-white transition">
+          &larr; Kembali ke Beranda
+        </Link>
 
-        <div className="bg-gray-50 border p-4 rounded-lg text-center mb-6">
-          <p className="text-sm font-semibold text-gray-700 mb-2">Scan QRIS RT Tempat Tinggal</p>
-          <img 
-            src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=QRIS_RT_KAS" 
-            alt="QRIS RT" 
-            className="mx-auto w-48 h-48 border rounded-md"
-          />
-          <p className="text-xs text-gray-500 mt-2">Nominal Iuran Rutin: <b>Rp 50.000 / Bulan</b></p>
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+          <div>
+            <h2 className="text-xl font-bold text-white">💳 Pembayaran Iuran RT</h2>
+            <p className="text-xs text-slate-400 mt-1">Upload bukti transfer atau scan QRIS pembayaran warga</p>
+          </div>
+
+          {/* Stiker QRIS Card */}
+          <div className="bg-slate-950 border border-slate-800/80 p-4 rounded-xl text-center space-y-3">
+            <span className="text-xs font-semibold text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">
+              QRIS Resmi Kas RT
+            </span>
+            <div className="w-48 h-48 bg-white mx-auto rounded-lg flex items-center justify-center text-slate-900 font-bold text-xs p-2">
+              [ Standard QRIS Code Image ]
+            </div>
+            <p className="text-[11px] text-slate-400">Transfer tepat sesuai nominal iuran bulanan (Rp50.000)</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Nama Lengkap</label>
+              <input
+                type="text"
+                required
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Contoh: Budi Santoso"
+                value={nama}
+                onChange={(e) => setNama(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Blok / No. Rumah</label>
+                <input
+                  type="text"
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Contoh: A3/12"
+                  value={blok}
+                  onChange={(e) => setBlok(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Iuran Bulan</label>
+                <select
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={bulan}
+                  onChange={(e) => setBulan(e.target.value)}
+                >
+                  {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Upload Struk / Bukti Transfer</label>
+              <input
+                type="file"
+                accept="image/*"
+                required
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500"
+                onChange={(e) => setFile(e.target.files[0])}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-3 rounded-xl text-sm transition shadow-lg shadow-blue-600/30"
+            >
+              {loading ? 'Mengunggah...' : 'Kirim Bukti Pembayaran'}
+            </button>
+          </form>
         </div>
-
-        <form onSubmit={handleUpload} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">NIK Kepala Keluarga/Warga</label>
-            <input 
-              type="text" 
-              required
-              className="w-full border p-2 rounded mt-1" 
-              placeholder="Masukkan 16 Digit NIK"
-              value={nik}
-              onChange={(e) => setNik(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Bulan Iuran</label>
-            <input 
-              type="month" 
-              required
-              className="w-full border p-2 rounded mt-1"
-              value={bulan}
-              onChange={(e) => setBulan(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Upload Bukti Transfer / Resi QRIS</label>
-            <input 
-              type="file" 
-              accept="image/*"
-              required
-              className="w-full border p-2 rounded mt-1 text-sm"
-              onChange={(e) => setFile(e.target.files[0])}
-            />
-          </div>
-
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full bg-green-600 text-white py-2 rounded font-semibold hover:bg-green-700 transition"
-          >
-            {loading ? 'Mengirim...' : 'Kirim Bukti Pembayaran'}
-          </button>
-        </form>
-
-        {pesan && <p className="mt-4 p-3 bg-green-50 text-green-700 rounded text-sm text-center">{pesan}</p>}
       </div>
     </div>
   );
