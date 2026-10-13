@@ -26,8 +26,8 @@ export default function DashboardWarga() {
   const [allIuranList, setAllIuranList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingRekap, setLoadingRekap] = useState(false);
-  const [activeTab, setActiveTab] = useState('iuran'); // 'iuran', 'pengumuman', 'surat'
-  const [showRekapModal, setShowRekapModal] = useState(false); // State untuk buka modal rekap seluruh warga
+  const [activeTab, setActiveTab] = useState('iuran'); 
+  const [showRekapModal, setShowRekapModal] = useState(false); 
   const router = useRouter();
 
   useEffect(() => {
@@ -59,7 +59,6 @@ export default function DashboardWarga() {
     }
   };
 
-  // Fungsi untuk mengambil data seluruh warga & iuran untuk laporan rekap
   const fetchAllWargaAndIuran = async () => {
     if (allWargaList.length > 0) {
       setShowRekapModal(true);
@@ -90,22 +89,14 @@ export default function DashboardWarga() {
 
   if (!warga) return null;
 
-  // Cek Kategori Usaha
   const isUsaha = warga.kategori === 'Usaha' || warga.no_rumah?.trim() === 'A2 - 19';
   const tarifBulanan = isUsaha ? 30000 : 15000;
-
-  // Total akumulasi setoran
   const totalDisetor = iuranList.reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
-
-  // Total kewajiban penuh selama 9 bulan (April - Desember)
   const totalKewajibanSemuaBulan = PERIODE_BULAN.length * tarifBulanan;
-
-  // Sisa deposit
   const sisaDeposit = totalDisetor > totalKewajibanSemuaBulan 
     ? totalDisetor - totalKewajibanSemuaBulan 
     : 0;
 
-  // Saldo berjalan untuk status per bulan
   let poolSaldo = totalDisetor;
 
   return (
@@ -114,7 +105,6 @@ export default function DashboardWarga() {
         <title>Dashboard Warga - RT 38 Puri Kencana Wagir</title>
       </Head>
 
-      {/* Navigasi Atas */}
       <header className="px-5 py-3.5 border-b border-slate-800/60 flex justify-between items-center bg-slate-900/40 backdrop-blur-md sticky top-0 z-50">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700/80 flex items-center justify-center overflow-hidden shrink-0">
@@ -138,10 +128,8 @@ export default function DashboardWarga() {
         </button>
       </header>
 
-      {/* Main Content */}
       <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-6 my-1">
 
-        {/* Profil Warga Modern */}
         <section className="bg-slate-900/80 border border-slate-800/80 rounded-3xl p-5 sm:p-6 shadow-2xl relative overflow-hidden backdrop-blur-sm">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
@@ -174,7 +162,6 @@ export default function DashboardWarga() {
           </div>
         </section>
 
-        {/* NAVIGASI MENU MINI / MINIMALIS */}
         <div className="pt-2">
           <div className="flex items-center justify-between mb-3 px-1">
             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
@@ -218,15 +205,10 @@ export default function DashboardWarga() {
           </div>
         </div>
 
-        {/* GARIS PEMISAH TIPIS */}
         <div className="border-t border-slate-800/60 my-4"></div>
 
-        {/* KONTEN DYNAMIC */}
-
-        {/* TAB 1: STATUS IURAN BULANAN */}
         {activeTab === 'iuran' && (
           <div className="space-y-6 animate-in fade-in duration-200">
-            {/* Tombol Rekap Seluruh Warga */}
             <div className="bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/30 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <div>
                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -363,7 +345,6 @@ export default function DashboardWarga() {
           </div>
         )}
 
-        {/* TAB 2: PENGUMUMAN */}
         {activeTab === 'pengumuman' && (
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-6 shadow-xl space-y-4 animate-in fade-in duration-200">
             <h3 className="text-base font-bold text-white">📢 Pengumuman Lingkungan RT 38</h3>
@@ -380,7 +361,6 @@ export default function DashboardWarga() {
           </div>
         )}
 
-        {/* TAB 3: SURAT MANDIRI */}
         {activeTab === 'surat' && (
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-6 text-center space-y-3 animate-in fade-in duration-200">
             <div className="text-4xl">📄</div>
@@ -396,10 +376,119 @@ export default function DashboardWarga() {
 
       </main>
 
-      {/* MODAL LAPORAN REKAP SELURUH WARGA (SPREADSHEET VIEW) */}
       {showRekapModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-5xl h-[90vh] rounded-3xl flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
             
-            {/* Header Modal */}
-            <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-
+            <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/60">
+              <div>
+                <h3 className="font-bold text-white text-sm sm:text-base flex items-center gap-2">
+                  📋 Rekapitulasi Iuran Seluruh Warga RT 38 (2026)
+                </h3>
+                <p className="text-[11px] text-slate-400">Transparansi kas dan status setoran warga</p>
+              </div>
+              <button 
+                onClick={() => setShowRekapModal(false)}
+                className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center text-sm transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4">
+              <div className="min-w-[800px]">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400 bg-slate-950/40">
+                      <th className="p-3 sticky left-0 bg-slate-950 z-10">No. Rumah</th>
+                      <th className="p-3 sticky left-20 bg-slate-950 z-10">Nama Warga</th>
+                      <th className="p-3 text-center">Total Setor</th>
+                      {PERIODE_BULAN.map((b, i) => (
+                        <th key={i} className="p-3 text-center">{b.nama}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {allWargaList.map((w, idx) => {
+                      const isWargaUsaha = w.kategori === 'Usaha' || w.no_rumah?.trim() === 'A2 - 19';
+                      const tarifWarga = isWargaUsaha ? 30000 : 15000;
+                      
+                      const iuranWarga = allIuranList.filter(i => i.warga_id === w.id);
+                      const totalWargaSetor = iuranWarga.reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
+                      let saldoWarga = totalWargaSetor;
+
+                      return (
+                        <tr key={idx} className="hover:bg-slate-800/30 transition">
+                          <td className="p-3 font-bold text-white sticky left-0 bg-slate-900 z-10">
+                            {w.no_rumah}
+                          </td>
+                          <td className="p-3 text-slate-300 sticky left-20 bg-slate-900 z-10">
+                            {w.nama_lengkap}
+                          </td>
+                          <td className="p-3 text-center font-extrabold text-blue-400">
+                            Rp {totalWargaSetor.toLocaleString('id-ID')}
+                          </td>
+
+                          {PERIODE_BULAN.map((bln, bIdx) => {
+                            const rec = iuranWarga.find(i => i.bulan_tahun === bln.kode);
+                            const nomLangsung = rec ? Number(rec.jumlah || 0) : 0;
+
+                            let lunas = false;
+                            let sebagian = false;
+
+                            if (nomLangsung >= tarifWarga) {
+                              lunas = true;
+                              saldoWarga -= tarifWarga;
+                            } else if (nomLangsung > 0 && nomLangsung < tarifWarga) {
+                              sebagian = true;
+                              saldoWarga -= nomLangsung;
+                            } else if (saldoWarga >= tarifWarga) {
+                              lunas = true;
+                              saldoWarga -= tarifWarga;
+                            } else if (saldoWarga > 0 && saldoWarga < tarifWarga) {
+                              sebagian = true;
+                              saldoWarga = 0;
+                            }
+
+                            return (
+                              <td key={bIdx} className="p-2 text-center">
+                                <span className={`inline-block px-2 py-1 rounded-lg text-[10px] font-semibold ${
+                                  lunas 
+                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                                    : sebagian
+                                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                    : 'bg-slate-800/40 text-slate-500'
+                                }`}>
+                                  {lunas ? 'Lunas' : sebagian ? 'Kurang' : '-'}
+                                </span>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="px-6 py-3 border-t border-slate-800 bg-slate-950/60 flex justify-between items-center text-xs text-slate-400">
+              <span>Menampilkan seluruh data warga dan status bulanan real-time.</span>
+              <button 
+                onClick={() => setShowRekapModal(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition"
+              >
+                Tutup
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      <footer className="p-4 text-center text-xs text-slate-500 border-t border-slate-900 bg-slate-950">
+        RT 38 Puri Kencana Wagir &copy; 2026 • Portal Mandiri Warga
+      </footer>
+    </div>
+  );
+}
