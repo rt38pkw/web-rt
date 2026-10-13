@@ -61,14 +61,21 @@ export default function DashboardWarga() {
 
   if (!warga) return null;
 
-  // Tarif bulanan berdasarkan kategori
-  const tarifBulanan = warga.kategori === 'Usaha' ? 30000 : 15000;
+  // Cek Kategori Usaha (Sesuai flag database atau nomor rumah A2 - 19)
+  const isUsaha = warga.kategori === 'Usaha' || warga.no_rumah?.trim() === 'A2 - 19';
+  const tarifBulanan = isUsaha ? 30000 : 15000;
 
-  // Total akumulasi uang yang disetor
+  // Total akumulasi setoran yang tercatat
   const totalDisetor = iuranList.reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
 
-  // Saldo berjalan untuk alokasi grid bulan
-  let sisaSaldoUntukBulan = totalDisetor;
+  // Total kewajiban 9 bulan (April - Desember)
+  const totalKewajibanPeriode = PERIODE_BULAN.length * tarifBulanan;
+
+  // Hitung sisa deposit setelah melunasi kewajiban 9 bulan
+  const sisaDeposit = totalDisetor > totalKewajibanPeriode ? totalDisetor - totalKewajibanPeriode : 0;
+
+  // Variabel untuk melacak kecukupan saldo di grid bulan
+  let sisaSaldoUntukGrid = totalDisetor;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-blue-500 selection:text-white">
@@ -122,9 +129,9 @@ export default function DashboardWarga() {
               <span className="bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-xl">
                 💳 Tarif: <strong className="text-blue-400">Rp {tarifBulanan.toLocaleString('id-ID')} / bln</strong>
               </span>
-              {warga.kategori === 'Usaha' && (
+              {isUsaha && (
                 <span className="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-xl">
-                  ⚠️ Kategori Tempat Usaha
+                  ⚠️ Tempat Usaha
                 </span>
               )}
             </div>
@@ -149,11 +156,7 @@ export default function DashboardWarga() {
             <div>
               <span className="text-[11px] text-slate-400 block uppercase font-medium">Sisa Saldo Deposit Active</span>
               <span className="text-xl font-black text-emerald-400 mt-0.5 block">
-                {(() => {
-                  const totalKewajibanPeriode = PERIODE_BULAN.length * tarifBulanan;
-                  const depositSisa = totalDisetor > totalKewajibanPeriode ? totalDisetor - totalKewajibanPeriode : 0;
-                  return `Rp ${depositSisa.toLocaleString('id-ID')}`;
-                })()}
+                Rp {sisaDeposit.toLocaleString('id-ID')}
               </span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg">
@@ -178,16 +181,11 @@ export default function DashboardWarga() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {PERIODE_BULAN.map((bln, idx) => {
-                const recordBulan = iuranList.find(i => i.bulan_tahun === bln.kode);
-                const nominalTerbayarBulanIni = recordBulan ? Number(recordBulan.jumlah || 0) : 0;
-
-                let isLunas = nominalTerbayarBulanIni >= tarifBulanan;
+                let isLunas = false;
                 
-                if (!isLunas && sisaSaldoUntukBulan >= tarifBulanan) {
+                if (sisaSaldoUntukGrid >= tarifBulanan) {
                   isLunas = true;
-                  sisaSaldoUntukBulan -= tarifBulanan;
-                } else if (isLunas) {
-                  sisaSaldoUntukBulan -= tarifBulanan;
+                  sisaSaldoUntukGrid -= tarifBulanan;
                 }
 
                 return (
