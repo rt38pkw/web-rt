@@ -53,10 +53,9 @@ export default function Home() {
         <div className="flex items-center space-x-3 overflow-hidden">
           <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0 shadow-md">
             <img 
-              src="/logo.png" 
+              src="/logo-rt38.png" 
               alt="Logo RT 38" 
               className="w-full h-full object-cover" 
-              onError={(e)=>{e.target.src = '/logo-rt38.png'}}
             />
           </div>
           <div>
@@ -93,10 +92,9 @@ export default function Home() {
           <div className="text-center mb-6">
             <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-slate-950 border border-slate-700 flex items-center justify-center overflow-hidden shadow-inner p-1">
               <img 
-                src="/logo.png" 
+                src="/logo-rt38.png" 
                 alt="Logo RT" 
                 className="w-full h-full object-cover rounded-full"
-                onError={(e)=>{e.target.src = '/logo-rt38.png'}}
               />
             </div>
             <h3 className="text-lg font-bold tracking-tight text-white">Masuk Akun Warga</h3>
