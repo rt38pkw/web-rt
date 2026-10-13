@@ -23,7 +23,7 @@ export default function DashboardWarga() {
   const [warga, setWarga] = useState(null);
   const [iuranList, setIuranList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('iuran'); // State Tab Active: 'iuran', 'pengumuman', 'surat', 'kontak'
+  const [activeTab, setActiveTab] = useState('iuran'); // Default aktif di 'iuran'
   const router = useRouter();
 
   useEffect(() => {
@@ -146,63 +146,48 @@ export default function DashboardWarga() {
           </div>
         </section>
 
-        {/* NAVIGASI MENU UTAMA (GRID MENU) */}
-        <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* NAVIGASI MENU UTAMA (3 Menu: Iuran, Pengumuman, Surat) */}
+        <section className="grid grid-cols-3 gap-3">
           <button
             onClick={() => setActiveTab('iuran')}
-            className={`p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
+            className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
               activeTab === 'iuran'
                 ? 'bg-blue-600/20 border-blue-500 text-white shadow-lg shadow-blue-500/10'
                 : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:bg-slate-900/90'
             }`}
           >
-            <span className="text-2xl">💰</span>
-            <span className="text-xs font-bold tracking-wide">Status Iuran</span>
+            <span className="text-xl sm:text-2xl">💰</span>
+            <span className="text-[11px] sm:text-xs font-bold tracking-wide">Status Iuran</span>
           </button>
 
           <button
             onClick={() => setActiveTab('pengumuman')}
-            className={`p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
+            className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
               activeTab === 'pengumuman'
                 ? 'bg-blue-600/20 border-blue-500 text-white shadow-lg shadow-blue-500/10'
                 : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:bg-slate-900/90'
             }`}
           >
-            <span className="text-2xl">📢</span>
-            <span className="text-xs font-bold tracking-wide">Pengumuman</span>
+            <span className="text-xl sm:text-2xl">📢</span>
+            <span className="text-[11px] sm:text-xs font-bold tracking-wide">Pengumuman</span>
           </button>
 
           <button
             onClick={() => setActiveTab('surat')}
-            className={`p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
+            className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
               activeTab === 'surat'
                 ? 'bg-blue-600/20 border-blue-500 text-white shadow-lg shadow-blue-500/10'
                 : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:bg-slate-900/90'
             }`}
           >
-            <span className="text-2xl">📄</span>
-            <span className="text-xs font-bold tracking-wide">Surat Mandiri</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('kontak')}
-            className={`p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
-              activeTab === 'kontak'
-                ? 'bg-blue-600/20 border-blue-500 text-white shadow-lg shadow-blue-500/10'
-                : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:bg-slate-900/90'
-            }`}
-          >
-            <span className="text-2xl">📞</span>
-            <span className="text-xs font-bold tracking-wide">Pengurus RT</span>
+            <span className="text-xl sm:text-2xl">📄</span>
+            <span className="text-[11px] sm:text-xs font-bold tracking-wide">Surat Mandiri</span>
           </button>
         </section>
-
-        {/* KONTEN DYNAMIC BERDASARKAN TAB YANG DIPILIH */}
 
         {/* TAB 1: STATUS IURAN BULANAN */}
         {activeTab === 'iuran' && (
           <div className="space-y-6 animate-in fade-in duration-200">
-            {/* Highlight Widget Ringkas */}
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
                 <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
@@ -223,7 +208,6 @@ export default function DashboardWarga() {
               </div>
             </div>
 
-            {/* Grid Pembayaran Per Bulan */}
             <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-5 sm:p-6 shadow-xl">
               <div className="flex justify-between items-center mb-5">
                 <div>
@@ -350,25 +334,6 @@ export default function DashboardWarga() {
             <button disabled className="px-4 py-2 bg-slate-800/60 text-slate-500 rounded-xl text-xs font-semibold cursor-not-allowed border border-slate-800">
               Segera Hadir 🚧
             </button>
-          </div>
-        )}
-
-        {/* TAB 4: KONTAK PENGURUS */}
-        {activeTab === 'kontak' && (
-          <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-6 space-y-4 animate-in fade-in duration-200">
-            <h3 className="text-base font-bold text-white">📞 Kontak Pengurus RT 38</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800">
-                <span className="text-slate-400 block text-[10px]">Ketua RT 38</span>
-                <strong className="text-white text-sm block mt-0.5">Pengurus RT 38</strong>
-                <span className="text-blue-400 text-[11px] block mt-2">Puri Kencana Wagir</span>
-              </div>
-              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800">
-                <span className="text-slate-400 block text-[10px]">Bendahara RT 38</span>
-                <strong className="text-white text-sm block mt-0.5">Muhamad Ilyas</strong>
-                <span className="text-blue-400 text-[11px] block mt-2">Puri Kencana Wagir</span>
-              </div>
-            </div>
           </div>
         )}
 
