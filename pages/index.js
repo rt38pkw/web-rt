@@ -1,111 +1,149 @@
-import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState } from 'react';
+import { useRouter } from 'next/router';
+import { createClient } from '@supabase/supabase-js';
+import Head from 'next/head';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function Home() {
-  const [pengumuman, setPengumuman] = useState([]);
+  const [noRumah, setNoRumah] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const router = useRouter();
 
-  useEffect(() => {
-    async function fetchPengumuman() {
-      const { data } = await supabase.from('pengumuman').select('*').order('created_at', { ascending: false }).limit(3);
-      if (data) setPengumuman(data);
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg('');
+
+    try {
+      // Cek ke tabel warga berdasarkan nomor rumah dan password
+      const { data, error } = await supabase
+        .from('warga')
+        .select('*')
+        .eq('no_rumah', noRumah.trim())
+        .eq('password', password)
+        .single();
+
+      if (error || !data) {
+        setErrorMsg('Nomor Rumah atau Password salah! Periksa kembali.');
+        setLoading(false);
+        return;
+      }
+
+      // Simpan sesi warga ke localStorage agar bisa dibaca di dashboard warga
+      localStorage.setItem('warga_session', JSON.stringify(data));
+      
+      // Arahkan ke dashboard warga
+      router.push('/dashboard-warga');
+    } catch (err) {
+      setErrorMsg('Terjadi kesalahan koneksi. Silakan coba lagi.');
+      setLoading(false);
     }
-    fetchPengumuman();
-  }, []);
+  };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-blue-500 selection:text-white">
-      {/* Background Glow Deco */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-blue-600/10 blur-[120px] pointer-events-none rounded-full"></div>
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
+      <Head>
+        <title>Portal Warga - RT 38 Puri Kencana Wagir</title>
+      </Head>
 
-      {/* Navbar Modern */}
-      <header className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800/80">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-black text-white text-lg shadow-lg shadow-blue-500/30">
-              RT
-            </div>
-            <div>
-              <h1 className="font-bold text-white text-base leading-none">Layanan Warga RT</h1>
-              <p className="text-[11px] text-slate-400 mt-0.5">Portal Digital Lingkungan Sejahtera</p>
-            </div>
+      {/* Header / Navigasi Atas */}
+      <header className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 backdrop-blur sticky top-0 z-50">
+        <div className="flex items-center space-x-3">
+          <img src="/logo.png" alt="Logo RT 38" className="w-10 h-10 object-contain rounded-full border border-slate-700 p-0.5" />
+          <div>
+            <h1 className="font-bold text-sm tracking-wide">RT 38 PURI KENCANA</h1>
+            <p className="text-xs text-slate-400">Wagir • Rukun • Peduli • Bersama</p>
           </div>
-          <Link
-            href="/admin"
-            className="text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 px-4 py-2 rounded-xl transition duration-200 active:scale-95"
-          >
-            Portal Pengurus &rarr;
-          </Link>
         </div>
+        <button 
+          onClick={() => router.push('/admin')}
+          className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition"
+        >
+          🔐 Login Pengurus
+        </button>
       </header>
 
-      {/* Hero Section */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-10 space-y-12 relative z-10">
-        <div className="text-center max-w-2xl mx-auto space-y-4">
-          <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold">
-            ✨ Layanan Mandiri Online 24/7
-          </span>
-          <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
-            Kemudahan Administrasi <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">Dalam Genggaman</span>
-          </h2>
-          <p className="text-slate-400 text-sm sm:text-base">
-            Bayar iuran QRIS, cek status kependudukan, hingga ajukan surat pengantar secara cepat dan transparan.
+      {/* Konten Utama (Greeting & Login Warga) */}
+      <main className="flex-1 flex flex-col items-center justify-center p-4 max-w-md mx-auto w-full">
+        <div className="text-center mb-8">
+          <div className="inline-block p-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl mb-4 text-blue-400 text-2xl shadow-inner">
+            👋
+          </div>
+          <h2 className="text-2xl font-extrabold tracking-tight mb-2">Selamat Datang, Warga RT 38</h2>
+          <p className="text-sm text-slate-400">
+            Portal digital layanan mandiri warga. Masukkan Nomor Rumah dan Password Anda untuk mengakses informasi iuran dan pengajuan surat.
           </p>
         </div>
 
-        {/* Quick Menu Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <Link href="/iuran" className="group bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-blue-500/50 p-6 rounded-2xl shadow-xl transition-all duration-300 relative overflow-hidden">
-            <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition duration-300">
-              💳
+        {/* Card Form Login */}
+        <div className="w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+          {errorMsg && (
+            <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-xl text-center">
+              ⚠️ {errorMsg}
             </div>
-            <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition">Bayar Iuran RT</h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">Pembayaran iuran kebersihan & keamanan via scan QRIS otomatis.</p>
-            <div className="mt-4 text-xs font-semibold text-blue-400 flex items-center gap-1 group-hover:translate-x-1 transition">Bayar Sekarang &rarr;</div>
-          </Link>
+          )}
 
-          <Link href="/surat" className="group bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-500/50 p-6 rounded-2xl shadow-xl transition-all duration-300 relative overflow-hidden">
-            <div className="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition duration-300">
-              📄
-            </div>
-            <h3 className="text-lg font-bold text-white group-hover:text-indigo-400 transition">Surat Pengantar</h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">Ajukan surat pengantar RT untuk KTP, KK, dan keperluaan domisili.</p>
-            <div className="mt-4 text-xs font-semibold text-indigo-400 flex items-center gap-1 group-hover:translate-x-1 transition">Buat Surat &rarr;</div>
-          </Link>
-
-          <Link href="/warga" className="group bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-emerald-500/50 p-6 rounded-2xl shadow-xl transition-all duration-300 relative overflow-hidden">
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition duration-300">
-              👥
-            </div>
-            <h3 className="text-lg font-bold text-white group-hover:text-emerald-400 transition">Pendataan Warga</h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">Cek & daftarkan data anggota keluarga untuk pendataan resmi RT.</p>
-            <div className="mt-4 text-xs font-semibold text-emerald-400 flex items-center gap-1 group-hover:translate-x-1 transition">Lihat Data &rarr;</div>
-          </Link>
-        </div>
-
-        {/* Pengumuman Feed */}
-        <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 sm:p-8 backdrop-blur-md">
-          <div className="flex items-center justify-between mb-6">
+          <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <h3 className="text-lg font-bold text-white">📢 Pengumuman Lingkungan</h3>
-              <p className="text-xs text-slate-400">Informasi dan kegiatan terbaru warga</p>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                Nomor Rumah
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="Contoh: A1 - 06"
+                value={noRumah}
+                onChange={(e) => setNoRumah(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 transition"
+              />
+              <span className="text-[10px] text-slate-500 mt-1 block">Gunakan format sesuai data bendahara (Misal: A1 - 06)</span>
             </div>
-          </div>
 
-          <div className="space-y-4">
-            {pengumuman.length > 0 ? (
-              pengumuman.map((item) => (
-                <div key={item.id} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/60 space-y-1">
-                  <h4 className="font-semibold text-sm text-white">{item.judul}</h4>
-                  <p className="text-xs text-slate-400">{item.isi}</p>
-                </div>
-              ))
-            ) : (
-              <p className="text-xs text-slate-500 text-center py-4">Belum ada pengumuman terbaru.</p>
-            )}
-          </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                Password / PIN
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 transition pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3.5 text-slate-400 hover:text-white text-xs"
+                >
+                  {showPassword ? '🙈' : '👁️'}
+                </button>
+              </div>
+              <span className="text-[10px] text-slate-500 mt-1 block">Default awal: <code className="text-slate-300">123456</code></span>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 rounded-xl text-sm transition shadow-lg shadow-blue-600/20 disabled:opacity-50"
+            >
+              {loading ? 'Sedang Masuk...' : 'Masuk ke Dashboard Warga'}
+            </button>
+          </form>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="p-4 text-center text-xs text-slate-500 border-t border-slate-900">
+        RT 38 Puri Kencana Wagir &copy; 2026 • Sistem Administrasi Lingkungan
+      </footer>
     </div>
   );
 }
