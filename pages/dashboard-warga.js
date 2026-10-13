@@ -146,44 +146,54 @@ export default function DashboardWarga() {
           </div>
         </section>
 
-        {/* NAVIGASI MENU UTAMA (3 Menu: Iuran, Pengumuman, Surat) */}
-        <section className="grid grid-cols-3 gap-3">
-          <button
-            onClick={() => setActiveTab('iuran')}
-            className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
-              activeTab === 'iuran'
-                ? 'bg-blue-600/20 border-blue-500 text-white shadow-lg shadow-blue-500/10'
-                : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:bg-slate-900/90'
-            }`}
-          >
-            <span className="text-xl sm:text-2xl">💰</span>
-            <span className="text-[11px] sm:text-xs font-bold tracking-wide">Status Iuran</span>
-          </button>
+        {/* PEMISAH ELEGAN & NAVIGASI MENU MINI / MINIMALIS */}
+        <div className="pt-2">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              Menu Navigasi
+            </span>
+          </div>
 
-          <button
-            onClick={() => setActiveTab('pengumuman')}
-            className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
-              activeTab === 'pengumuman'
-                ? 'bg-blue-600/20 border-blue-500 text-white shadow-lg shadow-blue-500/10'
-                : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:bg-slate-900/90'
-            }`}
-          >
-            <span className="text-xl sm:text-2xl">📢</span>
-            <span className="text-[11px] sm:text-xs font-bold tracking-wide">Pengumuman</span>
-          </button>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <button
+              onClick={() => setActiveTab('iuran')}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 flex items-center gap-2 shrink-0 ${
+                activeTab === 'iuran'
+                  ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/20'
+                  : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
+              }`}
+            >
+              <span>💰</span> Status Iuran
+            </button>
 
-          <button
-            onClick={() => setActiveTab('surat')}
-            className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all duration-200 ${
-              activeTab === 'surat'
-                ? 'bg-blue-600/20 border-blue-500 text-white shadow-lg shadow-blue-500/10'
-                : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:bg-slate-900/90'
-            }`}
-          >
-            <span className="text-xl sm:text-2xl">📄</span>
-            <span className="text-[11px] sm:text-xs font-bold tracking-wide">Surat Mandiri</span>
-          </button>
-        </section>
+            <button
+              onClick={() => setActiveTab('pengumuman')}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 flex items-center gap-2 shrink-0 ${
+                activeTab === 'pengumuman'
+                  ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/20'
+                  : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
+              }`}
+            >
+              <span>📢</span> Pengumuman
+            </button>
+
+            <button
+              onClick={() => setActiveTab('surat')}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 flex items-center gap-2 shrink-0 ${
+                activeTab === 'surat'
+                  ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/20'
+                  : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
+              }`}
+            >
+              <span>📄</span> Surat Mandiri
+            </button>
+          </div>
+        </div>
+
+        {/* GARIS PEMISAH TIPIS ANTARA MENU DAN KONTEN */}
+        <div className="border-t border-slate-800/60 my-4"></div>
+
+        {/* KONTEN DYNAMIC */}
 
         {/* TAB 1: STATUS IURAN BULANAN */}
         {activeTab === 'iuran' && (
