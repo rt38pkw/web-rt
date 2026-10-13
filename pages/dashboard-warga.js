@@ -8,15 +8,15 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const PERIODE_BULAN = [
-  { kode: '2026-04', nama: 'April 2026' },
-  { kode: '2026-05', nama: 'Mei 2026' },
-  { kode: '2026-06', nama: 'Juni 2026' },
-  { kode: '2026-07', nama: 'Juli 2026' },
-  { kode: '2026-08', nama: 'Agustus 2026' },
-  { kode: '2026-09', nama: 'September 2026' },
-  { kode: '2026-10', nama: 'Oktober 2026' },
-  { kode: '2026-11', nama: 'November 2026' },
-  { kode: '2026-12', nama: 'Desember 2026' },
+  { kode: '2026-04', nama: 'April' },
+  { kode: '2026-05', nama: 'Mei' },
+  { kode: '2026-06', nama: 'Juni' },
+  { kode: '2026-07', nama: 'Juli' },
+  { kode: '2026-08', nama: 'Agustus' },
+  { kode: '2026-09', nama: 'September' },
+  { kode: '2026-10', nama: 'Oktober' },
+  { kode: '2026-11', nama: 'November' },
+  { kode: '2026-12', nama: 'Desember' },
 ];
 
 export default function DashboardWarga() {
@@ -65,30 +65,30 @@ export default function DashboardWarga() {
   const isUsaha = warga.kategori === 'Usaha' || warga.no_rumah?.trim() === 'A2 - 19';
   const tarifBulanan = isUsaha ? 30000 : 15000;
 
-  // Total akumulasi setoran yang tercatat
+  // Total akumulasi setoran
   const totalDisetor = iuranList.reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
 
   // Total kewajiban penuh selama 9 bulan (April - Desember)
   const totalKewajibanSemuaBulan = PERIODE_BULAN.length * tarifBulanan;
 
-  // Sisa deposit adalah kelebihan setoran melebihi kewajiban 9 bulan
+  // Sisa deposit
   const sisaDeposit = totalDisetor > totalKewajibanSemuaBulan 
     ? totalDisetor - totalKewajibanSemuaBulan 
     : 0;
 
-  // Saldo berjalan untuk alokasi status per bulan
+  // Saldo berjalan untuk status per bulan
   let poolSaldo = totalDisetor;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-blue-500 selection:text-white">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-blue-500 selection:text-white antialiased">
       <Head>
         <title>Dashboard Warga - RT 38 Puri Kencana Wagir</title>
       </Head>
 
       {/* Navigasi Atas */}
-      <header className="px-4 py-3 border-b border-slate-800/80 flex justify-between items-center bg-slate-900/60 backdrop-blur sticky top-0 z-50">
+      <header className="px-5 py-3.5 border-b border-slate-800/60 flex justify-between items-center bg-slate-900/40 backdrop-blur-md sticky top-0 z-50">
         <div className="flex items-center space-x-3">
-          <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0">
+          <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700/80 flex items-center justify-center overflow-hidden shrink-0">
             <img 
               src="/logo-rt38.png" 
               alt="Logo RT 38" 
@@ -96,92 +96,94 @@ export default function DashboardWarga() {
             />
           </div>
           <div>
-            <h1 className="font-bold text-xs sm:text-sm text-white leading-tight">PORTAL WARGA</h1>
+            <h1 className="font-bold text-xs sm:text-sm text-white tracking-wide">PORTAL WARGA</h1>
             <p className="text-[10px] text-slate-400">RT 38 Puri Kencana Wagir</p>
           </div>
         </div>
 
         <button
           onClick={handleLogout}
-          className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-xl border border-rose-500/30 transition font-medium"
+          className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-xl border border-rose-500/20 transition font-medium"
         >
           Keluar 🚪
         </button>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-4xl w-full mx-auto p-4 space-y-6 my-2">
+      <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-6 my-1">
 
-        {/* Card Header Profil Warga */}
-        <section className="bg-gradient-to-r from-slate-900 via-slate-900 to-blue-950/40 border border-slate-800 rounded-3xl p-6 shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none text-8xl">
-            🏠
-          </div>
-          <div className="relative z-10">
-            <span className="inline-block px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold rounded-full mb-2">
-              Warga RT 38 Puri Kencana
-            </span>
-            <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">
-              {warga.nama_lengkap}
-            </h2>
-            <div className="flex flex-wrap gap-2 text-xs text-slate-300 mt-3">
-              <span className="bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-xl">
-                📍 No. Rumah: <strong className="text-white">{warga.no_rumah}</strong>
-              </span>
-              <span className="bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-xl">
-                💳 Tarif: <strong className="text-blue-400">Rp {tarifBulanan.toLocaleString('id-ID')} / bln</strong>
-              </span>
-              {isUsaha && (
-                <span className="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-xl">
-                  ⚠️ Tempat Usaha
+        {/* Profil Warga Modern Minimalis */}
+        <section className="bg-slate-900/80 border border-slate-800/80 rounded-3xl p-5 sm:p-6 shadow-2xl relative overflow-hidden backdrop-blur-sm">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                  Warga RT 38
                 </span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                {warga.nama_lengkap}
+              </h2>
+            </div>
+
+            <div className="flex flex-wrap gap-2 text-xs">
+              <div className="bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+                <span className="text-slate-400">Rumah:</span>
+                <strong className="text-white font-semibold">{warga.no_rumah}</strong>
+              </div>
+              <div className="bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+                <span className="text-slate-400">Tarif:</span>
+                <strong className="text-blue-400 font-semibold">Rp {tarifBulanan.toLocaleString('id-ID')}/bln</strong>
+              </div>
+              {isUsaha && (
+                <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-xl font-medium">
+                  Tempat Usaha
+                </div>
               )}
             </div>
           </div>
         </section>
 
-        {/* Highlight Widget Total Setoran & Sisa Deposit */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex items-center justify-between">
-            <div>
-              <span className="text-[11px] text-slate-400 block uppercase font-medium">Total Akumulasi Setor</span>
-              <span className="text-xl font-black text-white mt-0.5 block">
-                Rp {totalDisetor.toLocaleString('id-ID')}
-              </span>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-lg">
-              💰
-            </div>
+        {/* Highlight Widget Ringkas */}
+        <section className="grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+            <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
+              Total Setor
+            </span>
+            <span className="text-lg sm:text-2xl font-black text-white mt-1">
+              Rp {totalDisetor.toLocaleString('id-ID')}
+            </span>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex items-center justify-between">
-            <div>
-              <span className="text-[11px] text-slate-400 block uppercase font-medium">Sisa Saldo Deposit Active</span>
-              <span className="text-xl font-black text-emerald-400 mt-0.5 block">
-                Rp {sisaDeposit.toLocaleString('id-ID')}
-              </span>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg">
-              ✨
-            </div>
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+            <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
+              Sisa Deposit
+            </span>
+            <span className="text-lg sm:text-2xl font-black text-emerald-400 mt-1">
+              Rp {sisaDeposit.toLocaleString('id-ID')}
+            </span>
           </div>
         </section>
 
-        {/* Grid Pembayaran Per Bulan (April - Desember) */}
-        <section className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-2">
+        {/* Grid Pembayaran Modern & Simpel */}
+        <section className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-5 sm:p-6 shadow-xl">
+          <div className="flex justify-between items-center mb-5">
             <div>
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                🗓️ Status Pembayaran Per Bulan (2026)
+              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                Iuran Bulanan 2026
               </h3>
-              <p className="text-xs text-slate-400">Rincian status lunas per periode bulan</p>
+              <p className="text-xs text-slate-400">Status kelunasan periode April – Desember</p>
             </div>
+            <span className="text-xs bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 font-medium">
+              9 Bulan
+            </span>
           </div>
 
           {loading ? (
             <div className="py-12 text-center text-xs text-slate-500">Memuat data iuran...</div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
               {PERIODE_BULAN.map((bln, idx) => {
                 const recordBulan = iuranList.find(i => i.bulan_tahun === bln.kode);
                 const nominalLangsung = recordBulan ? Number(recordBulan.jumlah || 0) : 0;
@@ -213,96 +215,31 @@ export default function DashboardWarga() {
                 return (
                   <div 
                     key={idx} 
-                    className={`p-4 rounded-2xl border flex flex-col justify-between transition ${
+                    className={`p-3.5 rounded-2xl border transition-all duration-200 flex items-center justify-between ${
                       isLunas 
-                        ? 'bg-emerald-500/5 border-emerald-500/30 text-emerald-300' 
+                        ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-300' 
                         : isSebagian
-                        ? 'bg-amber-500/5 border-amber-500/30 text-amber-300'
-                        : 'bg-slate-950/80 border-slate-800/80 text-slate-400'
+                        ? 'bg-amber-950/20 border-amber-500/30 text-amber-300'
+                        : 'bg-slate-950/60 border-slate-800/60 text-slate-400'
                     }`}
                   >
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-xs font-bold uppercase tracking-wider text-white">
-                        {bln.nama}
-                      </span>
-                      <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold border ${
-                        isLunas 
-                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
-                          : isSebagian
-                          ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-                          : 'bg-slate-800 text-slate-400 border-slate-700'
-                      }`}>
-                        {isLunas ? 'Lunas' : isSebagian ? 'Kurang Sebagian' : 'Belum Bayar'}
-                      </span>
-                    </div>
-
-                    <div className="mt-2 pt-2 border-t border-slate-800/60 flex justify-between items-end">
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">Terbayar / Wajib:</span>
-                        <span className="text-sm font-extrabold text-white">
-                          Rp {nominalTercoverBulanIni.toLocaleString('id-ID')} <span className="text-xs font-normal text-slate-400">/ {tarifBulanan.toLocaleString('id-ID')}</span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white tracking-wide">
+                          {bln.nama}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          2026
                         </span>
                       </div>
-                      <span className="text-[10px] font-medium text-slate-400">
+                      <div className="text-[11px] mt-0.5 text-slate-400">
                         {isLunas 
-                          ? 'Lunas' 
+                          ? `Rp ${tarifBulanan.toLocaleString('id-ID')}` 
                           : isSebagian 
-                          ? `Kurang Rp ${sisaKekurangan.toLocaleString('id-ID')}` 
-                          : 'Belum Setor'}
-                      </span>
+                          ? `Terbayar Rp ${nominalTercoverBulanIni.toLocaleString('id-ID')}` 
+                          : `Rp 0 / ${tarifBulanan.toLocaleString('id-ID')}`}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
 
-        {/* Menu Layanan Mandiri (Pengajuan Surat Disabled) */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-slate-900/50 border border-slate-800/60 rounded-3xl p-6 shadow-xl flex flex-col justify-between opacity-60">
-            <div>
-              <div className="w-10 h-10 rounded-2xl bg-slate-800 border border-slate-700 text-slate-400 flex items-center justify-center text-xl mb-3">
-                📄
-              </div>
-              <h4 className="font-bold text-slate-300 text-base">Pengajuan Surat Pengantar</h4>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Fitur pengajuan surat online sedang dalam tahap pengembangan dan akan segera diaktifkan.
-              </p>
-            </div>
-            <button 
-              disabled
-              className="mt-4 w-full bg-slate-800/40 text-slate-500 text-xs font-semibold py-2.5 rounded-xl border border-slate-800 cursor-not-allowed"
-            >
-              Segera Hadir 🚧
-            </button>
-          </div>
-
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col justify-between">
-            <div>
-              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl mb-3">
-                📢
-              </div>
-              <h4 className="font-bold text-white text-base">Pengumuman RT 38</h4>
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                Pantau jadwal kegiatan warga, kerja bakti, rapat rutin, dan informasi penting lingkungan Puri Kencana.
-              </p>
-            </div>
-            <button 
-              onClick={() => alert('Belum ada pengumuman baru.')}
-              className="mt-4 w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold py-2.5 rounded-xl border border-slate-700 transition"
-            >
-              Lihat Pengumuman 🔍
-            </button>
-          </div>
-        </section>
-
-      </main>
-
-      {/* Footer */}
-      <footer className="p-4 text-center text-xs text-slate-500 border-t border-slate-900 bg-slate-950">
-        RT 38 Puri Kencana Wagir &copy; 2026 • Layanan Mandiri Warga
-      </footer>
-    </div>
-  );
-}
+                    <div className="text-right">
+                      <span className={`inline-block text-[10px] px-2.5 py-1 rounded-xl font-semibold border ${
