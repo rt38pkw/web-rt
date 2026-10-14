@@ -184,7 +184,7 @@ export default function AdminDashboard() {
     );
   }
 
-  const canAccessIuran = user.role === 'ketua' || user.role === 'bendahara';
+  const canAccessKeuangan = user.role === 'ketua' || user.role === 'bendahara';
   const canAccessWarga = user.role === 'ketua' || user.role === 'sekretaris';
 
   return (
@@ -246,6 +246,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* Kartu Statistik */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
             <div className="flex items-center justify-between mb-3">
@@ -256,14 +257,28 @@ export default function AdminDashboard() {
             <p className="text-[11px] text-slate-500 mt-1">Terdaftar dalam sistem</p>
           </div>
 
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Verifikasi Iuran</span>
-              <span className="p-2 bg-amber-500/10 text-amber-400 rounded-xl text-lg">💳</span>
+          {canAccessKeuangan ? (
+            <Link
+              href="/admin-iuran"
+              className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-5 shadow-lg transition duration-300"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider group-hover:text-amber-400 transition">Menunggu Verifikasi</span>
+                <span className="p-2 bg-amber-500/10 text-amber-400 rounded-xl text-lg group-hover:scale-110 transition">💳</span>
+              </div>
+              <div className="text-3xl font-extrabold text-amber-400">{stats.pendingIuran}</div>
+              <p className="text-[11px] text-slate-500 mt-1 group-hover:text-amber-400/70 transition">Klik untuk verifikasi &rarr;</p>
+            </Link>
+          ) : (
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Menunggu Verifikasi</span>
+                <span className="p-2 bg-slate-800 text-slate-500 rounded-xl text-lg">💳</span>
+              </div>
+              <div className="text-3xl font-extrabold text-slate-600">-</div>
+              <p className="text-[11px] text-slate-500 mt-1">Khusus Ketua & Bendahara</p>
             </div>
-            <div className="text-3xl font-extrabold text-amber-400">{stats.pendingIuran}</div>
-            <p className="text-[11px] text-slate-500 mt-1">Menunggu persetujuan</p>
-          </div>
+          )}
 
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
             <div className="flex items-center justify-between mb-3">
@@ -278,19 +293,19 @@ export default function AdminDashboard() {
         <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">Akses Layanan Admin</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {canAccessIuran ? (
+          {canAccessKeuangan ? (
             <Link href="/admin-iuran" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-blue-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
               <div>
-                <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition mb-4 text-blue-400">💳</div>
-                <h4 className="text-lg font-bold text-white group-hover:text-blue-400 transition">Verifikasi Iuran</h4>
-                <p className="text-xs text-slate-400 mt-1">Cek bukti transfer QRIS dan setujui iuran bulanan warga.</p>
+                <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition mb-4 text-blue-400">💰</div>
+                <h4 className="text-lg font-bold text-white group-hover:text-blue-400 transition">Keuangan</h4>
+                <p className="text-xs text-slate-400 mt-1">Verifikasi iuran, riwayat transaksi, tunggakan, dan laporan kas RT.</p>
               </div>
               <div className="mt-6 flex items-center text-xs font-semibold text-blue-400 group-hover:translate-x-1 transition">Buka Layanan &rarr;</div>
             </Link>
           ) : (
             <div className="bg-slate-900/30 border border-slate-800/50 rounded-2xl p-6 opacity-40 cursor-not-allowed">
               <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-xl mb-4 text-slate-500">🔒</div>
-              <h4 className="text-lg font-bold text-slate-500">Verifikasi Iuran</h4>
+              <h4 className="text-lg font-bold text-slate-500">Keuangan</h4>
               <p className="text-xs text-slate-600 mt-1">Khusus akses Ketua & Bendahara.</p>
             </div>
           )}
@@ -312,7 +327,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* Kartu Pengajuan Surat — SEGERA */}
           <div className="relative bg-slate-900/40 border border-slate-800/50 rounded-2xl p-6 opacity-60 cursor-not-allowed overflow-hidden">
             <span className="absolute top-3 right-3 text-[9px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700 font-semibold uppercase tracking-wider">
               Segera
