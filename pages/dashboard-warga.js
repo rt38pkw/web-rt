@@ -19,7 +19,7 @@ const PERIODE_BULAN = [
   { kode: '2026-12', nama: 'Desember' },
 ];
 
-const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3 MB
+const MAX_FILE_SIZE = 3 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
 export default function DashboardWarga() {
@@ -33,7 +33,6 @@ export default function DashboardWarga() {
   const [showRekapModal, setShowRekapModal] = useState(false);
   const [selectedBulanDetail, setSelectedBulanDetail] = useState(null);
 
-  // Modal bayar
   const [showModalBayar, setShowModalBayar] = useState(false);
   const [bulanDipilih, setBulanDipilih] = useState([]);
   const [fileBukti, setFileBukti] = useState([null, null, null]);
@@ -45,10 +44,7 @@ export default function DashboardWarga() {
 
   useEffect(() => {
     const savedSession = localStorage.getItem('warga_session');
-    if (!savedSession) {
-      router.push('/');
-      return;
-    }
+    if (!savedSession) { router.push('/'); return; }
     const userData = JSON.parse(savedSession);
     setWarga(userData);
     fetchDataIuran(userData.id);
@@ -64,9 +60,7 @@ export default function DashboardWarga() {
         setWarga(data);
         localStorage.setItem('warga_session', JSON.stringify(data));
       }
-    } catch (err) {
-      console.error('Gagal refresh session:', err);
-    }
+    } catch (err) { console.error('Gagal refresh session:', err); }
   };
 
   const fetchDataIuran = async (wargaId) => {
@@ -76,16 +70,11 @@ export default function DashboardWarga() {
       if (!error && data) setIuranList(data);
     } catch (err) {
       console.error('Gagal mengambil data iuran:', err);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const fetchAllWargaAndIuran = async () => {
-    if (allWargaList.length > 0) {
-      setShowRekapModal(true);
-      return;
-    }
+    if (allWargaList.length > 0) { setShowRekapModal(true); return; }
     setLoadingRekap(true);
     try {
       const [resWarga, resIuran] = await Promise.all([
@@ -97,9 +86,7 @@ export default function DashboardWarga() {
       setShowRekapModal(true);
     } catch (err) {
       console.error('Gagal memuat rekap seluruh warga:', err);
-    } finally {
-      setLoadingRekap(false);
-    }
+    } finally { setLoadingRekap(false); }
   };
 
   const handleLogout = () => {
@@ -110,9 +97,7 @@ export default function DashboardWarga() {
   const formatTanggal = (dateString) => {
     if (!dateString) return 'Tanggal tidak tercatat';
     const date = new Date(dateString);
-    return new Intl.DateTimeFormat('id-ID', {
-      day: 'numeric', month: 'long', year: 'numeric',
-    }).format(date);
+    return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
   };
 
   if (!warga) return null;
@@ -125,13 +110,27 @@ export default function DashboardWarga() {
     .reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
 
   const adaPending = iuranList.some(i => i.status === 'pending');
-  const bulanAbu = PERIODE_BULAN.filter(bln =>
-    !iuranList.find(i => i.bulan_tahun === bln.kode)
-  );
+
+  // Helper: hitung info bulan dari daftar record
+  const getInfoBulan = (list, kodeBulan, tarif) => {
+    const recs = list.filter(i => i.bulan_tahun === kodeBulan);
+    const totalApproved = recs.filter(r => r.status === 'approved')
+      .reduce((s, r) => s + Number(r.jumlah || 0), 0);
+    const adaPendingBulan = recs.some(r => r.status === 'pending');
+    const kurang = Math.max(0, tarif - totalApproved);
+    return { recs, totalApproved, adaPendingBulan, kurang, kosong: recs.length === 0 };
+  };
+
+  // Daftar bulan yang belum lunas & tidak sedang pending
+  const belumLunasList = PERIODE_BULAN.filter(bln => {
+    const info = getInfoBulan(iuranList, bln.kode, tarifBulanan);
+    if (info.adaPendingBulan) return false;
+    return info.totalApproved < tarifBulanan;
+  });
 
   // ============ MODAL BAYAR ============
   const handleOpenModalBayar = () => {
-    setBulanDipilih(bulanAbu.map(b => b.kode));
+    setBulanDipilih(belumLunasList.map(b => b.kode));
     setFileBukti([null, null, null]);
     setPreviewBukti([null, null, null]);
     setCatatanBayar('');
@@ -141,18 +140,11 @@ export default function DashboardWarga() {
   const handleFileChange = (slotIndex, e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      alert('Format file harus JPG, PNG, atau WebP');
-      return;
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      alert('Ukuran file maksimal 3 MB');
-      return;
-    }
+    if (!ALLOWED_TYPES.includes(file.type)) { alert('Format file harus JPG, PNG, atau WebP'); return; }
+    if (file.size > MAX_FILE_SIZE) { alert('Ukuran file maksimal 3 MB'); return; }
     const newFiles = [...fileBukti];
     newFiles[slotIndex] = file;
     setFileBukti(newFiles);
-
     const newPreviews = [...previewBukti];
     if (newPreviews[slotIndex]) URL.revokeObjectURL(newPreviews[slotIndex]);
     newPreviews[slotIndex] = URL.createObjectURL(file);
@@ -163,7 +155,6 @@ export default function DashboardWarga() {
     const newFiles = [...fileBukti];
     newFiles[slotIndex] = null;
     setFileBukti(newFiles);
-
     const newPreviews = [...previewBukti];
     if (newPreviews[slotIndex]) URL.revokeObjectURL(newPreviews[slotIndex]);
     newPreviews[slotIndex] = null;
@@ -171,14 +162,8 @@ export default function DashboardWarga() {
   };
 
   const handleSubmitBayar = async () => {
-    if (bulanDipilih.length === 0) {
-      alert('Pilih minimal 1 bulan');
-      return;
-    }
-    if (!fileBukti[0]) {
-      alert('Upload minimal 1 bukti pembayaran (slot 1)');
-      return;
-    }
+    if (bulanDipilih.length === 0) { alert('Pilih minimal 1 bulan'); return; }
+    if (!fileBukti[0]) { alert('Upload minimal 1 bukti pembayaran (slot 1)'); return; }
 
     setSubmitting(true);
     try {
@@ -191,26 +176,28 @@ export default function DashboardWarga() {
         const ext = file.name.split('.').pop().toLowerCase();
         const path = `${warga.id}/${batchId}/${i + 1}.${ext}`;
         const { error: upErr } = await supabase.storage
-          .from('bukti-transfer')
-          .upload(path, file, { upsert: false });
+          .from('bukti-transfer').upload(path, file, { upsert: false });
         if (upErr) throw upErr;
-
-        const { data: urlData } = supabase.storage
-          .from('bukti-transfer')
-          .getPublicUrl(path);
+        const { data: urlData } = supabase.storage.from('bukti-transfer').getPublicUrl(path);
         uploadedUrls.push(urlData.publicUrl);
       }
 
-      const records = bulanDipilih.map(bln => ({
-        warga_id: warga.id,
-        bulan_tahun: bln,
-        jumlah: tarifBulanan,
-        status: 'pending',
-        batch_id: batchId,
-        bukti_urls: uploadedUrls,
-        catatan: catatanBayar || null,
-        tanggal_transaksi: null,
-      }));
+      // Insert 1 record per bulan terpilih, dengan jumlah = kurang bayar bulan itu
+      const records = bulanDipilih.map(bln => {
+        const info = getInfoBulan(iuranList, bln, tarifBulanan);
+        return {
+          warga_id: warga.id,
+          bulan_tahun: bln,
+          jumlah: info.kurang, // untuk abu = tarif penuh, untuk kuning = kekurangan
+          status: 'pending',
+          batch_id: batchId,
+          bukti_urls: uploadedUrls,
+          catatan: catatanBayar || null,
+          tanggal_transaksi: null,
+        };
+      }).filter(r => r.jumlah > 0);
+
+      if (records.length === 0) throw new Error('Tidak ada nominal yang perlu dibayar');
 
       const { error: insErr } = await supabase.from('iuran').insert(records);
       if (insErr) throw insErr;
@@ -221,12 +208,13 @@ export default function DashboardWarga() {
     } catch (err) {
       console.error(err);
       alert('Gagal mengirim: ' + (err.message || 'Unknown error'));
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
-  const totalBayar = bulanDipilih.length * tarifBulanan;
+  const totalBayar = bulanDipilih.reduce((sum, bln) => {
+    const info = getInfoBulan(iuranList, bln, tarifBulanan);
+    return sum + info.kurang;
+  }, 0);
 
   // ============ RENDER ============
   return (
@@ -248,9 +236,7 @@ export default function DashboardWarga() {
         <button
           onClick={handleLogout}
           className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-xl border border-rose-500/20 transition font-medium"
-        >
-          Keluar 🚪
-        </button>
+        >Keluar 🚪</button>
       </header>
 
       <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-6 my-1">
@@ -274,9 +260,7 @@ export default function DashboardWarga() {
                 <strong className="text-blue-400 font-semibold">Rp {tarifBulanan.toLocaleString('id-ID')}/bln</strong>
               </div>
               {isUsaha && (
-                <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-xl font-medium">
-                  Tempat Usaha
-                </div>
+                <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-xl font-medium">Tempat Usaha</div>
               )}
             </div>
           </div>
@@ -300,9 +284,7 @@ export default function DashboardWarga() {
                     ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/20'
                     : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
                 }`}
-              >
-                <span>{t.icon}</span> {t.label}
-              </button>
+              ><span>{t.icon}</span> {t.label}</button>
             ))}
           </div>
         </div>
@@ -320,17 +302,13 @@ export default function DashboardWarga() {
                 onClick={fetchAllWargaAndIuran}
                 disabled={loadingRekap}
                 className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 shrink-0"
-              >
-                {loadingRekap ? 'Memuat Data...' : '📋 Lihat Rekap Seluruh Warga'}
-              </button>
+              >{loadingRekap ? 'Memuat Data...' : '📋 Lihat Rekap Seluruh Warga'}</button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
                 <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">Total Setor Warga</span>
-                <span className="text-lg sm:text-2xl font-black text-white mt-1">
-                  Rp {totalDisetor.toLocaleString('id-ID')}
-                </span>
+                <span className="text-lg sm:text-2xl font-black text-white mt-1">Rp {totalDisetor.toLocaleString('id-ID')}</span>
               </div>
               <div className="bg-slate-900/60 border border-emerald-500/20 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
                 <span className="text-[11px] text-emerald-400 uppercase tracking-wider font-medium">Total Donasi 💚</span>
@@ -359,29 +337,21 @@ export default function DashboardWarga() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                     {PERIODE_BULAN.map((bln, idx) => {
-                      const recordBulan = iuranList.find(i => i.bulan_tahun === bln.kode);
-                      const nominalLangsung = recordBulan ? Number(recordBulan.jumlah || 0) : 0;
-                      const status = recordBulan?.status || null;
+                      const info = getInfoBulan(iuranList, bln.kode, tarifBulanan);
+                      const isPending = info.adaPendingBulan;
+                      const isLunas = !isPending && info.totalApproved >= tarifBulanan;
+                      const isSebagian = !isPending && info.totalApproved > 0 && info.totalApproved < tarifBulanan;
+                      const isKosong = info.recs.length === 0;
 
-                      const isPending = status === 'pending';
-                      const isApproved = status === 'approved';
-                      const isLunas = isApproved && nominalLangsung >= tarifBulanan;
-                      const isSebagian = isApproved && nominalLangsung > 0 && nominalLangsung < tarifBulanan;
-                      const isKosong = !recordBulan;
-
-                      const isTombolBayar =
-                        isKosong &&
-                        !adaPending &&
-                        bulanAbu[0]?.kode === bln.kode;
-
-                      const sisaKekurangan = isSebagian ? tarifBulanan - nominalLangsung : 0;
+                      // Tombol muncul di semua bulan belum lunas (abu atau kuning), asalkan tidak ada pending
+                      const isTombolBayar = !adaPending && !isPending && !isLunas;
 
                       let cardClass = 'bg-slate-950/60 border-slate-800/60 text-slate-400';
                       if (isLunas) cardClass = 'bg-emerald-950/20 border-emerald-500/20 text-emerald-300';
                       else if (isSebagian) cardClass = 'bg-amber-950/20 border-amber-500/30 text-amber-300';
                       else if (isPending) cardClass = 'bg-orange-950/20 border-orange-500/30 text-orange-300';
 
-                      const canClick = isApproved && nominalLangsung > 0;
+                      const canClick = !isPending && !isKosong && info.totalApproved > 0;
 
                       return (
                         <div
@@ -390,9 +360,8 @@ export default function DashboardWarga() {
                             if (canClick) {
                               setSelectedBulanDetail({
                                 namaBulan: bln.nama,
-                                jumlah: nominalLangsung,
-                                tanggal: recordBulan?.tanggal_transaksi,
-                                buktiUrls: recordBulan?.bukti_urls || [],
+                                jumlah: info.totalApproved,
+                                tanggal: info.recs.find(r => r.status === 'approved')?.tanggal_transaksi,
                               });
                             }
                           }}
@@ -412,29 +381,24 @@ export default function DashboardWarga() {
                               : 'bg-slate-800/80 text-slate-400 border-slate-700/60'
                             }`}>
                               {isLunas ? '✓ Lunas'
-                                : isSebagian ? `- Rp ${sisaKekurangan.toLocaleString('id-ID')}`
+                                : isSebagian ? `- Rp ${info.kurang.toLocaleString('id-ID')}`
                                 : isPending ? '⏳ Menunggu'
                                 : 'Belum'}
                             </span>
                           </div>
 
                           <div className="text-[11px] mt-1 text-slate-400">
-                            {isLunas ? `Rp ${nominalLangsung.toLocaleString('id-ID')}`
-                              : isSebagian ? `Terbayar Rp ${nominalLangsung.toLocaleString('id-ID')}`
-                              : isPending ? `Rp ${nominalLangsung.toLocaleString('id-ID')}`
+                            {isLunas ? `Rp ${info.totalApproved.toLocaleString('id-ID')}`
+                              : isSebagian ? `Terbayar Rp ${info.totalApproved.toLocaleString('id-ID')}`
+                              : isPending ? `Rp ${info.totalApproved.toLocaleString('id-ID')}`
                               : `Rp 0 / ${tarifBulanan.toLocaleString('id-ID')}`}
                           </div>
 
                           {isTombolBayar && (
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenModalBayar();
-                              }}
+                              onClick={(e) => { e.stopPropagation(); handleOpenModalBayar(); }}
                               className="mt-2.5 w-full bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold py-2 rounded-xl transition shadow-lg shadow-blue-600/20"
-                            >
-                              📱 Bayar via QRIS
-                            </button>
+                            >📱 Bayar via QRIS</button>
                           )}
                         </div>
                       );
@@ -467,15 +431,13 @@ export default function DashboardWarga() {
             <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
               Fitur pencetakan dan pengajuan Surat Pengantar RT online sedang dalam tahap pengembangan dan akan segera diaktifkan.
             </p>
-            <button disabled className="px-4 py-2 bg-slate-800/60 text-slate-500 rounded-xl text-xs font-semibold cursor-not-allowed border border-slate-800">
-              Segera Hadir 🚧
-            </button>
+            <button disabled className="px-4 py-2 bg-slate-800/60 text-slate-500 rounded-xl text-xs font-semibold cursor-not-allowed border border-slate-800">Segera Hadir 🚧</button>
           </div>
         )}
 
       </main>
 
-      {/* ============ MODAL DETAIL BULAN (approved) ============ */}
+      {/* MODAL DETAIL BULAN */}
       {selectedBulanDetail && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 space-y-4 shadow-2xl">
@@ -492,7 +454,7 @@ export default function DashboardWarga() {
                 <strong className="text-white">{selectedBulanDetail.namaBulan} 2026</strong>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-400">Nominal:</span>
+                <span className="text-slate-400">Total Terbayar:</span>
                 <strong className="text-emerald-400">Rp {selectedBulanDetail.jumlah.toLocaleString('id-ID')}</strong>
               </div>
               <div className="flex justify-between py-1">
@@ -508,7 +470,7 @@ export default function DashboardWarga() {
         </div>
       )}
 
-      {/* ============ MODAL BAYAR ============ */}
+      {/* MODAL BAYAR */}
       {showModalBayar && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xl my-8">
@@ -524,67 +486,70 @@ export default function DashboardWarga() {
               >✕</button>
             </div>
 
-            {/* QRIS */}
             <div className="bg-white rounded-2xl p-3 flex flex-col items-center">
               <img src="/qris.png" alt="QRIS RT 38" className="w-48 h-48 object-contain" />
               <p className="text-[10px] text-slate-600 mt-2 font-medium">Scan dengan aplikasi bank / e-wallet</p>
-
               <a
                 href="/qris.png"
                 download="QRIS-RT38.png"
                 className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition"
-              >
-                ⬇️ Download QRIS
-              </a>
-
+              >⬇️ Download QRIS</a>
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(String(totalBayar));
                   alert('Total Rp ' + totalBayar.toLocaleString('id-ID') + ' disalin');
                 }}
                 className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition"
-              >
-                📋 Salin Total: Rp {totalBayar.toLocaleString('id-ID')}
-              </button>
+              >📋 Salin Total: Rp {totalBayar.toLocaleString('id-ID')}</button>
             </div>
 
-            {/* Checklist bulan */}
+            {/* Checklist bulan — hanya yang belum lunas */}
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-2">Pilih Bulan</label>
+              <label className="text-xs font-semibold text-slate-300 block mb-2">
+                Pilih Bulan <span className="text-slate-500">(hanya yang belum lunas)</span>
+              </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {PERIODE_BULAN.map((bln) => {
-                  const rec = iuranList.find(i => i.bulan_tahun === bln.kode);
-                  const disabled = !!rec;
-                  const checked = bulanDipilih.includes(bln.kode);
-                  return (
-                    <label
-                      key={bln.kode}
-                      className={`p-2 rounded-xl border text-xs flex items-center gap-2 cursor-pointer transition ${
-                        disabled
-                          ? 'bg-slate-950/40 border-slate-800/50 text-slate-600 cursor-not-allowed'
-                          : checked
-                          ? 'bg-blue-600/20 border-blue-500/50 text-white'
-                          : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={disabled}
-                        onChange={() => {
-                          if (disabled) return;
-                          setBulanDipilih(prev =>
-                            prev.includes(bln.kode)
-                              ? prev.filter(k => k !== bln.kode)
-                              : [...prev, bln.kode]
-                          );
-                        }}
-                        className="accent-blue-500"
-                      />
-                      <span className="truncate">{bln.nama}</span>
-                    </label>
-                  );
-                })}
+                {belumLunasList.length === 0 ? (
+                  <div className="col-span-full text-center text-xs text-slate-500 py-4">
+                    Semua bulan sudah lunas 🎉
+                  </div>
+                ) : (
+                  belumLunasList.map((bln) => {
+                    const info = getInfoBulan(iuranList, bln.kode, tarifBulanan);
+                    const checked = bulanDipilih.includes(bln.kode);
+                    const labelNominal = info.totalApproved > 0
+                      ? `kurang Rp ${info.kurang.toLocaleString('id-ID')}`
+                      : `Rp ${tarifBulanan.toLocaleString('id-ID')}`;
+
+                    return (
+                      <label
+                        key={bln.kode}
+                        className={`p-2 rounded-xl border text-xs flex flex-col gap-0.5 cursor-pointer transition ${
+                          checked
+                            ? 'bg-blue-600/20 border-blue-500/50 text-white'
+                            : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              setBulanDipilih(prev =>
+                                prev.includes(bln.kode)
+                                  ? prev.filter(k => k !== bln.kode)
+                                  : [...prev, bln.kode]
+                              );
+                            }}
+                            className="accent-blue-500"
+                          />
+                          <span className="truncate font-semibold">{bln.nama}</span>
+                        </div>
+                        <span className="text-[9px] text-slate-400 pl-5">{labelNominal}</span>
+                      </label>
+                    );
+                  })
+                )}
               </div>
             </div>
 
@@ -606,11 +571,9 @@ export default function DashboardWarga() {
                     <label
                       htmlFor={`file-slot-${slot}`}
                       className={`block aspect-square rounded-2xl border-2 border-dashed flex items-center justify-center cursor-pointer overflow-hidden transition ${
-                        previewBukti[slot]
-                          ? 'border-blue-500/60 bg-slate-950'
-                          : slot === 0
-                          ? 'border-blue-500/40 bg-blue-500/5 hover:bg-blue-500/10'
-                          : 'border-slate-700 bg-slate-950/60 hover:bg-slate-800/40'
+                        previewBukti[slot] ? 'border-blue-500/60 bg-slate-950'
+                        : slot === 0 ? 'border-blue-500/40 bg-blue-500/5 hover:bg-blue-500/10'
+                        : 'border-slate-700 bg-slate-950/60 hover:bg-slate-800/40'
                       }`}
                     >
                       {previewBukti[slot] ? (
@@ -624,10 +587,7 @@ export default function DashboardWarga() {
                     </label>
                     {previewBukti[slot] && (
                       <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleRemoveFile(slot);
-                        }}
+                        onClick={(e) => { e.preventDefault(); handleRemoveFile(slot); }}
                         className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 hover:bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center shadow-lg"
                       >✕</button>
                     )}
@@ -637,7 +597,6 @@ export default function DashboardWarga() {
               <p className="text-[10px] text-slate-500 mt-1.5">JPG / PNG / WebP • maks 3 MB per file</p>
             </div>
 
-            {/* Catatan */}
             <div>
               <label className="text-xs font-semibold text-slate-300 block mb-2">Catatan (opsional)</label>
               <textarea
@@ -649,26 +608,23 @@ export default function DashboardWarga() {
               />
             </div>
 
-            {/* Total & Submit */}
             <div className="flex items-center justify-between border-t border-slate-800 pt-3">
               <div>
                 <div className="text-[10px] text-slate-400 uppercase">Total Bayar</div>
                 <div className="text-lg font-black text-white">Rp {totalBayar.toLocaleString('id-ID')}</div>
-                <div className="text-[10px] text-slate-500">{bulanDipilih.length} bulan × Rp {tarifBulanan.toLocaleString('id-ID')}</div>
+                <div className="text-[10px] text-slate-500">{bulanDipilih.length} bulan dipilih</div>
               </div>
               <button
                 onClick={handleSubmitBayar}
                 disabled={submitting || bulanDipilih.length === 0 || !fileBukti[0]}
                 className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white text-xs font-semibold px-5 py-3 rounded-xl transition shadow-lg shadow-blue-600/20"
-              >
-                {submitting ? 'Mengirim...' : 'Kirim Pengajuan'}
-              </button>
+              >{submitting ? 'Mengirim...' : 'Kirim Pengajuan'}</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ============ MODAL REKAP WARGA ============ */}
+      {/* MODAL REKAP */}
       {showRekapModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-6xl h-[90vh] rounded-3xl flex flex-col shadow-2xl overflow-hidden">
@@ -728,27 +684,28 @@ export default function DashboardWarga() {
                           </div>
                         </td>
                         {PERIODE_BULAN.map((bln, bIdx) => {
-                          const rec = iuranWarga.find(i => i.bulan_tahun === bln.kode);
-                          const nomLangsung = rec ? Number(rec.jumlah || 0) : 0;
-                          const status = rec?.status;
-                          const kosong = !rec;
-                          const pending = status === 'pending';
-                          const lunas = status === 'approved' && nomLangsung >= tarifWarga;
-                          const sebagian = status === 'approved' && nomLangsung > 0 && nomLangsung < tarifWarga;
-                          const kurang = tarifWarga - nomLangsung;
+                          const recsBulan = iuranWarga.filter(i => i.bulan_tahun === bln.kode);
+                          const totalApproved = recsBulan.filter(r => r.status === 'approved')
+                            .reduce((s, r) => s + Number(r.jumlah || 0), 0);
+                          const adaPendingBulan = recsBulan.some(r => r.status === 'pending');
+                          const kosong = recsBulan.length === 0 && !adaPendingBulan;
+                          const lunas = !adaPendingBulan && totalApproved >= tarifWarga;
+                          const sebagian = !adaPendingBulan && totalApproved > 0 && totalApproved < tarifWarga;
+                          const kurang = tarifWarga - totalApproved;
 
                           return (
                             <td key={bIdx} className="p-0.5 sm:p-2 text-center align-middle">
                               {kosong ? (
                                 <span className="text-slate-600 text-[10px]">-</span>
+                              ) : adaPendingBulan ? (
+                                <span className="text-[9px] sm:text-[10px] font-semibold px-1 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">⏳</span>
                               ) : (
                                 <div className="inline-flex flex-col items-center justify-center">
                                   <span className={`text-[9px] sm:text-[10px] font-semibold px-1 py-0.5 rounded whitespace-nowrap ${
-                                    pending ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
-                                    : lunas ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                    : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                    lunas ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                                   }`}>
-                                    {pending ? '⏳' : nomLangsung.toLocaleString('id-ID')}
+                                    {totalApproved.toLocaleString('id-ID')}
                                   </span>
                                   {sebagian && (
                                     <span className="text-[7px] sm:text-[8px] text-amber-500/80 whitespace-nowrap mt-0.5">
