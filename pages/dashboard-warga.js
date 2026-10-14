@@ -528,6 +528,24 @@ export default function DashboardWarga() {
             <div className="bg-white rounded-2xl p-3 flex flex-col items-center">
               <img src="/qris.png" alt="QRIS RT 38" className="w-48 h-48 object-contain" />
               <p className="text-[10px] text-slate-600 mt-2 font-medium">Scan dengan aplikasi bank / e-wallet</p>
+
+              <a
+                href="/qris.png"
+                download="QRIS-RT38.png"
+                className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition"
+              >
+                ⬇️ Download QRIS
+              </a>
+
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(String(totalBayar));
+                  alert('Total Rp ' + totalBayar.toLocaleString('id-ID') + ' disalin');
+                }}
+                className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition"
+              >
+                📋 Salin Total: Rp {totalBayar.toLocaleString('id-ID')}
+              </button>
             </div>
 
             {/* Checklist bulan */}
