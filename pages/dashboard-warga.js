@@ -42,9 +42,29 @@ export default function DashboardWarga() {
     }
 
     const userData = JSON.parse(savedSession);
-    setWarga(userData);
-    fetchDataIuran(userData.id);
+    setWarga(userData);            // tampilkan dulu dari cache (biar cepat)
+    fetchDataIuran(userData.id);   // ambil iuran
+    refreshSession(userData.id);   // ← sinkronkan profil dari DB
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fungsi baru: ambil ulang profil warga dari Supabase & update localStorage
+  const refreshSession = async (wargaId) => {
+    try {
+      const { data, error } = await supabase
+        .from('warga')
+        .select('*')
+        .eq('id', wargaId)
+        .single();
+
+      if (!error && data) {
+        setWarga(data);
+        localStorage.setItem('warga_session', JSON.stringify(data));
+      }
+    } catch (err) {
+      console.error('Gagal refresh session:', err);
+    }
+  };
 
   const fetchDataIuran = async (wargaId) => {
     try {
@@ -108,7 +128,6 @@ export default function DashboardWarga() {
 
   const totalDisetor = iuranList.reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
 
-  // Total donasi warga yang login (kelebihan dari tarif tiap bulan)
   const totalDonasi = iuranList.reduce((acc, curr) => {
     const nominal = Number(curr.jumlah || 0);
     return acc + Math.max(0, nominal - tarifBulanan);
@@ -242,7 +261,6 @@ export default function DashboardWarga() {
               </button>
             </div>
 
-            {/* Ringkasan: Total Setor & Donasi */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
                 <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
