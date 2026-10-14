@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import InstallButton from '../InstallButton';
 
 const MENU = [
   { key: 'iuran', label: 'Status Iuran', icon: '💰', path: '/dashboard-warga/iuran' },
@@ -28,12 +29,15 @@ export default function Layout({ children, warga, onLogout }) {
           </div>
         </Link>
 
-        <button
-          onClick={onLogout}
-          className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-xl border border-rose-500/20 transition font-medium"
-        >
-          Keluar 🚪
-        </button>
+        <div className="flex items-center gap-2">
+          <InstallButton />
+          <button
+            onClick={onLogout}
+            className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-xl border border-rose-500/20 transition font-medium"
+          >
+            Keluar 🚪
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-6 my-1">
