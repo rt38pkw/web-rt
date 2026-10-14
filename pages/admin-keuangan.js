@@ -18,6 +18,7 @@ import TabDeposit from '../components/keuangan/TabDeposit';
 import TabTunggakan from '../components/keuangan/TabTunggakan';
 import TabRiwayat from '../components/keuangan/TabRiwayat';
 import ModalPakaiDeposit from '../components/keuangan/ModalPakaiDeposit';
+import NotifToggle from '../components/NotifToggle';
 
 export default function AdminKeuangan() {
   const [user, setUser] = useState(null);
