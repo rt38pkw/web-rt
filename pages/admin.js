@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import Link from 'next/link';
+import InstallButton from '../components/InstallButton';
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
@@ -13,11 +14,11 @@ export default function AdminDashboard() {
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  
+
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
+
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
@@ -190,20 +191,22 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased font-sans">
       <header className="bg-slate-900/70 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img 
-              src="/logo-rt38.png" 
-              alt="Logo RT 38 Puri Kencana Wagir" 
-              className="w-10 h-10 rounded-full object-cover border border-blue-500/30 shadow-md shadow-blue-500/20"
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <img
+              src="/logo-rt38.png"
+              alt="Logo RT 38 Puri Kencana Wagir"
+              className="w-10 h-10 rounded-full object-cover border border-blue-500/30 shadow-md shadow-blue-500/20 shrink-0"
             />
-            <div>
-              <h1 className="text-base font-bold text-white leading-tight">RT 38 Puri Kencana Wagir</h1>
+            <div className="min-w-0">
+              <h1 className="text-base font-bold text-white leading-tight truncate">RT 38 Puri Kencana Wagir</h1>
               <p className="text-[11px] text-slate-400">Rukun • Peduli • Bersama</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
+            <InstallButton />
+
             <div className="hidden sm:flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-full">
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
               <span className="text-xs font-medium text-slate-200">{user.nama}</span>
@@ -221,7 +224,7 @@ export default function AdminDashboard() {
               }}
               className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-medium transition active:scale-95 flex items-center gap-1"
             >
-              🔑 Edit Akun
+              🔑 <span className="hidden sm:inline">Edit Akun</span>
             </button>
 
             <button
@@ -290,7 +293,7 @@ export default function AdminDashboard() {
         </div>
 
         <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">Akses Layanan Admin</h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {canAccessKeuangan ? (
             <Link href="/admin-keuangan" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-blue-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
