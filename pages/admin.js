@@ -59,7 +59,7 @@ export default function AdminDashboard() {
   async function fetchStats() {
     try {
       const { count: wargaCount } = await supabase.from('warga').select('*', { count: 'exact', head: true });
-      const { count: pendingCount } = await supabase.from('iuran').select('*', { count: 'exact', head: true }).eq('status', 'Pending');
+      const { count: pendingCount } = await supabase.from('iuran').select('*', { count: 'exact', head: true }).eq('status', 'pending');
       const { count: pengumumanCount } = await supabase.from('pengumuman').select('*', { count: 'exact', head: true });
 
       setStats({
@@ -185,7 +185,6 @@ export default function AdminDashboard() {
   }
 
   const canAccessIuran = user.role === 'ketua' || user.role === 'bendahara';
-  const canAccessSurat = user.role === 'ketua' || user.role === 'sekretaris';
   const canAccessWarga = user.role === 'ketua' || user.role === 'sekretaris';
 
   return (
@@ -313,22 +312,15 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {canAccessSurat ? (
-            <Link href="/surat" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
-              <div>
-                <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition mb-4 text-emerald-400">📄</div>
-                <h4 className="text-lg font-bold text-white group-hover:text-emerald-400 transition">Pengajuan Surat</h4>
-                <p className="text-xs text-slate-400 mt-1">Proses dan cetak surat pengantar permohonan warga.</p>
-              </div>
-              <div className="mt-6 flex items-center text-xs font-semibold text-emerald-400 group-hover:translate-x-1 transition">Buka Layanan &rarr;</div>
-            </Link>
-          ) : (
-            <div className="bg-slate-900/30 border border-slate-800/50 rounded-2xl p-6 opacity-40 cursor-not-allowed">
-              <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-xl mb-4 text-slate-500">🔒</div>
-              <h4 className="text-lg font-bold text-slate-500">Pengajuan Surat</h4>
-              <p className="text-xs text-slate-600 mt-1">Khusus akses Ketua & Sekretaris.</p>
-            </div>
-          )}
+          {/* Kartu Pengajuan Surat — SEGERA */}
+          <div className="relative bg-slate-900/40 border border-slate-800/50 rounded-2xl p-6 opacity-60 cursor-not-allowed overflow-hidden">
+            <span className="absolute top-3 right-3 text-[9px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700 font-semibold uppercase tracking-wider">
+              Segera
+            </span>
+            <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-xl mb-4 text-slate-500">📄</div>
+            <h4 className="text-lg font-bold text-slate-500">Pengajuan Surat</h4>
+            <p className="text-xs text-slate-600 mt-1">Fitur pengajuan surat pengantar sedang dalam tahap pengembangan.</p>
+          </div>
 
           <Link href="/" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-600 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
             <div>
