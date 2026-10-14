@@ -297,7 +297,7 @@ export default function AdminDashboard() {
           )}
 
           {canAccessWarga ? (
-            <Link href="/warga" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
+            <Link href="/admin-warga" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
               <div>
                 <div className="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition mb-4 text-indigo-400">👥</div>
                 <h4 className="text-lg font-bold text-white group-hover:text-indigo-400 transition">Data Warga</h4>
