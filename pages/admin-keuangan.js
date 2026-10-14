@@ -549,29 +549,31 @@ export default function AdminKeuangan() {
       </div>
 
       <div className="max-w-7xl mx-auto p-4 space-y-4">
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+        {/* TAB MENU — Grid di HP, Flex di Desktop */}
+        <div className="grid grid-cols-4 gap-1.5 sm:flex sm:gap-2 sm:overflow-x-auto sm:pb-1 sm:scrollbar-none">
           {[
-            { k: 'dashboard', l: '📊 Dashboard' },
-            { k: 'verifikasi', l: '⏳ Verifikasi' },
-            { k: 'tunai', l: '💵 Input Tunai' },
-            { k: 'pemasukan', l: '➕ Pemasukan' },
-            { k: 'pengeluaran', l: '➖ Pengeluaran' },
-            { k: 'deposit', l: '💎 Deposit' },
-            { k: 'tunggakan', l: '⚠️ Tunggakan' },
-            { k: 'riwayat', l: '📋 Riwayat' },
+            { k: 'dashboard',   i: '📊', l: 'Dashboard' },
+            { k: 'verifikasi',  i: '⏳', l: 'Verifikasi' },
+            { k: 'tunai',       i: '💵', l: 'Tunai' },
+            { k: 'pemasukan',   i: '➕', l: 'Pemasukan' },
+            { k: 'pengeluaran', i: '➖', l: 'Pengeluaran' },
+            { k: 'deposit',     i: '💎', l: 'Deposit' },
+            { k: 'tunggakan',   i: '⚠️', l: 'Tunggakan' },
+            { k: 'riwayat',     i: '📋', l: 'Riwayat' },
           ].map((t) => (
             <button
               key={t.k}
               onClick={() => setTab(t.k)}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold border transition shrink-0 ${
+              className={`relative flex flex-col items-center justify-center gap-0.5 sm:flex-row sm:gap-1.5 px-2 py-2 sm:px-3 rounded-xl text-[9px] sm:text-xs font-semibold border transition shrink-0 ${
                 tab === t.k
                   ? 'bg-blue-600 text-white border-blue-500'
                   : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
               }`}
             >
-              {t.l}
+              <span className="text-base sm:text-xs leading-none">{t.i}</span>
+              <span className="leading-tight">{t.l}</span>
               {t.k === 'verifikasi' && pendingBatches.length > 0 && (
-                <span className="ml-1 inline-block bg-orange-500 text-white text-[9px] px-1.5 rounded-full">
+                <span className="absolute top-0.5 right-0.5 inline-block bg-orange-500 text-white text-[8px] px-1 rounded-full leading-tight">
                   {pendingBatches.length}
                 </span>
               )}
