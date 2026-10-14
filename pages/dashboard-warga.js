@@ -28,6 +28,10 @@ export default function DashboardWarga() {
   const [loadingRekap, setLoadingRekap] = useState(false);
   const [activeTab, setActiveTab] = useState('iuran'); 
   const [showRekapModal, setShowRekapModal] = useState(false); 
+  
+  // State untuk Modal Detail Transaksi per Bulan
+  const [selectedBulanDetail, setSelectedBulanDetail] = useState(null);
+
   const router = useRouter();
 
   useEffect(() => {
@@ -87,15 +91,21 @@ export default function DashboardWarga() {
     router.push('/');
   };
 
+  const formatTanggal = (dateString) => {
+    if (!dateString) return 'Tanggal tidak tercatat';
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    }).format(date);
+  };
+
   if (!warga) return null;
 
   const isUsaha = warga.kategori === 'Usaha' || warga.no_rumah?.trim() === 'A2 - 19';
   const tarifBulanan = isUsaha ? 30000 : 15000;
   const totalDisetor = iuranList.reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
-  const totalKewajibanSemuaBulan = PERIODE_BULAN.length * tarifBulanan;
-  const sisaDeposit = totalDisetor > totalKewajibanSemuaBulan 
-    ? totalDisetor - totalKewajibanSemuaBulan 
-    : 0;
 
   let poolSaldo = totalDisetor;
 
@@ -227,24 +237,14 @@ export default function DashboardWarga() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
-                <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
-                  Total Setor
-                </span>
-                <span className="text-lg sm:text-2xl font-black text-white mt-1">
-                  Rp {totalDisetor.toLocaleString('id-ID')}
-                </span>
-              </div>
-
-              <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
-                <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
-                  Sisa Deposit
-                </span>
-                <span className="text-lg sm:text-2xl font-black text-emerald-400 mt-1">
-                  Rp {sisaDeposit.toLocaleString('id-ID')}
-                </span>
-              </div>
+            {/* Total Setor (Tanpa Sisa Deposit) */}
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+              <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
+                Total Setor Warga
+              </span>
+              <span className="text-lg sm:text-2xl font-black text-white mt-1">
+                Rp {totalDisetor.toLocaleString('id-ID')}
+              </span>
             </div>
 
             <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-5 sm:p-6 shadow-xl">
@@ -253,7 +253,7 @@ export default function DashboardWarga() {
                   <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
                     Grid Iuran Bulanan 2026
                   </h3>
-                  <p className="text-xs text-slate-400">Rincian status pembayaran periode April – Desember</p>
+                  <p className="text-xs text-slate-400">Rincian status pembayaran periode April – Desember (Klik grid untuk detail tanggal)</p>
                 </div>
                 <span className="text-xs bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 font-medium">
                   9 Bulan
@@ -291,11 +291,24 @@ export default function DashboardWarga() {
                     }
 
                     const sisaKekurangan = tarifBulanan - nominalTercoverBulanIni;
+                    const canClick = nominalLangsung > 0;
 
                     return (
                       <div 
                         key={idx} 
+                        onClick={() => {
+                          if (canClick) {
+                            setSelectedBulanDetail({
+                              namaBulan: bln.nama,
+                              jumlah: nominalLangsung,
+                              tanggal: recordBulan?.tanggal_transaksi,
+                              isLunas: isLunas
+                            });
+                          }
+                        }}
                         className={`p-3.5 rounded-2xl border transition-all duration-200 flex items-center justify-between ${
+                          canClick ? 'cursor-pointer hover:scale-[1.01]' : 'cursor-default'
+                        } ${
                           isLunas 
                             ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-300' 
                             : isSebagian
@@ -375,6 +388,45 @@ export default function DashboardWarga() {
         )}
 
       </main>
+
+      {/* MODAL DETAIL TANGGAL TRANSAKSI PER BULAN */}
+      {selectedBulanDetail && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="font-bold text-white text-base">Detail Pembayaran</h3>
+              <button 
+                onClick={() => setSelectedBulanDetail(null)}
+                className="w-7 h-7 bg-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center text-xs transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-300">
+              <div className="flex justify-between py-1 border-b border-slate-800/60">
+                <span className="text-slate-400">Bulan:</span>
+                <strong className="text-white">{selectedBulanDetail.namaBulan} 2026</strong>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-800/60">
+                <span className="text-slate-400">Nominal Terbayar:</span>
+                <strong className="text-emerald-400">Rp {selectedBulanDetail.jumlah.toLocaleString('id-ID')}</strong>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-slate-400">Tanggal Transaksi:</span>
+                <strong className="text-amber-400">{formatTanggal(selectedBulanDetail.tanggal)}</strong>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setSelectedBulanDetail(null)}
+              className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition shadow-lg shadow-blue-600/20"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
 
       {showRekapModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
