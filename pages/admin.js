@@ -246,7 +246,6 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Kartu Statistik */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
             <div className="flex items-center justify-between mb-3">
@@ -259,7 +258,7 @@ export default function AdminDashboard() {
 
           {canAccessKeuangan ? (
             <Link
-              href="/admin-iuran"
+              href="/admin-keuangan?tab=verifikasi"
               className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-5 shadow-lg transition duration-300"
             >
               <div className="flex items-center justify-between mb-3">
@@ -294,7 +293,7 @@ export default function AdminDashboard() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {canAccessKeuangan ? (
-            <Link href="/admin-iuran" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-blue-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
+            <Link href="/admin-keuangan" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-blue-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
               <div>
                 <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition mb-4 text-blue-400">💰</div>
                 <h4 className="text-lg font-bold text-white group-hover:text-blue-400 transition">Keuangan</h4>
