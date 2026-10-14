@@ -1,0 +1,32 @@
+{
+  "name": "Portal Warga RT 38 Puri Kencana Wagir",
+  "short_name": "RT 38 PKW",
+  "description": "Portal mandiri warga RT 38 — cek iuran, pengumuman, dan surat pengantar",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#1e40af",
+  "background_color": "#020617",
+  "lang": "id",
+  "icons": [
+    {
+      "src": "/logo-rt38.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo-rt38.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo-rt38.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
