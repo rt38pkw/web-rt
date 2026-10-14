@@ -44,7 +44,7 @@ export default function DashboardWarga() {
     const userData = JSON.parse(savedSession);
     setWarga(userData);            // tampilkan dulu dari cache (biar cepat)
     fetchDataIuran(userData.id);   // ambil iuran
-    refreshSession(userData.id);   // ← sinkronkan profil dari DB
+    refreshSession(userData.id);   // sinkronkan profil dari DB
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -468,7 +468,7 @@ export default function DashboardWarga() {
 
       {showRekapModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-5xl h-[90vh] rounded-3xl flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-6xl h-[90vh] rounded-3xl flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
 
             <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/60">
               <div>
@@ -486,7 +486,7 @@ export default function DashboardWarga() {
             </div>
 
             <div className="flex-1 overflow-auto p-4">
-              <div className="min-w-[900px]">
+              <div className="min-w-[1050px]">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-slate-800 text-slate-400 bg-slate-950/40">
@@ -520,13 +520,24 @@ export default function DashboardWarga() {
                           <td className="p-3 font-bold text-white sticky left-0 bg-slate-900 z-10">
                             {w.no_rumah}
                           </td>
-                          <td className="p-3 text-slate-300 sticky left-20 bg-slate-900 z-10">
-                            {w.nama_lengkap}
+                          <td className="p-3 sticky left-20 bg-slate-900 z-10">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-slate-300 whitespace-nowrap">{w.nama_lengkap}</span>
+                              <span
+                                className={`inline-flex items-center gap-1 text-[9px] font-medium w-fit px-1.5 py-0.5 rounded-md border whitespace-nowrap ${
+                                  isWargaUsaha
+                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                    : 'bg-slate-800/60 text-slate-400 border-slate-700/60'
+                                }`}
+                              >
+                                {isWargaUsaha ? '🏪 Usaha' : '🏠 Tempat Tinggal'}
+                              </span>
+                            </div>
                           </td>
-                          <td className="p-3 text-center font-extrabold text-blue-400">
+                          <td className="p-3 text-center font-extrabold text-blue-400 whitespace-nowrap">
                             Rp {totalWargaSetor.toLocaleString('id-ID')}
                           </td>
-                          <td className="p-3 text-center font-semibold text-emerald-400">
+                          <td className="p-3 text-center font-semibold text-emerald-400 whitespace-nowrap">
                             {totalDonasiWarga > 0
                               ? `Rp ${totalDonasiWarga.toLocaleString('id-ID')}`
                               : '-'}
@@ -538,20 +549,31 @@ export default function DashboardWarga() {
 
                             const lunas = nomLangsung >= tarifWarga;
                             const sebagian = nomLangsung > 0 && nomLangsung < tarifWarga;
+                            const kosong = nomLangsung === 0;
+                            const kurang = tarifWarga - nomLangsung;
 
                             return (
                               <td key={bIdx} className="p-2 text-center">
-                                <span
-                                  className={`inline-block px-2 py-1 rounded-lg text-[10px] font-semibold ${
-                                    lunas
-                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                      : sebagian
-                                      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                      : 'bg-slate-800/40 text-slate-500'
-                                  }`}
-                                >
-                                  {lunas ? 'Lunas' : sebagian ? 'Kurang' : '-'}
-                                </span>
+                                {kosong ? (
+                                  <span className="text-slate-600 text-[11px]">-</span>
+                                ) : (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <span
+                                      className={`inline-block px-2 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap ${
+                                        lunas
+                                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                      }`}
+                                    >
+                                      {nomLangsung.toLocaleString('id-ID')}
+                                    </span>
+                                    {sebagian && (
+                                      <span className="text-[9px] text-amber-500/80 whitespace-nowrap">
+                                        kurang {kurang.toLocaleString('id-ID')}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </td>
                             );
                           })}
