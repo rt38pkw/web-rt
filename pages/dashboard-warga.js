@@ -42,13 +42,12 @@ export default function DashboardWarga() {
     }
 
     const userData = JSON.parse(savedSession);
-    setWarga(userData);            // tampilkan dulu dari cache (biar cepat)
-    fetchDataIuran(userData.id);   // ambil iuran
-    refreshSession(userData.id);   // sinkronkan profil dari DB
+    setWarga(userData);
+    fetchDataIuran(userData.id);
+    refreshSession(userData.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fungsi baru: ambil ulang profil warga dari Supabase & update localStorage
   const refreshSession = async (wargaId) => {
     try {
       const { data, error } = await supabase
@@ -470,126 +469,234 @@ export default function DashboardWarga() {
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-6xl h-[90vh] rounded-3xl flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
 
-            <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/60">
+            {/* HEADER MODAL */}
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/60">
               <div>
                 <h3 className="font-bold text-white text-sm sm:text-base flex items-center gap-2">
-                  📋 Rekapitulasi Iuran Seluruh Warga RT 38 (2026)
+                  📋 Rekapitulasi Iuran RT 38 (2026)
                 </h3>
                 <p className="text-[11px] text-slate-400">Transparansi kas dan status setoran warga</p>
               </div>
               <button
                 onClick={() => setShowRekapModal(false)}
-                className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center text-sm transition"
+                className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center text-sm transition shrink-0"
               >
                 ✕
               </button>
             </div>
 
-            <div className="flex-1 overflow-auto p-4">
-              <div className="min-w-[1050px]">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-800 text-slate-400 bg-slate-950/40">
-                      <th className="p-3 sticky left-0 bg-slate-950 z-10">No. Rumah</th>
-                      <th className="p-3 sticky left-20 bg-slate-950 z-10">Nama Warga</th>
-                      <th className="p-3 text-center">Total Setor</th>
-                      <th className="p-3 text-center text-emerald-400">Donasi</th>
-                      {PERIODE_BULAN.map((b, i) => (
-                        <th key={i} className="p-3 text-center">{b.nama}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60">
-                    {allWargaList.map((w, idx) => {
-                      const isWargaUsaha = w.kategori === 'Usaha' || w.no_rumah?.trim() === 'A2 - 19';
-                      const tarifWarga = isWargaUsaha ? 30000 : 15000;
+            {/* BODY */}
+            <div className="flex-1 overflow-auto p-3 sm:p-4">
 
-                      const iuranWarga = allIuranList.filter(i => i.warga_id === w.id);
-                      const totalWargaSetor = iuranWarga.reduce(
-                        (acc, curr) => acc + Number(curr.jumlah || 0),
-                        0
-                      );
+              {/* ====== 📱 MOBILE VIEW: CARD ====== */}
+              <div className="md:hidden space-y-3">
+                {allWargaList.map((w, idx) => {
+                  const isWargaUsaha = w.kategori === 'Usaha' || w.no_rumah?.trim() === 'A2 - 19';
+                  const tarifWarga = isWargaUsaha ? 30000 : 15000;
 
-                      const totalDonasiWarga = iuranWarga.reduce((acc, curr) => {
-                        const nominal = Number(curr.jumlah || 0);
-                        return acc + Math.max(0, nominal - tarifWarga);
-                      }, 0);
+                  const iuranWarga = allIuranList.filter(i => i.warga_id === w.id);
+                  const totalWargaSetor = iuranWarga.reduce(
+                    (acc, curr) => acc + Number(curr.jumlah || 0),
+                    0
+                  );
+                  const totalDonasiWarga = iuranWarga.reduce((acc, curr) => {
+                    const nominal = Number(curr.jumlah || 0);
+                    return acc + Math.max(0, nominal - tarifWarga);
+                  }, 0);
 
-                      return (
-                        <tr key={idx} className="hover:bg-slate-800/30 transition">
-                          <td className="p-3 font-bold text-white sticky left-0 bg-slate-900 z-10">
-                            {w.no_rumah}
-                          </td>
-                          <td className="p-3 sticky left-20 bg-slate-900 z-10">
-                            <div className="flex flex-col gap-1">
-                              <span className="text-slate-300 whitespace-nowrap">{w.nama_lengkap}</span>
-                              <span
-                                className={`inline-flex items-center gap-1 text-[9px] font-medium w-fit px-1.5 py-0.5 rounded-md border whitespace-nowrap ${
-                                  isWargaUsaha
-                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                                    : 'bg-slate-800/60 text-slate-400 border-slate-700/60'
-                                }`}
-                              >
-                                {isWargaUsaha ? '🏪 Usaha' : '🏠 Tempat Tinggal'}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="p-3 text-center font-extrabold text-blue-400 whitespace-nowrap">
+                  return (
+                    <div
+                      key={idx}
+                      className="bg-slate-950/60 border border-slate-800 rounded-2xl p-3 space-y-3"
+                    >
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-white text-sm">{w.no_rumah}</span>
+                            <span
+                              className={`text-[9px] px-1.5 py-0.5 rounded-md border font-medium whitespace-nowrap ${
+                                isWargaUsaha
+                                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                  : 'bg-slate-800/60 text-slate-400 border-slate-700/60'
+                              }`}
+                            >
+                              {isWargaUsaha ? '🏪 Usaha' : '🏠 Hunian'}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-300 mt-1 truncate">
+                            {w.nama_lengkap}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-[9px] text-slate-500 uppercase">Total</div>
+                          <div className="font-extrabold text-blue-400 text-sm whitespace-nowrap">
                             Rp {totalWargaSetor.toLocaleString('id-ID')}
-                          </td>
-                          <td className="p-3 text-center font-semibold text-emerald-400 whitespace-nowrap">
-                            {totalDonasiWarga > 0
-                              ? `Rp ${totalDonasiWarga.toLocaleString('id-ID')}`
-                              : '-'}
-                          </td>
+                          </div>
+                          {totalDonasiWarga > 0 && (
+                            <div className="text-[9px] text-emerald-400 whitespace-nowrap">
+                              + Donasi {totalDonasiWarga.toLocaleString('id-ID')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
 
-                          {PERIODE_BULAN.map((bln, bIdx) => {
-                            const rec = iuranWarga.find(i => i.bulan_tahun === bln.kode);
-                            const nomLangsung = rec ? Number(rec.jumlah || 0) : 0;
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {PERIODE_BULAN.map((bln, bIdx) => {
+                          const rec = iuranWarga.find(i => i.bulan_tahun === bln.kode);
+                          const nomLangsung = rec ? Number(rec.jumlah || 0) : 0;
+                          const lunas = nomLangsung >= tarifWarga;
+                          const sebagian = nomLangsung > 0 && nomLangsung < tarifWarga;
+                          const kosong = nomLangsung === 0;
+                          const kurang = tarifWarga - nomLangsung;
 
-                            const lunas = nomLangsung >= tarifWarga;
-                            const sebagian = nomLangsung > 0 && nomLangsung < tarifWarga;
-                            const kosong = nomLangsung === 0;
-                            const kurang = tarifWarga - nomLangsung;
-
-                            return (
-                              <td key={bIdx} className="p-2 text-center">
-                                {kosong ? (
-                                  <span className="text-slate-600 text-[11px]">-</span>
-                                ) : (
-                                  <div className="flex flex-col items-center gap-0.5">
-                                    <span
-                                      className={`inline-block px-2 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap ${
-                                        lunas
-                                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                      }`}
-                                    >
-                                      {nomLangsung.toLocaleString('id-ID')}
-                                    </span>
-                                    {sebagian && (
-                                      <span className="text-[9px] text-amber-500/80 whitespace-nowrap">
-                                        kurang {kurang.toLocaleString('id-ID')}
-                                      </span>
-                                    )}
+                          return (
+                            <div
+                              key={bIdx}
+                              className={`p-1.5 rounded-lg border text-center ${
+                                kosong
+                                  ? 'bg-slate-900/60 border-slate-800/60'
+                                  : lunas
+                                  ? 'bg-emerald-500/10 border-emerald-500/20'
+                                  : 'bg-amber-500/10 border-amber-500/20'
+                              }`}
+                            >
+                              <div className="text-[9px] text-slate-400">
+                                {bln.nama.substring(0, 3)}
+                              </div>
+                              {kosong ? (
+                                <div className="text-[11px] text-slate-600 font-semibold">-</div>
+                              ) : (
+                                <>
+                                  <div
+                                    className={`text-[10px] font-bold ${
+                                      lunas ? 'text-emerald-400' : 'text-amber-400'
+                                    }`}
+                                  >
+                                    {nomLangsung.toLocaleString('id-ID')}
                                   </div>
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                                  {sebagian && (
+                                    <div className="text-[8px] text-amber-500/80">
+                                      kurang {kurang.toLocaleString('id-ID')}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+
+              {/* ====== 💻 DESKTOP VIEW: TABEL ====== */}
+              <div className="hidden md:block">
+                <div className="min-w-[1050px]">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-slate-400 bg-slate-950/40">
+                        <th className="p-3 sticky left-0 bg-slate-950 z-10">No. Rumah</th>
+                        <th className="p-3 sticky left-20 bg-slate-950 z-10">Nama Warga</th>
+                        <th className="p-3 text-center">Total Setor</th>
+                        <th className="p-3 text-center text-emerald-400">Donasi</th>
+                        {PERIODE_BULAN.map((b, i) => (
+                          <th key={i} className="p-3 text-center">{b.nama}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {allWargaList.map((w, idx) => {
+                        const isWargaUsaha = w.kategori === 'Usaha' || w.no_rumah?.trim() === 'A2 - 19';
+                        const tarifWarga = isWargaUsaha ? 30000 : 15000;
+
+                        const iuranWarga = allIuranList.filter(i => i.warga_id === w.id);
+                        const totalWargaSetor = iuranWarga.reduce(
+                          (acc, curr) => acc + Number(curr.jumlah || 0),
+                          0
+                        );
+                        const totalDonasiWarga = iuranWarga.reduce((acc, curr) => {
+                          const nominal = Number(curr.jumlah || 0);
+                          return acc + Math.max(0, nominal - tarifWarga);
+                        }, 0);
+
+                        return (
+                          <tr key={idx} className="hover:bg-slate-800/30 transition">
+                            <td className="p-3 font-bold text-white sticky left-0 bg-slate-900 z-10">
+                              {w.no_rumah}
+                            </td>
+                            <td className="p-3 sticky left-20 bg-slate-900 z-10">
+                              <div className="flex flex-col gap-1">
+                                <span className="text-slate-300 whitespace-nowrap">{w.nama_lengkap}</span>
+                                <span
+                                  className={`inline-flex items-center gap-1 text-[9px] font-medium w-fit px-1.5 py-0.5 rounded-md border whitespace-nowrap ${
+                                    isWargaUsaha
+                                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                      : 'bg-slate-800/60 text-slate-400 border-slate-700/60'
+                                  }`}
+                                >
+                                  {isWargaUsaha ? '🏪 Usaha' : '🏠 Tempat Tinggal'}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="p-3 text-center font-extrabold text-blue-400 whitespace-nowrap">
+                              Rp {totalWargaSetor.toLocaleString('id-ID')}
+                            </td>
+                            <td className="p-3 text-center font-semibold text-emerald-400 whitespace-nowrap">
+                              {totalDonasiWarga > 0
+                                ? `Rp ${totalDonasiWarga.toLocaleString('id-ID')}`
+                                : '-'}
+                            </td>
+
+                            {PERIODE_BULAN.map((bln, bIdx) => {
+                              const rec = iuranWarga.find(i => i.bulan_tahun === bln.kode);
+                              const nomLangsung = rec ? Number(rec.jumlah || 0) : 0;
+                              const lunas = nomLangsung >= tarifWarga;
+                              const sebagian = nomLangsung > 0 && nomLangsung < tarifWarga;
+                              const kosong = nomLangsung === 0;
+                              const kurang = tarifWarga - nomLangsung;
+
+                              return (
+                                <td key={bIdx} className="p-2 text-center">
+                                  {kosong ? (
+                                    <span className="text-slate-600 text-[11px]">-</span>
+                                  ) : (
+                                    <div className="flex flex-col items-center gap-0.5">
+                                      <span
+                                        className={`inline-block px-2 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap ${
+                                          lunas
+                                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                        }`}
+                                      >
+                                        {nomLangsung.toLocaleString('id-ID')}
+                                      </span>
+                                      {sebagian && (
+                                        <span className="text-[9px] text-amber-500/80 whitespace-nowrap">
+                                          kurang {kurang.toLocaleString('id-ID')}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
             </div>
 
-            <div className="px-6 py-3 border-t border-slate-800 bg-slate-950/60 flex justify-between items-center text-xs text-slate-400">
-              <span>Menampilkan seluruh data warga dan status bulanan real-time.</span>
+            <div className="px-4 sm:px-6 py-3 border-t border-slate-800 bg-slate-950/60 flex justify-between items-center text-xs text-slate-400 gap-3">
+              <span className="hidden sm:inline">Menampilkan seluruh data warga dan status bulanan real-time.</span>
+              <span className="sm:hidden">Status iuran real-time</span>
               <button
                 onClick={() => setShowRekapModal(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition"
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition shrink-0"
               >
                 Tutup
               </button>
