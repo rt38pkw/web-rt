@@ -26,9 +26,9 @@ export default function DashboardWarga() {
   const [allIuranList, setAllIuranList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingRekap, setLoadingRekap] = useState(false);
-  const [activeTab, setActiveTab] = useState('iuran'); 
-  const [showRekapModal, setShowRekapModal] = useState(false); 
-  
+  const [activeTab, setActiveTab] = useState('iuran');
+  const [showRekapModal, setShowRekapModal] = useState(false);
+
   // State untuk Modal Detail Transaksi per Bulan
   const [selectedBulanDetail, setSelectedBulanDetail] = useState(null);
 
@@ -73,7 +73,7 @@ export default function DashboardWarga() {
     try {
       const [resWarga, resIuran] = await Promise.all([
         supabase.from('warga').select('*').order('no_rumah', { ascending: true }),
-        supabase.from('iuran').select('*')
+        supabase.from('iuran').select('*'),
       ]);
 
       if (!resWarga.error && resWarga.data) setAllWargaList(resWarga.data);
@@ -97,7 +97,7 @@ export default function DashboardWarga() {
     return new Intl.DateTimeFormat('id-ID', {
       day: 'numeric',
       month: 'long',
-      year: 'numeric'
+      year: 'numeric',
     }).format(date);
   };
 
@@ -105,9 +105,14 @@ export default function DashboardWarga() {
 
   const isUsaha = warga.kategori === 'Usaha' || warga.no_rumah?.trim() === 'A2 - 19';
   const tarifBulanan = isUsaha ? 30000 : 15000;
+
   const totalDisetor = iuranList.reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
 
-  let poolSaldo = totalDisetor;
+  // Total donasi warga yang login (kelebihan dari tarif tiap bulan)
+  const totalDonasi = iuranList.reduce((acc, curr) => {
+    const nominal = Number(curr.jumlah || 0);
+    return acc + Math.max(0, nominal - tarifBulanan);
+  }, 0);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-blue-500 selection:text-white antialiased">
@@ -118,10 +123,10 @@ export default function DashboardWarga() {
       <header className="px-5 py-3.5 border-b border-slate-800/60 flex justify-between items-center bg-slate-900/40 backdrop-blur-md sticky top-0 z-50">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700/80 flex items-center justify-center overflow-hidden shrink-0">
-            <img 
-              src="/logo-rt38.png" 
-              alt="Logo RT 38" 
-              className="w-full h-full object-cover" 
+            <img
+              src="/logo-rt38.png"
+              alt="Logo RT 38"
+              className="w-full h-full object-cover"
             />
           </div>
           <div>
@@ -237,14 +242,25 @@ export default function DashboardWarga() {
               </button>
             </div>
 
-            {/* Total Setor (Tanpa Sisa Deposit) */}
-            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
-              <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
-                Total Setor Warga
-              </span>
-              <span className="text-lg sm:text-2xl font-black text-white mt-1">
-                Rp {totalDisetor.toLocaleString('id-ID')}
-              </span>
+            {/* Ringkasan: Total Setor & Donasi */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
+                  Total Setor Warga
+                </span>
+                <span className="text-lg sm:text-2xl font-black text-white mt-1">
+                  Rp {totalDisetor.toLocaleString('id-ID')}
+                </span>
+              </div>
+
+              <div className="bg-slate-900/60 border border-emerald-500/20 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                <span className="text-[11px] text-emerald-400 uppercase tracking-wider font-medium">
+                  Total Donasi 💚
+                </span>
+                <span className="text-lg sm:text-2xl font-black text-emerald-400 mt-1">
+                  Rp {totalDonasi.toLocaleString('id-ID')}
+                </span>
+              </div>
             </div>
 
             <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-5 sm:p-6 shadow-xl">
@@ -268,49 +284,38 @@ export default function DashboardWarga() {
                     const recordBulan = iuranList.find(i => i.bulan_tahun === bln.kode);
                     const nominalLangsung = recordBulan ? Number(recordBulan.jumlah || 0) : 0;
 
-                    let isLunas = false;
-                    let isSebagian = false;
-                    let nominalTercoverBulanIni = 0;
+                    const isLunas = nominalLangsung >= tarifBulanan;
+                    const isSebagian = nominalLangsung > 0 && nominalLangsung < tarifBulanan;
 
-                    if (nominalLangsung >= tarifBulanan) {
-                      isLunas = true;
-                      nominalTercoverBulanIni = tarifBulanan;
-                      poolSaldo -= tarifBulanan;
-                    } else if (nominalLangsung > 0 && nominalLangsung < tarifBulanan) {
-                      isSebagian = true;
-                      nominalTercoverBulanIni = nominalLangsung;
-                      poolSaldo -= nominalLangsung;
-                    } else if (poolSaldo >= tarifBulanan) {
-                      isLunas = true;
-                      nominalTercoverBulanIni = tarifBulanan;
-                      poolSaldo -= tarifBulanan;
-                    } else if (poolSaldo > 0 && poolSaldo < tarifBulanan) {
-                      isSebagian = true;
-                      nominalTercoverBulanIni = poolSaldo;
-                      poolSaldo = 0;
-                    }
+                    const nominalTercover = isLunas
+                      ? tarifBulanan
+                      : isSebagian
+                      ? nominalLangsung
+                      : 0;
 
-                    const sisaKekurangan = tarifBulanan - nominalTercoverBulanIni;
+                    const nominalDonasi = isLunas ? nominalLangsung - tarifBulanan : 0;
+                    const sisaKekurangan = tarifBulanan - nominalTercover;
                     const canClick = nominalLangsung > 0;
 
                     return (
-                      <div 
-                        key={idx} 
+                      <div
+                        key={idx}
                         onClick={() => {
                           if (canClick) {
                             setSelectedBulanDetail({
                               namaBulan: bln.nama,
                               jumlah: nominalLangsung,
+                              donasi: nominalDonasi,
                               tanggal: recordBulan?.tanggal_transaksi,
-                              isLunas: isLunas
+                              isLunas,
                             });
                           }
                         }}
                         className={`p-3.5 rounded-2xl border transition-all duration-200 flex items-center justify-between ${
                           canClick ? 'cursor-pointer hover:scale-[1.01]' : 'cursor-default'
                         } ${
-                          isLunas 
-                            ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-300' 
+                          isLunas
+                            ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-300'
                             : isSebagian
                             ? 'bg-amber-950/20 border-amber-500/30 text-amber-300'
                             : 'bg-slate-950/60 border-slate-800/60 text-slate-400'
@@ -321,31 +326,36 @@ export default function DashboardWarga() {
                             <span className="text-xs font-bold text-white tracking-wide">
                               {bln.nama}
                             </span>
-                            <span className="text-[10px] text-slate-400">
-                              2026
-                            </span>
+                            <span className="text-[10px] text-slate-400">2026</span>
                           </div>
                           <div className="text-[11px] mt-0.5 text-slate-400">
-                            {isLunas 
-                              ? `Rp ${tarifBulanan.toLocaleString('id-ID')}` 
-                              : isSebagian 
-                              ? `Terbayar Rp ${nominalTercoverBulanIni.toLocaleString('id-ID')}` 
+                            {isLunas
+                              ? `Rp ${tarifBulanan.toLocaleString('id-ID')}`
+                              : isSebagian
+                              ? `Terbayar Rp ${nominalTercover.toLocaleString('id-ID')}`
                               : `Rp 0 / ${tarifBulanan.toLocaleString('id-ID')}`}
                           </div>
+                          {nominalDonasi > 0 && (
+                            <div className="text-[10px] text-emerald-400 mt-0.5">
+                              + Donasi Rp {nominalDonasi.toLocaleString('id-ID')}
+                            </div>
+                          )}
                         </div>
 
                         <div className="text-right">
-                          <span className={`inline-block text-[10px] px-2.5 py-1 rounded-xl font-semibold border ${
-                            isLunas 
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
+                          <span
+                            className={`inline-block text-[10px] px-2.5 py-1 rounded-xl font-semibold border ${
+                              isLunas
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                : isSebagian
+                                ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                : 'bg-slate-800/80 text-slate-400 border-slate-700/60'
+                            }`}
+                          >
+                            {isLunas
+                              ? '✓ Lunas'
                               : isSebagian
-                              ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                              : 'bg-slate-800/80 text-slate-400 border-slate-700/60'
-                          }`}>
-                            {isLunas 
-                              ? '✓ Lunas' 
-                              : isSebagian 
-                              ? `- Rp ${sisaKekurangan.toLocaleString('id-ID')}` 
+                              ? `- Rp ${sisaKekurangan.toLocaleString('id-ID')}`
                               : 'Belum'}
                           </span>
                         </div>
@@ -395,7 +405,7 @@ export default function DashboardWarga() {
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="font-bold text-white text-base">Detail Pembayaran</h3>
-              <button 
+              <button
                 onClick={() => setSelectedBulanDetail(null)}
                 className="w-7 h-7 bg-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center text-xs transition"
               >
@@ -410,15 +420,25 @@ export default function DashboardWarga() {
               </div>
               <div className="flex justify-between py-1 border-b border-slate-800/60">
                 <span className="text-slate-400">Nominal Terbayar:</span>
-                <strong className="text-emerald-400">Rp {selectedBulanDetail.jumlah.toLocaleString('id-ID')}</strong>
+                <strong className="text-emerald-400">
+                  Rp {selectedBulanDetail.jumlah.toLocaleString('id-ID')}
+                </strong>
               </div>
+              {selectedBulanDetail.donasi > 0 && (
+                <div className="flex justify-between py-1 border-b border-slate-800/60">
+                  <span className="text-slate-400">Donasi (kelebihan):</span>
+                  <strong className="text-emerald-400">
+                    + Rp {selectedBulanDetail.donasi.toLocaleString('id-ID')}
+                  </strong>
+                </div>
+              )}
               <div className="flex justify-between py-1">
                 <span className="text-slate-400">Tanggal Transaksi:</span>
                 <strong className="text-amber-400">{formatTanggal(selectedBulanDetail.tanggal)}</strong>
               </div>
             </div>
 
-            <button 
+            <button
               onClick={() => setSelectedBulanDetail(null)}
               className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition shadow-lg shadow-blue-600/20"
             >
@@ -431,7 +451,7 @@ export default function DashboardWarga() {
       {showRekapModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-5xl h-[90vh] rounded-3xl flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            
+
             <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/60">
               <div>
                 <h3 className="font-bold text-white text-sm sm:text-base flex items-center gap-2">
@@ -439,7 +459,7 @@ export default function DashboardWarga() {
                 </h3>
                 <p className="text-[11px] text-slate-400">Transparansi kas dan status setoran warga</p>
               </div>
-              <button 
+              <button
                 onClick={() => setShowRekapModal(false)}
                 className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center text-sm transition"
               >
@@ -448,13 +468,14 @@ export default function DashboardWarga() {
             </div>
 
             <div className="flex-1 overflow-auto p-4">
-              <div className="min-w-[800px]">
+              <div className="min-w-[900px]">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-slate-800 text-slate-400 bg-slate-950/40">
                       <th className="p-3 sticky left-0 bg-slate-950 z-10">No. Rumah</th>
                       <th className="p-3 sticky left-20 bg-slate-950 z-10">Nama Warga</th>
                       <th className="p-3 text-center">Total Setor</th>
+                      <th className="p-3 text-center text-emerald-400">Donasi</th>
                       {PERIODE_BULAN.map((b, i) => (
                         <th key={i} className="p-3 text-center">{b.nama}</th>
                       ))}
@@ -464,10 +485,17 @@ export default function DashboardWarga() {
                     {allWargaList.map((w, idx) => {
                       const isWargaUsaha = w.kategori === 'Usaha' || w.no_rumah?.trim() === 'A2 - 19';
                       const tarifWarga = isWargaUsaha ? 30000 : 15000;
-                      
+
                       const iuranWarga = allIuranList.filter(i => i.warga_id === w.id);
-                      const totalWargaSetor = iuranWarga.reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
-                      let saldoWarga = totalWargaSetor;
+                      const totalWargaSetor = iuranWarga.reduce(
+                        (acc, curr) => acc + Number(curr.jumlah || 0),
+                        0
+                      );
+
+                      const totalDonasiWarga = iuranWarga.reduce((acc, curr) => {
+                        const nominal = Number(curr.jumlah || 0);
+                        return acc + Math.max(0, nominal - tarifWarga);
+                      }, 0);
 
                       return (
                         <tr key={idx} className="hover:bg-slate-800/30 transition">
@@ -480,37 +508,30 @@ export default function DashboardWarga() {
                           <td className="p-3 text-center font-extrabold text-blue-400">
                             Rp {totalWargaSetor.toLocaleString('id-ID')}
                           </td>
+                          <td className="p-3 text-center font-semibold text-emerald-400">
+                            {totalDonasiWarga > 0
+                              ? `Rp ${totalDonasiWarga.toLocaleString('id-ID')}`
+                              : '-'}
+                          </td>
 
                           {PERIODE_BULAN.map((bln, bIdx) => {
                             const rec = iuranWarga.find(i => i.bulan_tahun === bln.kode);
                             const nomLangsung = rec ? Number(rec.jumlah || 0) : 0;
 
-                            let lunas = false;
-                            let sebagian = false;
-
-                            if (nomLangsung >= tarifWarga) {
-                              lunas = true;
-                              saldoWarga -= tarifWarga;
-                            } else if (nomLangsung > 0 && nomLangsung < tarifWarga) {
-                              sebagian = true;
-                              saldoWarga -= nomLangsung;
-                            } else if (saldoWarga >= tarifWarga) {
-                              lunas = true;
-                              saldoWarga -= tarifWarga;
-                            } else if (saldoWarga > 0 && saldoWarga < tarifWarga) {
-                              sebagian = true;
-                              saldoWarga = 0;
-                            }
+                            const lunas = nomLangsung >= tarifWarga;
+                            const sebagian = nomLangsung > 0 && nomLangsung < tarifWarga;
 
                             return (
                               <td key={bIdx} className="p-2 text-center">
-                                <span className={`inline-block px-2 py-1 rounded-lg text-[10px] font-semibold ${
-                                  lunas 
-                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                                    : sebagian
-                                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                    : 'bg-slate-800/40 text-slate-500'
-                                }`}>
+                                <span
+                                  className={`inline-block px-2 py-1 rounded-lg text-[10px] font-semibold ${
+                                    lunas
+                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                      : sebagian
+                                      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                      : 'bg-slate-800/40 text-slate-500'
+                                  }`}
+                                >
                                   {lunas ? 'Lunas' : sebagian ? 'Kurang' : '-'}
                                 </span>
                               </td>
@@ -526,7 +547,7 @@ export default function DashboardWarga() {
 
             <div className="px-6 py-3 border-t border-slate-800 bg-slate-950/60 flex justify-between items-center text-xs text-slate-400">
               <span>Menampilkan seluruh data warga dan status bulanan real-time.</span>
-              <button 
+              <button
                 onClick={() => setShowRekapModal(false)}
                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition"
               >
