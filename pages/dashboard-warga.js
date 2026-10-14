@@ -111,7 +111,6 @@ export default function DashboardWarga() {
 
   const adaPending = iuranList.some(i => i.status === 'pending');
 
-  // Helper: hitung info bulan dari daftar record
   const getInfoBulan = (list, kodeBulan, tarif) => {
     const recs = list.filter(i => i.bulan_tahun === kodeBulan);
     const totalApproved = recs.filter(r => r.status === 'approved')
@@ -127,6 +126,9 @@ export default function DashboardWarga() {
     if (info.adaPendingBulan) return false;
     return info.totalApproved < tarifBulanan;
   });
+
+  // Bulan pertama yang belum lunas → hanya ini yang tampil tombol bayar di grid
+  const bulanTombolBayar = belumLunasList[0]?.kode || null;
 
   // ============ MODAL BAYAR ============
   const handleOpenModalBayar = () => {
@@ -182,13 +184,12 @@ export default function DashboardWarga() {
         uploadedUrls.push(urlData.publicUrl);
       }
 
-      // Insert 1 record per bulan terpilih, dengan jumlah = kurang bayar bulan itu
       const records = bulanDipilih.map(bln => {
         const info = getInfoBulan(iuranList, bln, tarifBulanan);
         return {
           warga_id: warga.id,
           bulan_tahun: bln,
-          jumlah: info.kurang, // untuk abu = tarif penuh, untuk kuning = kekurangan
+          jumlah: info.kurang,
           status: 'pending',
           batch_id: batchId,
           bukti_urls: uploadedUrls,
@@ -343,8 +344,12 @@ export default function DashboardWarga() {
                       const isSebagian = !isPending && info.totalApproved > 0 && info.totalApproved < tarifBulanan;
                       const isKosong = info.recs.length === 0;
 
-                      // Tombol muncul di semua bulan belum lunas (abu atau kuning), asalkan tidak ada pending
-                      const isTombolBayar = !adaPending && !isPending && !isLunas;
+                      // Hanya bulan pertama yang belum lunas & tidak pending yang punya tombol
+                      const isTombolBayar =
+                        !adaPending &&
+                        !isPending &&
+                        !isLunas &&
+                        bln.kode === bulanTombolBayar;
 
                       let cardClass = 'bg-slate-950/60 border-slate-800/60 text-slate-400';
                       if (isLunas) cardClass = 'bg-emerald-950/20 border-emerald-500/20 text-emerald-300';
@@ -506,7 +511,7 @@ export default function DashboardWarga() {
             {/* Checklist bulan — hanya yang belum lunas */}
             <div>
               <label className="text-xs font-semibold text-slate-300 block mb-2">
-                Pilih Bulan <span className="text-slate-500">(hanya yang belum lunas)</span>
+                Pilih Bulan <span className="text-slate-500">(bisa pilih beberapa)</span>
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {belumLunasList.length === 0 ? (
