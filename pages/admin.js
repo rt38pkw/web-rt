@@ -45,11 +45,19 @@ export default function AdminDashboard() {
 
     if (error || !data) {
       alert(`Login gagal: ${error ? error.message : 'Username atau Password salah!'}`);
-    } else {
-      setUser(data);
-      sessionStorage.setItem('pengurusSession', JSON.stringify(data));
-      fetchStats();
+      return;
     }
+
+    setUser(data);
+    sessionStorage.setItem('pengurusSession', JSON.stringify(data));
+
+    // BONUS: Bendahara langsung ke halaman keuangan
+    if (data.role === 'bendahara') {
+      window.location.href = '/keuangan/dashboard';
+      return;
+    }
+
+    fetchStats();
   };
 
   const handleLogout = () => {
