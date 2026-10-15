@@ -13,7 +13,7 @@ import {
 } from '../../lib/keuangan/hooks';
 
 export default function PageDeposit() {
-  const { user, iuran, warga, depositList, loading, refetch } = useKeuanganData();
+  const { user, iuran, warga, depositList, tarifList, loading, refetch } = useKeuanganData();
   const [depWargaId, setDepWargaId] = useState('');
   const [depTgl, setDepTgl] = useState(new Date().toISOString().split('T')[0]);
   const [depJumlah, setDepJumlah] = useState('');
@@ -61,13 +61,19 @@ export default function PageDeposit() {
   const saldoDepositWargaIni = wargaPakaiDeposit
     ? getSaldoDepositWarga(depositList, wargaPakaiDeposit.id)
     : 0;
-  const tarifPakaiDeposit = tarifWarga(wargaPakaiDeposit);
+  const tarifPakaiDeposit = wargaPakaiDeposit
+    ? tarifWarga(wargaPakaiDeposit, tarifList, pakaiTahun)
+    : 0;
   const totalPakaiDeposit = pakaiBulan.length * tarifPakaiDeposit;
   const sisaDepositSetelah = saldoDepositWargaIni - totalPakaiDeposit;
 
   async function handleSubmitPakaiDeposit() {
     if (pakaiBulan.length === 0) {
       alert('Pilih minimal 1 bulan');
+      return;
+    }
+    if (tarifPakaiDeposit === 0) {
+      alert(`Tarif tahun ${pakaiTahun} belum ditetapkan. Set dulu di tab 💰 Tarif.`);
       return;
     }
     if (totalPakaiDeposit > saldoDepositWargaIni) {
@@ -126,6 +132,7 @@ export default function PageDeposit() {
     <KeuanganLayout user={user} pendingCount={getPendingBatches(iuran).length}>
       <TabDeposit
         warga={warga}
+        tarifList={tarifList}
         depositList={depositList}
         getSaldoDepositWarga={(id) => getSaldoDepositWarga(depositList, id)}
         depWargaId={depWargaId}
