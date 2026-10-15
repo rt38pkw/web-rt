@@ -1,7 +1,9 @@
 import { formatRupiah, tarifWarga } from '../../lib/keuangan/helpers';
 import { PERIODE_BULAN } from '../../lib/keuangan/constants';
 
-export default function TabTunggakan({ warga, iuran, tunggakanBulan, setTunggakanBulan }) {
+export default function TabTunggakan({ warga, tarifList, iuran, tunggakanBulan, setTunggakanBulan }) {
+  const tahunTerpilih = Number(tunggakanBulan.substring(0, 4));
+
   const list = warga
     .map((w) => {
       const totalApproved = iuran
@@ -18,7 +20,7 @@ export default function TabTunggakan({ warga, iuran, tunggakanBulan, setTunggaka
           i.bulan_tahun === tunggakanBulan &&
           i.status === 'pending'
       );
-      const tarif = tarifWarga(w);
+      const tarif = tarifWarga(w, tarifList, tahunTerpilih);
       return {
         ...w,
         totalApproved,
