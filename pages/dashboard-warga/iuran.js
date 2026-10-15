@@ -7,7 +7,7 @@ import IuranGrid from '../../components/warga/IuranGrid';
 import ModalBayar from '../../components/warga/ModalBayar';
 import ModalRekap from '../../components/warga/ModalRekap';
 import ModalDetailBulan from '../../components/warga/ModalDetailBulan';
-import { PERIODE_BULAN, getTarif, isWargaUsaha } from '../../lib/iuran/constants';
+import { PERIODE_BULAN, isWargaUsaha } from '../../lib/iuran/constants';
 import { getInfoBulan, hitungBelumLunas } from '../../lib/iuran/calculations';
 import {
   fetchWargaById,
@@ -17,10 +17,12 @@ import {
   insertPengajuanIuran,
 } from '../../lib/iuran/queries';
 import { uploadBukti } from '../../lib/iuran/storage';
+import { fetchTarifList, getTarifWarga } from '../../lib/iuran/tarif';
 
 export default function DashboardWargaIuran() {
   const [warga, setWarga] = useState(null);
   const [iuranList, setIuranList] = useState([]);
+  const [tarifList, setTarifList] = useState([]);
   const [allWargaList, setAllWargaList] = useState([]);
   const [allIuranList, setAllIuranList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +44,7 @@ export default function DashboardWargaIuran() {
     const userData = JSON.parse(savedSession);
     setWarga(userData);
     loadIuran(userData.id);
+    loadTarif();
     refreshSession(userData.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -64,6 +67,15 @@ export default function DashboardWargaIuran() {
       console.error('Gagal mengambil data iuran:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadTarif = async () => {
+    try {
+      const data = await fetchTarifList();
+      setTarifList(data);
+    } catch (err) {
+      console.error('Gagal ambil tarif:', err);
     }
   };
 
@@ -92,7 +104,8 @@ export default function DashboardWargaIuran() {
 
   if (!warga) return null;
 
-  const tarifBulanan = getTarif(warga);
+  // ── Tarif dari DB ──
+  const tarifBulanan = getTarifWarga(warga, tarifList, 2026);
   const usaha = isWargaUsaha(warga);
 
   const totalDisetor = iuranList
@@ -233,6 +246,7 @@ export default function DashboardWargaIuran() {
         onClose={() => setShowRekapModal(false)}
         allWargaList={allWargaList}
         allIuranList={allIuranList}
+        tarifList={tarifList}
       />
     </>
   );
