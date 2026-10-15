@@ -4,7 +4,7 @@ import TabTunggakan from '../../components/keuangan/TabTunggakan';
 import { useKeuanganData, getPendingBatches } from '../../lib/keuangan/hooks';
 
 export default function PageTunggakan() {
-  const { user, iuran, warga, loading } = useKeuanganData();
+  const { user, iuran, warga, tarifList, loading } = useKeuanganData();
   const [tunggakanBulan, setTunggakanBulan] = useState('2026-10');
 
   if (loading) {
@@ -19,6 +19,7 @@ export default function PageTunggakan() {
     <KeuanganLayout user={user} pendingCount={getPendingBatches(iuran).length}>
       <TabTunggakan
         warga={warga}
+        tarifList={tarifList}
         iuran={iuran}
         tunggakanBulan={tunggakanBulan}
         setTunggakanBulan={setTunggakanBulan}
