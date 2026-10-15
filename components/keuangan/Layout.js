@@ -5,6 +5,7 @@ import InstallButton from '../InstallButton';
 
 const MENU = [
   { key: 'dashboard', i: '📊', l: 'Dashboard', path: '/keuangan/dashboard' },
+  { key: 'tarif', i: '💰', l: 'Tarif', path: '/keuangan/tarif' },
   { key: 'verifikasi', i: '⏳', l: 'Verifikasi', path: '/keuangan/verifikasi' },
   { key: 'tunai', i: '💵', l: 'Tunai', path: '/keuangan/tunai' },
   { key: 'pemasukan', i: '➕', l: 'Pemasukan', path: '/keuangan/pemasukan' },
