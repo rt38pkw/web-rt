@@ -1,7 +1,7 @@
-import { PERIODE_BULAN } from '../../lib/iuran/constants';
-import { isWargaUsaha, TARIF_NORMAL, TARIF_USAHA } from '../../lib/iuran/constants';
+import { PERIODE_BULAN, isWargaUsaha, TARIF_NORMAL, TARIF_USAHA } from '../../lib/iuran/constants';
+import { getTarifWarga } from '../../lib/iuran/tarif';
 
-export default function ModalRekap({ show, onClose, allWargaList, allIuranList }) {
+export default function ModalRekap({ show, onClose, allWargaList, allIuranList, tarifList }) {
   if (!show) return null;
 
   return (
@@ -44,8 +44,12 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList }
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {allWargaList.map((w, idx) => {
-                const isUsaha = isWargaUsaha(w);
-                const tarifWarga = isUsaha ? TARIF_USAHA : TARIF_NORMAL;
+                const usaha = isWargaUsaha(w);
+                // ── Tarif dinamis dari DB ──
+                const tarifWarga = tarifList && tarifList.length > 0
+                  ? getTarifWarga(w, tarifList, 2026)
+                  : (usaha ? TARIF_USAHA : TARIF_NORMAL);
+
                 const iuranWarga = allIuranList.filter((i) => i.warga_id === w.id);
                 const totalWargaSetor = iuranWarga
                   .filter((i) => i.status === 'approved')
@@ -61,14 +65,14 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList }
                           </span>
                           <span
                             className={`text-[8px] sm:text-[9px] px-1 py-0.5 rounded border font-medium whitespace-nowrap ${
-                              isUsaha
+                              usaha
                                 ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                                 : 'bg-slate-800/60 text-slate-400 border-slate-700/60'
                             }`}
                           >
-                            {isUsaha ? '🏪' : '🏠'}
+                            {usaha ? '🏪' : '🏠'}
                             <span className="hidden lg:inline">
-                              {isUsaha ? ' Usaha' : ' Hunian'}
+                              {usaha ? ' Usaha' : ' Hunian'}
                             </span>
                           </span>
                         </div>
