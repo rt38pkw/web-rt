@@ -7,7 +7,7 @@ import { tarifWarga } from '../../lib/keuangan/helpers';
 import { useKeuanganData, getPendingBatches, invalidateKeuanganCache } from '../../lib/keuangan/hooks';
 
 export default function PageTunai() {
-  const { user, iuran, warga, loading, refetch } = useKeuanganData();
+  const { user, iuran, warga, tarifList, loading, refetch } = useKeuanganData();
   const [tunaiWargaId, setTunaiWargaId] = useState('');
   const [tunaiBulan, setTunaiBulan] = useState([]);
   const [tunaiTanggal, setTunaiTanggal] = useState(new Date().toISOString().split('T')[0]);
@@ -16,6 +16,7 @@ export default function PageTunai() {
 
   const iuranWargaTerpilih = iuran.filter((i) => i.warga_id === tunaiWargaId);
   const wargaTerpilih = warga.find((w) => w.id === tunaiWargaId);
+  const tarifTerpilih = wargaTerpilih ? tarifWarga(wargaTerpilih, tarifList, 2026) : 0;
 
   const bulanBelumLunas = PERIODE_BULAN.filter((bln) => {
     const totalApproved = iuranWargaTerpilih
@@ -24,17 +25,16 @@ export default function PageTunai() {
     const adaPending = iuranWargaTerpilih.some(
       (i) => i.bulan_tahun === bln.kode && i.status === 'pending'
     );
-    return !adaPending && totalApproved < tarifWarga(wargaTerpilih);
+    return !adaPending && totalApproved < tarifTerpilih;
   });
 
   const totalTunai = (() => {
     if (!wargaTerpilih) return 0;
-    const tarif = tarifWarga(wargaTerpilih);
     return tunaiBulan.reduce((sum, bln) => {
       const totalApproved = iuranWargaTerpilih
         .filter((i) => i.bulan_tahun === bln && i.status === 'approved')
         .reduce((s, i) => s + Number(i.jumlah || 0), 0);
-      return sum + Math.max(0, tarif - totalApproved);
+      return sum + Math.max(0, tarifTerpilih - totalApproved);
     }, 0);
   })();
 
@@ -47,7 +47,6 @@ export default function PageTunai() {
     setTunaiSubmitting(true);
     try {
       const batchId = crypto.randomUUID();
-      const tarif = tarifWarga(wargaTerpilih);
       const records = tunaiBulan
         .map((bln) => {
           const totalApproved = iuranWargaTerpilih
@@ -56,7 +55,7 @@ export default function PageTunai() {
           return {
             warga_id: tunaiWargaId,
             bulan_tahun: bln,
-            jumlah: Math.max(0, tarif - totalApproved),
+            jumlah: Math.max(0, tarifTerpilih - totalApproved),
             status: 'approved',
             metode: 'tunai',
             batch_id: batchId,
@@ -94,6 +93,7 @@ export default function PageTunai() {
     <KeuanganLayout user={user} pendingCount={getPendingBatches(iuran).length}>
       <TabTunai
         warga={warga}
+        tarifList={tarifList}
         tunaiWargaId={tunaiWargaId}
         setTunaiWargaId={setTunaiWargaId}
         tunaiBulan={tunaiBulan}
