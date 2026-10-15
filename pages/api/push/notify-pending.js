@@ -72,7 +72,7 @@ export default async function handler(req, res) {
       body: `${namaWarga} — ${bulanInfo}${totalInfo ? ' • ' + totalInfo : ''}`,
       icon: '/logo-rt38.png',
       badge: '/logo-rt38.png',
-      url: '/admin-keuangan?tab=verifikasi',
+      url: '/keuangan/verifikasi',
       tag: 'pending-approval',
     });
 
