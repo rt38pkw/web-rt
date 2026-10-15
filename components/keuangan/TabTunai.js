@@ -2,6 +2,7 @@ import { formatRupiah, tarifWarga } from '../../lib/keuangan/helpers';
 
 export default function TabTunai({
   warga,
+  tarifList,
   tunaiWargaId,
   setTunaiWargaId,
   tunaiBulan,
@@ -16,6 +17,8 @@ export default function TabTunai({
   handleSubmitTunai,
 }) {
   const w = warga.find((x) => x.id === tunaiWargaId);
+  const tarifTerpilih = w ? tarifWarga(w, tarifList, 2026) : 0;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <form
@@ -26,9 +29,7 @@ export default function TabTunai({
         <p className="text-[10px] text-slate-500">Untuk warga yang bayar langsung ke bendahara.</p>
 
         <div>
-          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-            Warga
-          </label>
+          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Warga</label>
           <select
             value={tunaiWargaId}
             onChange={(e) => {
@@ -51,13 +52,11 @@ export default function TabTunai({
           <>
             <div className="text-[10px] text-slate-400">
               Tarif:{' '}
-              <strong className="text-blue-400">{formatRupiah(tarifWarga(w))}/bln</strong>
+              <strong className="text-blue-400">{formatRupiah(tarifTerpilih)}/bln</strong>
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-2">
-                Bulan
-              </label>
+              <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-2">Bulan</label>
               <div className="grid grid-cols-2 gap-1.5">
                 {bulanBelumLunas.length === 0 ? (
                   <div className="col-span-2 text-[10px] text-emerald-400 text-center py-3">
@@ -91,9 +90,7 @@ export default function TabTunai({
         )}
 
         <div>
-          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-            Tanggal
-          </label>
+          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Tanggal</label>
           <input
             type="date"
             value={tunaiTanggal}
@@ -103,9 +100,7 @@ export default function TabTunai({
         </div>
 
         <div>
-          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-            Catatan
-          </label>
+          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Catatan</label>
           <textarea
             value={tunaiCatatan}
             onChange={(e) => setTunaiCatatan(e.target.value)}
