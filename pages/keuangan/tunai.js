@@ -1,41 +1,24 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import KeuanganLayout from '../../components/keuangan/Layout';
 import TabTunai from '../../components/keuangan/TabTunai';
-import { getBulanTahun } from '../../lib/keuangan/constants';
+import { PERIODE_BULAN } from '../../lib/keuangan/constants';
 import { tarifWarga, formatRupiah } from '../../lib/keuangan/helpers';
 import { useKeuanganData, getPendingBatches, invalidateKeuanganCache } from '../../lib/keuangan/hooks';
 
 export default function PageTunai() {
   const { user, iuran, warga, tarifList, loading, refetch } = useKeuanganData();
-
-  // Tahun default: tahun berjalan
-  const [tunaiTahun, setTunaiTahun] = useState(new Date().getFullYear());
   const [tunaiWargaId, setTunaiWargaId] = useState('');
   const [tunaiBulan, setTunaiBulan] = useState([]);
   const [tunaiTanggal, setTunaiTanggal] = useState(new Date().toISOString().split('T')[0]);
   const [tunaiCatatan, setTunaiCatatan] = useState('');
   const [tunaiSubmitting, setTunaiSubmitting] = useState(false);
 
-  // List tahun yang tersedia (dari tarif_iuran)
-  const tahunTersedia = useMemo(() => {
-    const set = new Set(tarifList.map((t) => Number(t.tahun)));
-    return [...set].sort((a, b) => a - b);
-  }, [tarifList]);
-
-  // Kalau tarifList belum ready, pakai fallback tahun berjalan
-  const tahunOptions = tahunTersedia.length > 0 ? tahunTersedia : [new Date().getFullYear()];
-
   const iuranWargaTerpilih = iuran.filter((i) => i.warga_id === tunaiWargaId);
   const wargaTerpilih = warga.find((w) => w.id === tunaiWargaId);
-  const tarifTerpilih = wargaTerpilih
-    ? tarifWarga(wargaTerpilih, tarifList, tunaiTahun)
-    : 0;
+  const tarifTerpilih = wargaTerpilih ? tarifWarga(wargaTerpilih, tarifList, 2026) : 0;
 
-  // Bulan-bulan untuk tahun yang dipilih
-  const periodeBulanTahun = getBulanTahun(tunaiTahun);
-
-  const bulanBelumLunas = periodeBulanTahun.filter((bln) => {
+  const bulanBelumLunas = PERIODE_BULAN.filter((bln) => {
     const totalApproved = iuranWargaTerpilih
       .filter((i) => i.bulan_tahun === bln.kode && i.status === 'approved')
       .reduce((s, i) => s + Number(i.jumlah || 0), 0);
@@ -58,27 +41,28 @@ export default function PageTunai() {
   async function handleSubmitTunai(e) {
     e.preventDefault();
 
-    // ── PENGAMAN: validasi ulang ──
+    // ── Pengaman 1: validasi ──
     if (!tunaiWargaId || tunaiBulan.length === 0) {
       alert('Pilih warga dan minimal 1 bulan');
       return;
     }
     if (tarifTerpilih === 0) {
-      alert(`Tarif ${tunaiTahun} belum ditetapkan. Set dulu di tab 💰 Tarif.`);
+      alert('Tarif 2026 belum ditetapkan. Set dulu di tab 💰 Tarif.');
       return;
     }
 
-    // ── PENGAMAN: konfirmasi sebelum simpan ──
+    // ── Pengaman 2: konfirmasi ──
     const w = warga.find((x) => x.id === tunaiWargaId);
     const namaBulan = tunaiBulan
-      .map((k) => periodeBulanTahun.find((b) => b.kode === k)?.nama || k)
+      .map((k) => PERIODE_BULAN.find((b) => b.kode === k)?.nama || k)
       .join(', ');
+
     const konfirmasi = window.confirm(
-      `Konfirmasi pencatatan:\n\n` +
-      `Warga: ${w?.no_rumah} - ${w?.nama_lengkap}\n` +
-      `Tahun: ${tunaiTahun}\n` +
-      `Bulan: ${namaBulan}\n` +
-      `Total: ${formatRupiah(totalTunai)}\n\n` +
+      `Konfirmasi pencatatan iuran tunai:\n\n` +
+      `Warga   : ${w?.no_rumah} - ${w?.nama_lengkap}\n` +
+      `Bulan   : ${namaBulan}\n` +
+      `Tanggal : ${new Date(tunaiTanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}\n` +
+      `Total   : ${formatRupiah(totalTunai)}\n\n` +
       `Yakin data ini benar?`
     );
     if (!konfirmasi) return;
@@ -136,9 +120,6 @@ export default function PageTunai() {
       <TabTunai
         warga={warga}
         tarifList={tarifList}
-        tahunTersedia={tahunOptions}
-        tunaiTahun={tunaiTahun}
-        setTunaiTahun={setTunaiTahun}
         tunaiWargaId={tunaiWargaId}
         setTunaiWargaId={setTunaiWargaId}
         tunaiBulan={tunaiBulan}
