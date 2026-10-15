@@ -3,10 +3,12 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Layout from '../../components/warga/Layout';
 import ProfileCard from '../../components/warga/ProfileCard';
-import { getTarif, isWargaUsaha } from '../../lib/iuran/constants';
+import { isWargaUsaha } from '../../lib/iuran/constants';
+import { fetchTarifList, getTarifWarga } from '../../lib/iuran/tarif';
 
 export default function DashboardWargaPengumuman() {
   const [warga, setWarga] = useState(null);
+  const [tarifList, setTarifList] = useState([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -16,7 +18,17 @@ export default function DashboardWargaPengumuman() {
       return;
     }
     setWarga(JSON.parse(savedSession));
+    loadTarif();
   }, []);
+
+  const loadTarif = async () => {
+    try {
+      const data = await fetchTarifList();
+      setTarifList(data);
+    } catch (err) {
+      console.error('Gagal ambil tarif:', err);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('warga_session');
@@ -25,7 +37,7 @@ export default function DashboardWargaPengumuman() {
 
   if (!warga) return null;
 
-  const tarifBulanan = getTarif(warga);
+  const tarifBulanan = getTarifWarga(warga, tarifList, 2026);
   const usaha = isWargaUsaha(warga);
 
   return (
