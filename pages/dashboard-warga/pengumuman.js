@@ -6,7 +6,7 @@ import ProfileCard from '../../components/warga/ProfileCard';
 import { isWargaUsaha } from '../../lib/iuran/constants';
 import { fetchTarifList, getTarifWarga } from '../../lib/iuran/tarif';
 
-export default function DashboardWargaPengumuman() {
+export default function DashboardWargaSurat() {
   const [warga, setWarga] = useState(null);
   const [tarifList, setTarifList] = useState([]);
   const router = useRouter();
@@ -43,26 +43,24 @@ export default function DashboardWargaPengumuman() {
   return (
     <>
       <Head>
-        <title>Pengumuman - Portal Warga RT 38</title>
+        <title>Surat Mandiri - Portal Warga RT 38</title>
       </Head>
       <Layout warga={warga} onLogout={handleLogout}>
         <ProfileCard warga={warga} tarifBulanan={tarifBulanan} isUsaha={usaha} />
 
-        <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-6 shadow-xl space-y-4 animate-in fade-in duration-200">
-          <h3 className="text-base font-bold text-white">📢 Pengumuman Lingkungan RT 38</h3>
-          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
-            <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
-              Penting
-            </span>
-            <h4 className="text-sm font-bold text-white">
-              Peluncuran Portal Mandiri Warga RT 38
-            </h4>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Selamat datang di Portal Digital RT 38 Puri Kencana Wagir! Warga dapat memantau
-              riwayat pembayaran iuran bulanan dan informasi lingkungan secara real-time.
-            </p>
-            <span className="text-[10px] text-slate-500 block pt-1">Diunggah: Oktober 2026</span>
-          </div>
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-6 text-center space-y-3 animate-in fade-in duration-200">
+          <div className="text-4xl">📄</div>
+          <h3 className="text-base font-bold text-white">Pengajuan Surat Pengantar</h3>
+          <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+            Fitur pencetakan dan pengajuan Surat Pengantar RT online sedang dalam tahap
+            pengembangan dan akan segera diaktifkan.
+          </p>
+          <button
+            disabled
+            className="px-4 py-2 bg-slate-800/60 text-slate-500 rounded-xl text-xs font-semibold cursor-not-allowed border border-slate-800"
+          >
+            Segera Hadir 🚧
+          </button>
         </div>
       </Layout>
     </>
