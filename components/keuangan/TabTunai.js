@@ -3,9 +3,6 @@ import { formatRupiah, tarifWarga } from '../../lib/keuangan/helpers';
 export default function TabTunai({
   warga,
   tarifList,
-  tahunTersedia,
-  tunaiTahun,
-  setTunaiTahun,
   tunaiWargaId,
   setTunaiWargaId,
   tunaiBulan,
@@ -20,10 +17,9 @@ export default function TabTunai({
   handleSubmitTunai,
 }) {
   const w = warga.find((x) => x.id === tunaiWargaId);
-  const tarifTerpilih = w ? tarifWarga(w, tarifList, tunaiTahun) : 0;
+  const tarifTerpilih = w ? tarifWarga(w, tarifList, 2026) : 0;
   const tarifBelumDiset = w && tarifTerpilih === 0;
 
-  // Tombol simpan enabled hanya kalau semua kondisi terpenuhi
   const bisaSimpan =
     !tunaiSubmitting &&
     tunaiWargaId &&
@@ -37,28 +33,9 @@ export default function TabTunai({
         className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 h-fit"
       >
         <h3 className="text-sm font-bold text-white">💵 Input Iuran Tunai</h3>
-        <p className="text-[10px] text-slate-500">Untuk warga yang bayar langsung ke bendahara.</p>
-
-        {/* ── Dropdown Tahun ── */}
-        <div>
-          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-            Tahun <span className="text-slate-500">(pastikan benar)</span>
-          </label>
-          <select
-            value={tunaiTahun}
-            onChange={(e) => {
-              setTunaiTahun(Number(e.target.value));
-              setTunaiBulan([]); // Reset checklist
-            }}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
-          >
-            {tahunTersedia.map((thn) => (
-              <option key={thn} value={thn}>
-                {thn}{thn === new Date().getFullYear() ? ' (tahun ini)' : ''}
-              </option>
-            ))}
-          </select>
-        </div>
+        <p className="text-[10px] text-slate-500">
+          Catat pembayaran tunai warga untuk iuran 2026.
+        </p>
 
         {/* ── Pilih Warga ── */}
         <div>
@@ -67,7 +44,7 @@ export default function TabTunai({
             value={tunaiWargaId}
             onChange={(e) => {
               setTunaiWargaId(e.target.value);
-              setTunaiBulan([]); // Reset checklist
+              setTunaiBulan([]);
             }}
             required
             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
@@ -87,15 +64,15 @@ export default function TabTunai({
             {tarifBelumDiset ? (
               <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 space-y-1">
                 <p className="text-[11px] text-rose-400 font-semibold">
-                  ⚠️ Tarif {tunaiTahun} belum ditetapkan
+                  ⚠️ Tarif 2026 belum ditetapkan
                 </p>
                 <p className="text-[10px] text-slate-400">
-                  Set dulu di tab <strong className="text-rose-300">💰 Tarif</strong> sebelum input iuran tahun ini.
+                  Set dulu di tab <strong className="text-rose-300">💰 Tarif</strong>.
                 </p>
               </div>
             ) : (
               <div className="text-[10px] text-slate-400">
-                Tarif {tunaiTahun}:{' '}
+                Tarif:{' '}
                 <strong className="text-blue-400">{formatRupiah(tarifTerpilih)}/bln</strong>
               </div>
             )}
@@ -106,12 +83,12 @@ export default function TabTunai({
         {w && !tarifBelumDiset && (
           <div>
             <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-2">
-              Bulan <span className="text-slate-500">(hanya yang belum lunas)</span>
+              Bulan <span className="text-slate-500">(hanya belum lunas)</span>
             </label>
             <div className="grid grid-cols-2 gap-1.5">
               {bulanBelumLunas.length === 0 ? (
                 <div className="col-span-2 text-[10px] text-emerald-400 text-center py-3">
-                  Semua bulan {tunaiTahun} sudah lunas ✓
+                  Semua bulan sudah lunas ✓
                 </div>
               ) : (
                 bulanBelumLunas.map((b) => (
@@ -139,25 +116,30 @@ export default function TabTunai({
           </div>
         )}
 
-        {/* ── Tanggal ── */}
+        {/* ── Tanggal Bayar ── */}
         <div>
-          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Tanggal Bayar</label>
+          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
+            Tanggal Bayar
+          </label>
           <input
             type="date"
             value={tunaiTanggal}
             onChange={(e) => setTunaiTanggal(e.target.value)}
             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
           />
+          <p className="text-[9px] text-slate-500 mt-1">Kapan uang tunai diterima bendahara</p>
         </div>
 
         {/* ── Catatan ── */}
         <div>
-          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Catatan</label>
+          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
+            Catatan <span className="text-slate-500">(opsional)</span>
+          </label>
           <textarea
             value={tunaiCatatan}
             onChange={(e) => setTunaiCatatan(e.target.value)}
             rows={2}
-            placeholder="Opsional"
+            placeholder="Contoh: diterima langsung dari istri"
             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white resize-none"
           />
         </div>
@@ -183,11 +165,13 @@ export default function TabTunai({
       </form>
 
       <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex items-center justify-center text-xs text-slate-500">
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-2 max-w-sm">
           <div className="text-3xl">💡</div>
-          <p>Isi form di kiri untuk mencatat iuran tunai.</p>
-          <p className="text-[10px] text-slate-600">
-            Bulan yang sudah lunas otomatis disembunyikan dari checklist.
+          <p className="text-slate-400">Isi form di kiri untuk mencatat iuran tunai 2026.</p>
+          <p className="text-[10px] text-slate-600 leading-relaxed">
+            • Bulan yang sudah lunas otomatis disembunyikan<br />
+            • Dialog konfirmasi muncul sebelum simpan<br />
+            • Tanggal bayar = kapan uang diterima
           </p>
         </div>
       </div>
