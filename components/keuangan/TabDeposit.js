@@ -2,6 +2,7 @@ import { formatRupiah, formatTanggal, tarifWarga } from '../../lib/keuangan/help
 
 export default function TabDeposit({
   warga,
+  tarifList,
   depositList,
   getSaldoDepositWarga,
   depWargaId,
@@ -128,7 +129,7 @@ export default function TabDeposit({
                   </tr>
                 ) : (
                   wargaDenganSaldo.map((w) => {
-                    const tarif = tarifWarga(w);
+                    const tarif = tarifWarga(w, tarifList, 2026);
                     const estimasiBulan = Math.floor(w.saldo / tarif);
                     return (
                       <tr key={w.id} className="hover:bg-slate-800/40">
