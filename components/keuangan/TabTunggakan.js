@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { formatRupiah, tarifWarga } from '../../lib/keuangan/helpers';
-import { PERIODE_BULAN } from '../../lib/keuangan/constants';
+import { getPeriodeBulan, TAHUN_TERSEDIA, getTahunSekarang } from '../../lib/keuangan/constants';
 
 export default function TabTunggakan({ warga = [], tarifList = [], iuran = [] }) {
+  const [tahunTerpilih, setTahunTerpilih] = useState(getTahunSekarang());
   const [mode, setMode] = useState('per-bulan'); // 'per-bulan' | 'semua-bulan'
   const [bulanTerpilih, setBulanTerpilih] = useState('2026-10');
   const [filter, setFilter] = useState('semua'); // 'semua' | 'telat' | 'kurang'
@@ -12,15 +13,27 @@ export default function TabTunggakan({ warga = [], tarifList = [], iuran = [] })
   const iuranList = Array.isArray(iuran) ? iuran : [];
   const tarifListSafe = Array.isArray(tarifList) ? tarifList : [];
 
-  // ── Bulan sekarang (untuk cek jatuh tempo) ──
+  const periodeBulan = getPeriodeBulan(tahunTerpilih);
+
+  // ── Bulan sekarang ──
   const now = new Date();
   const bulanSekarang = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
+  // ── Kalau ganti tahun, reset bulan terpilih ke bulan pertama tahun itu ──
+  const handleGantiTahun = (tahunBaru) => {
+    setTahunTerpilih(tahunBaru);
+    const periodeBaru = getPeriodeBulan(tahunBaru);
+    // Set ke bulan sekarang kalau ada di periode, atau bulan pertama
+    const bulanAda = periodeBaru.find((b) => b.kode === bulanSekarang);
+    setBulanTerpilih(bulanAda?.kode || periodeBaru[0]?.kode || '');
+    setExpandedWarga(null);
+  };
+
   // ══════════════════════════════════════════════
-  // HELPER: Hitung status per bulan untuk warga
+  // HELPER
   // ══════════════════════════════════════════════
   const getStatusBulan = (w, blnKode) => {
-    const tarif = tarifWarga(w, tarifListSafe, 2026);
+    const tarif = tarifWarga(w, tarifListSafe, tahunTerpilih);
     const recsBulan = iuranList.filter(
       (i) => i.warga_id === w.id && i.bulan_tahun === blnKode
     );
@@ -50,14 +63,11 @@ export default function TabTunggakan({ warga = [], tarifList = [], iuran = [] })
       return { ...w, ...info };
     })
     .filter((w) => {
-      // Filter berdasarkan status
       if (filter === 'telat') return w.status === 'telat';
       if (filter === 'kurang') return w.status === 'kurang';
-      // default 'semua': telat + kurang
       return w.status === 'telat' || w.status === 'kurang';
     })
     .sort((a, b) => {
-      // Yang telat dulu, baru kurang
       if (a.status === 'telat' && b.status !== 'telat') return -1;
       if (a.status !== 'telat' && b.status === 'telat') return 1;
       return b.kurang - a.kurang;
@@ -75,7 +85,7 @@ export default function TabTunggakan({ warga = [], tarifList = [], iuran = [] })
       let jumlahKurang = 0;
       const detailBulan = [];
 
-      PERIODE_BULAN.forEach((bln) => {
+      periodeBulan.forEach((bln) => {
         const info = getStatusBulan(w, bln.kode);
         if (info.status === 'telat') {
           totalKurang += info.kurang;
@@ -88,13 +98,7 @@ export default function TabTunggakan({ warga = [], tarifList = [], iuran = [] })
         }
       });
 
-      return {
-        ...w,
-        totalKurang,
-        jumlahTelat,
-        jumlahKurang,
-        detailBulan,
-      };
+      return { ...w, totalKurang, jumlahTelat, jumlahKurang, detailBulan };
     })
     .filter((w) => {
       if (filter === 'telat') return w.jumlahTelat > 0;
@@ -105,15 +109,9 @@ export default function TabTunggakan({ warga = [], tarifList = [], iuran = [] })
 
   const totalTunggakanSemuaBulan = listSemuaBulan.reduce((s, w) => s + w.totalKurang, 0);
 
-  // ══════════════════════════════════════════════
-  // HANDLE FILTER CHIP
-  // ══════════════════════════════════════════════
   const handleFilterClick = (f) => {
-    if (filter === f) {
-      setFilter('semua'); // klik chip yang sama → balik ke Semua
-    } else {
-      setFilter(f);
-    }
+    if (filter === f) setFilter('semua');
+    else setFilter(f);
   };
 
   // ══════════════════════════════════════════════
@@ -121,7 +119,7 @@ export default function TabTunggakan({ warga = [], tarifList = [], iuran = [] })
   // ══════════════════════════════════════════════
   return (
     <div className="space-y-4">
-      {/* ═══ HEADER FILTER ═══ */}
+      {/* ═══ FILTER HEADER ═══ */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
         {/* Mode Toggle */}
         <div>
@@ -152,9 +150,28 @@ export default function TabTunggakan({ warga = [], tarifList = [], iuran = [] })
           </div>
         </div>
 
-        {/* Dropdown Bulan */}
-        <div className="flex items-end gap-3 flex-wrap">
-          <div className="flex-1 min-w-[180px]">
+        {/* Dropdown Tahun + Bulan + Filter */}
+        <div className="flex flex-wrap gap-3 items-end">
+          {/* Tahun */}
+          <div className="min-w-[100px]">
+            <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-2">
+              Tahun
+            </label>
+            <select
+              value={tahunTerpilih}
+              onChange={(e) => handleGantiTahun(Number(e.target.value))}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+            >
+              {TAHUN_TERSEDIA.map((thn) => (
+                <option key={thn} value={thn}>
+                  {thn}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Bulan */}
+          <div className="flex-1 min-w-[150px]">
             <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-2">
               Bulan {mode === 'semua-bulan' && <span className="text-slate-600">(non-aktif)</span>}
             </label>
@@ -163,20 +180,19 @@ export default function TabTunggakan({ warga = [], tarifList = [], iuran = [] })
               onChange={(e) => setBulanTerpilih(e.target.value)}
               disabled={mode === 'semua-bulan'}
               className={`w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white transition ${
-                mode === 'semua-bulan'
-                  ? 'opacity-40 cursor-not-allowed'
-                  : ''
+                mode === 'semua-bulan' ? 'opacity-40 cursor-not-allowed' : ''
               }`}
             >
-              {PERIODE_BULAN.map((b) => (
+              {periodeBulan.map((b) => (
                 <option key={b.kode} value={b.kode}>
-                  {b.nama} 2026
+                  {b.nama} {tahunTerpilih}
                 </option>
               ))}
             </select>
           </div>
 
-          <div className="flex-1 min-w-[140px]">
+          {/* Filter */}
+          <div className="min-w-[200px]">
             <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-2">
               Filter
             </label>
@@ -218,7 +234,9 @@ export default function TabTunggakan({ warga = [], tarifList = [], iuran = [] })
         {/* Total */}
         <div className="pt-3 border-t border-slate-800 flex justify-between items-center text-xs">
           <span className="text-slate-400">
-            {mode === 'per-bulan' ? `Tunggakan ${PERIODE_BULAN.find(b => b.kode === bulanTerpilih)?.nama}` : 'Total Tunggakan'}
+            {mode === 'per-bulan'
+              ? `Tunggakan ${periodeBulan.find((b) => b.kode === bulanTerpilih)?.nama} ${tahunTerpilih}`
+              : `Total Tunggakan ${tahunTerpilih}`}
             :
           </span>
           <strong className="text-amber-400 text-base font-bold">
@@ -227,7 +245,7 @@ export default function TabTunggakan({ warga = [], tarifList = [], iuran = [] })
         </div>
       </div>
 
-      {/* ═══ TABEL: MODE PER BULAN ═══ */}
+      {/* ═══ TABEL PER BULAN ═══ */}
       {mode === 'per-bulan' && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
@@ -246,7 +264,8 @@ export default function TabTunggakan({ warga = [], tarifList = [], iuran = [] })
                 {listPerBulan.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="p-6 text-center text-emerald-400">
-                      🎉 {filter === 'telat'
+                      🎉{' '}
+                      {filter === 'telat'
                         ? 'Tidak ada warga yang telat bulan ini.'
                         : filter === 'kurang'
                         ? 'Tidak ada warga yang kurang bayar bulan ini.'
@@ -298,7 +317,7 @@ export default function TabTunggakan({ warga = [], tarifList = [], iuran = [] })
         </div>
       )}
 
-      {/* ═══ TABEL: MODE SEMUA BULAN ═══ */}
+      {/* ═══ TABEL SEMUA BULAN ═══ */}
       {mode === 'semua-bulan' && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
@@ -329,7 +348,11 @@ export default function TabTunggakan({ warga = [], tarifList = [], iuran = [] })
                         onClick={() => setExpandedWarga(expandedWarga === w.id ? null : w.id)}
                       >
                         <td className="p-3 text-slate-500">
-                          <span className={`inline-block transition ${expandedWarga === w.id ? 'rotate-90' : ''}`}>
+                          <span
+                            className={`inline-block transition ${
+                              expandedWarga === w.id ? 'rotate-90' : ''
+                            }`}
+                          >
                             ▶
                           </span>
                         </td>
@@ -370,7 +393,6 @@ export default function TabTunggakan({ warga = [], tarifList = [], iuran = [] })
                           {formatRupiah(w.totalKurang)}
                         </td>
                       </tr>
-                      {/* Expand Detail */}
                       {expandedWarga === w.id && (
                         <tr key={w.id + '-detail'} className="bg-slate-950/60">
                           <td colSpan="6" className="p-3">
@@ -380,7 +402,9 @@ export default function TabTunggakan({ warga = [], tarifList = [], iuran = [] })
                                   key={bln.kode}
                                   className="flex justify-between items-center text-[11px] bg-slate-900/60 rounded-lg px-3 py-2"
                                 >
-                                  <span className="text-slate-300">{bln.nama} 2026</span>
+                                  <span className="text-slate-300">
+                                    {bln.nama} {tahunTerpilih}
+                                  </span>
                                   <div className="flex items-center gap-2">
                                     <span
                                       className={`text-[10px] px-2 py-0.5 rounded border ${
