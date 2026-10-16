@@ -48,7 +48,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    setUser(data);
+       setUser(data);
     sessionStorage.setItem('pengurusSession', JSON.stringify(data));
 
     // BONUS: Bendahara langsung ke halaman keuangan
