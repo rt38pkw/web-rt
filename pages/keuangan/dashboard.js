@@ -3,7 +3,18 @@ import TabDashboard from '../../components/keuangan/TabDashboard';
 import { useKeuanganData, getPendingBatches } from '../../lib/keuangan/hooks';
 
 export default function PageDashboard() {
-  const { user, iuran, pengeluaran, pemasukanLain, depositList, loading, refetch } = useKeuanganData();
+  const {
+    user,
+    iuran = [],
+    pengeluaran = [],
+    pemasukanLain = [],
+    depositList = [],
+    proyekList = [],
+    iuranProyekList = [],
+    loading,
+  } = useKeuanganData();
+
+  if (typeof window === 'undefined') return null;
 
   if (loading) {
     return (
@@ -13,31 +24,80 @@ export default function PageDashboard() {
     );
   }
 
-  const totalIuranApproved = iuran
+  const iuranList = Array.isArray(iuran) ? iuran : [];
+  const pengeluaranSafe = Array.isArray(pengeluaran) ? pengeluaran : [];
+  const pemasukanSafe = Array.isArray(pemasukanLain) ? pemasukanLain : [];
+  const depositSafe = Array.isArray(depositList) ? depositList : [];
+  const proyekSafe = Array.isArray(proyekList) ? proyekList : [];
+  const iuranProyekSafe = Array.isArray(iuranProyekList) ? iuranProyekList : [];
+
+  // ══════════════════════════════════════════════
+  // PERHITUNGAN
+  // ══════════════════════════════════════════════
+
+  // Iuran bulanan REAL (exclude metode=deposit, karena uangnya sudah masuk dari deposit_warga)
+  const totalIuranBulanan = iuranList
+    .filter((i) => i.status === 'approved' && i.metode !== 'deposit')
+    .reduce((s, i) => s + Number(i.jumlah || 0), 0);
+
+  // Total semua iuran approved (termasuk deposit) — untuk info
+  const totalIuranApproved = iuranList
     .filter((i) => i.status === 'approved')
     .reduce((s, i) => s + Number(i.jumlah || 0), 0);
-  const totalPemasukanLain = pemasukanLain.reduce((s, p) => s + Number(p.nominal || 0), 0);
-  const totalPemasukan = totalIuranApproved + totalPemasukanLain;
-  const totalPengeluaran = pengeluaran.reduce((s, p) => s + Number(p.nominal || 0), 0);
-  const saldoDepositTotal = depositList.reduce(
+
+  const totalPemasukanLain = pemasukanSafe.reduce((s, p) => s + Number(p.nominal || 0), 0);
+
+  // Pisahkan pengeluaran umum vs proyek
+  const totalPengeluaranUmum = pengeluaranSafe
+    .filter((p) => !p.proyek_id)
+    .reduce((s, p) => s + Number(p.nominal || 0), 0);
+
+  const totalPengeluaranProyek = pengeluaranSafe
+    .filter((p) => p.proyek_id)
+    .reduce((s, p) => s + Number(p.nominal || 0), 0);
+
+  const totalPengeluaran = totalPengeluaranUmum + totalPengeluaranProyek;
+
+  // Saldo deposit warga
+  const saldoDepositTotal = depositSafe.reduce(
     (s, d) => s + (d.tipe === 'masuk' ? Number(d.jumlah) : -Number(d.jumlah)),
     0
   );
-  const saldoKasBebas = totalPemasukan - totalPengeluaran - saldoDepositTotal;
-  const pendingBatches = getPendingBatches(iuran);
+
+  // Iuran proyek approved
+  const totalIuranProyekApproved = iuranProyekSafe
+    .filter((i) => i.status === 'approved')
+    .reduce((s, i) => s + Number(i.jumlah || 0), 0);
+
+  // Dana proyek = iuran proyek approved - pengeluaran proyek
+  const danaProyek = totalIuranProyekApproved - totalPengeluaranProyek;
+
+  // Saldo Kas Bebas (milik RT) — tidak include deposit & dana proyek
+  const saldoKasBebas = totalIuranBulanan + totalPemasukanLain - totalPengeluaranUmum;
+
+  // Total uang di rekening
+  const totalUangRekening = saldoKasBebas + saldoDepositTotal + danaProyek;
+
+  // Pending
+  const pendingBatches = getPendingBatches(iuranList);
+
+  // Statistik proyek
+  const proyekAktif = proyekSafe.filter((p) => p.status === 'aktif').length;
 
   return (
     <KeuanganLayout user={user} pendingCount={pendingBatches.length}>
       <TabDashboard
         saldoKasBebas={saldoKasBebas}
         saldoDepositTotal={saldoDepositTotal}
-        totalPemasukan={totalPemasukan}
+        danaProyek={danaProyek}
+        totalUangRekening={totalUangRekening}
+        totalPemasukan={totalIuranBulanan + totalPemasukanLain}
         totalPengeluaran={totalPengeluaran}
-        totalIuranApproved={totalIuranApproved}
+        totalIuranApproved={totalIuranBulanan}
         totalPemasukanLain={totalPemasukanLain}
+        proyekAktif={proyekAktif}
         pendingBatches={pendingBatches}
-        pengeluaran={pengeluaran}
-        setTab={(tab) => (window.location.href = `/keuangan/${tab}`)}
+        pengeluaran={pengeluaranSafe}
       />
     </KeuanganLayout>
   );
