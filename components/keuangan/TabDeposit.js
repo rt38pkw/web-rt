@@ -142,16 +142,24 @@ export default function TabDeposit({
                           ±{estimasiBulan} bulan @ {formatRupiah(tarif)}
                         </td>
                         <td className="p-3 text-right">
-                          {w.saldo >= tarif ? (
-                            <button
-                              onClick={() => setModalPakaiDeposit({ wargaId: w.id })}
-                              className="bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-semibold px-3 py-1.5 rounded-lg"
-                            >
-                              Pakai untuk Iuran
-                            </button>
-                          ) : (
-                            <span className="text-[10px] text-slate-600">Saldo kurang</span>
-                          )}
+                         {w.saldo >= tarif ? (
+  <div className="flex flex-col sm:flex-row gap-1 justify-end">
+    <button
+      onClick={() => setModalAutoDistribute({ wargaId: w.id })}
+      className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap"
+    >
+      ⚡ Auto
+    </button>
+    <button
+      onClick={() => setModalPakaiDeposit({ wargaId: w.id })}
+      className="bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap"
+    >
+      Manual
+    </button>
+  </div>
+) : (
+  <span className="text-[10px] text-slate-600">Saldo kurang</span>
+)}
                         </td>
                       </tr>
                     );
