@@ -4,6 +4,7 @@ import InstallButton from '../InstallButton';
 
 const MENU = [
   { key: 'iuran', label: 'Status Iuran', icon: '💰', path: '/dashboard-warga/iuran' },
+  { key: 'projek', label: 'Projek', icon: '🏗️', path: '/dashboard-warga/projek' },
   { key: 'pengumuman', label: 'Pengumuman', icon: '📢', path: '/dashboard-warga/pengumuman' },
   { key: 'surat', label: 'Surat Mandiri', icon: '📄', path: '/dashboard-warga/surat' },
 ];
@@ -41,7 +42,7 @@ export default function Layout({ children, warga, onLogout }) {
       </header>
 
       <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-4 my-1">
-        {/* ═══ MENU NAVIGASI DI ATAS ═══ */}
+        {/* Menu Navigasi di Atas */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
           {MENU.map((t) => (
             <Link
@@ -58,7 +59,6 @@ export default function Layout({ children, warga, onLogout }) {
           ))}
         </div>
 
-        {/* ═══ KONTEN HALAMAN ═══ */}
         <div className="space-y-6">{children}</div>
       </main>
 
