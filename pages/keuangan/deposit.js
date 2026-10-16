@@ -15,15 +15,16 @@ import {
 } from '../../lib/keuangan/hooks';
 
 export default function PageDeposit() {
+  const keuanganData = useKeuanganData() || {};
   const {
-    user,
+    user = null,
     iuran = [],
     warga = [],
     depositList = [],
     tarifList = [],
-    loading,
-    refetch,
-  } = useKeuanganData();
+    loading = true,
+    refetch = () => {},
+  } = keuanganData;
 
   const [depWargaId, setDepWargaId] = useState('');
   const [depTgl, setDepTgl] = useState(new Date().toISOString().split('T')[0]);
@@ -37,11 +38,27 @@ export default function PageDeposit() {
   const [pakaiTahun, setPakaiTahun] = useState(2027);
   const [pakaiBulan, setPakaiBulan] = useState([]);
 
+  // ═══ SEMUA VARIABLE DI-GUARD ARRAY ═══
   const iuranList = Array.isArray(iuran) ? iuran : [];
   const wargaList = Array.isArray(warga) ? warga : [];
   const depositListSafe = Array.isArray(depositList) ? depositList : [];
+  const tarifListSafe = Array.isArray(tarifList) ? tarifList : [];
 
-  // ===== UTILITY =====
+  // ═══ SSR GUARD — return loading SEBELUM perhitungan apa pun ═══
+  if (typeof window === 'undefined') {
+    // Saat SSR, langsung return loading, tidak usah hitung apa pun
+    return null;
+  }
+
+  if (loading) {
+    return (
+      <KeuanganLayout user={user}>
+        <div className="text-center py-10 text-slate-500 text-xs">Memuat data...</div>
+      </KeuanganLayout>
+    );
+  }
+
+  // ═══ SEMUA PERHITUNGAN SETELAH GUARD ═══
   function cekDepositSudahDipakai(depositId) {
     const data = depositListSafe.find((d) => d.id === depositId);
     if (!data) return { sudah: false, totalPakai: 0, sisaSaldo: 0 };
@@ -58,7 +75,6 @@ export default function PageDeposit() {
     return { sudah: sudahDipakai, totalPakai, sisaSaldo };
   }
 
-  // ===== INPUT DEPOSIT MASUK =====
   async function handleSubmitDeposit(e) {
     e.preventDefault();
     if (!depWargaId || !depJumlah) {
@@ -91,14 +107,11 @@ export default function PageDeposit() {
     }
   }
 
-  // ===== EDIT DEPOSIT =====
   async function handleSaveEditDeposit({ id, tanggal, jumlah, keterangan }) {
     try {
       const cek = cekDepositSudahDipakai(id);
       if (cek.sudah) {
-        alert(
-          '🔒 Tidak bisa edit deposit ini.\n\nDeposit ini sudah dipakai untuk iuran.\nUndo distribusi dulu.'
-        );
+        alert('🔒 Tidak bisa edit. Deposit sudah dipakai. Undo distribusi dulu.');
         return;
       }
       const { error } = await supabase
@@ -115,11 +128,10 @@ export default function PageDeposit() {
     }
   }
 
-  // ===== HAPUS DEPOSIT MASUK =====
   async function handleHapusDeposit(d) {
     const cek = cekDepositSudahDipakai(d.id);
     if (cek.sudah) {
-      alert('🔒 Tidak bisa hapus deposit ini.\n\nDeposit ini sudah dipakai untuk iuran.\nUndo distribusi dulu.');
+      alert('🔒 Tidak bisa hapus. Deposit sudah dipakai. Undo distribusi dulu.');
       return;
     }
     if (!confirm(`Hapus deposit Rp ${Number(d.jumlah).toLocaleString('id-ID')}?`)) return;
@@ -134,7 +146,6 @@ export default function PageDeposit() {
     }
   }
 
-  // ===== UNDO DISTRIBUSI =====
   async function handleUndoDistribusi(d) {
     if (!confirm(`↩️ Undo distribusi deposit Rp ${Number(d.jumlah).toLocaleString('id-ID')}?\n\nSemua iuran terkait akan DIHAPUS.`)) return;
     try {
@@ -164,14 +175,13 @@ export default function PageDeposit() {
     }
   }
 
-  // ===== PAKAI DEPOSIT MANUAL =====
-  const bulanPakaiDeposit = getBulanTahun(pakaiTahun);
+  const bulanPakaiDeposit = getBulanTahun(pakaiTahun) || [];
   const wargaPakaiDeposit = wargaList.find((w) => w.id === modalPakaiDeposit?.wargaId);
   const saldoDepositWargaIni = wargaPakaiDeposit
     ? getSaldoDepositWarga(depositListSafe, wargaPakaiDeposit.id)
     : 0;
   const tarifPakaiDeposit = wargaPakaiDeposit
-    ? tarifWarga(wargaPakaiDeposit, tarifList, pakaiTahun)
+    ? tarifWarga(wargaPakaiDeposit, tarifListSafe, pakaiTahun)
     : 0;
   const totalPakaiDeposit = pakaiBulan.length * tarifPakaiDeposit;
   const sisaDepositSetelah = saldoDepositWargaIni - totalPakaiDeposit;
@@ -226,7 +236,6 @@ export default function PageDeposit() {
     }
   }
 
-  // ===== AUTO-DISTRIBUTE =====
   async function handleConfirmAutoDistribute({ tahun, hasil, totalPakai, tarif }) {
     try {
       const batchId = crypto.randomUUID();
@@ -264,19 +273,12 @@ export default function PageDeposit() {
     }
   }
 
-  if (loading) {
-    return (
-      <KeuanganLayout user={user}>
-        <div className="text-center py-10 text-slate-500 text-xs">Memuat data...</div>
-      </KeuanganLayout>
-    );
-  }
-
+  // ═══ RENDER ═══
   return (
     <KeuanganLayout user={user} pendingCount={getPendingBatches(iuranList).length}>
       <TabDeposit
         warga={wargaList}
-        tarifList={tarifList}
+        tarifList={tarifListSafe}
         depositList={depositListSafe}
         getSaldoDepositWarga={(id) => getSaldoDepositWarga(depositListSafe, id)}
         depWargaId={depWargaId}
@@ -319,7 +321,7 @@ export default function PageDeposit() {
         return (
           <ModalAutoDistribute
             warga={w}
-            tarifList={tarifList}
+            tarifList={tarifListSafe}
             saldoDeposit={getSaldoDepositWarga(depositListSafe, w.id)}
             iuranWarga={iuranList.filter((i) => i.warga_id === w.id)}
             onClose={() => setModalAutoDistribute(null)}
