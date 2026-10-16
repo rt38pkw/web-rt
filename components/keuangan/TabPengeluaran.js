@@ -2,7 +2,7 @@ import { formatRupiah, formatTanggal } from '../../lib/keuangan/helpers';
 import { JENIS_PENGELUARAN } from '../../lib/keuangan/constants';
 
 export default function TabPengeluaran({
-  pengeluaran,
+  pengeluaran = [],
   pengTgl,
   setPengTgl,
   pengJenis,
@@ -15,8 +15,11 @@ export default function TabPengeluaran({
   setPengNominal,
   pengSubmitting,
   handleSubmitPengeluaran,
+  setModalEditPengeluaran,
+  handleHapusPengeluaran,
 }) {
-  const total = pengeluaran.reduce((s, p) => s + Number(p.nominal || 0), 0);
+  const pengeluaranSafe = Array.isArray(pengeluaran) ? pengeluaran : [];
+  const total = pengeluaranSafe.reduce((s, p) => s + Number(p.nominal || 0), 0);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -27,9 +30,7 @@ export default function TabPengeluaran({
         <h3 className="text-sm font-bold text-white">➖ Catat Pengeluaran</h3>
 
         <div>
-          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-            Tanggal
-          </label>
+          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Tanggal</label>
           <input
             type="date"
             value={pengTgl}
@@ -40,9 +41,7 @@ export default function TabPengeluaran({
         </div>
 
         <div>
-          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-            Jenis
-          </label>
+          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Jenis</label>
           <select
             value={pengJenis}
             onChange={(e) => setPengJenis(e.target.value)}
@@ -65,9 +64,7 @@ export default function TabPengeluaran({
         )}
 
         <div>
-          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-            Keterangan
-          </label>
+          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Keterangan</label>
           <textarea
             value={pengKet}
             onChange={(e) => setPengKet(e.target.value)}
@@ -78,9 +75,7 @@ export default function TabPengeluaran({
         </div>
 
         <div>
-          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-            Nominal (Rp)
-          </label>
+          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Nominal (Rp)</label>
           <input
             type="number"
             value={pengNominal}
@@ -102,9 +97,7 @@ export default function TabPengeluaran({
 
       <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
         <div className="p-4 border-b border-slate-800 flex justify-between items-center">
-          <h3 className="text-sm font-bold text-white">
-            📋 Daftar Pengeluaran ({pengeluaran.length})
-          </h3>
+          <h3 className="text-sm font-bold text-white">📋 Daftar Pengeluaran ({pengeluaranSafe.length})</h3>
           <span className="text-xs text-rose-400 font-bold">Total: {formatRupiah(total)}</span>
         </div>
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
@@ -115,23 +108,44 @@ export default function TabPengeluaran({
                 <th className="p-3">Jenis</th>
                 <th className="p-3">Keterangan</th>
                 <th className="p-3 text-right">Nominal</th>
+                <th className="p-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {pengeluaran.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-800/40">
-                  <td className="p-3 text-slate-400 whitespace-nowrap">
-                    {formatTanggal(p.tanggal)}
-                  </td>
-                  <td className="p-3">
-                    <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded">{p.jenis}</span>
-                  </td>
-                  <td className="p-3 text-slate-300">{p.keterangan || '-'}</td>
-                  <td className="p-3 text-right font-mono text-rose-400">
-                    {formatRupiah(p.nominal)}
-                  </td>
+              {pengeluaranSafe.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="p-6 text-center text-slate-500">Belum ada pengeluaran.</td>
                 </tr>
-              ))}
+              ) : (
+                pengeluaranSafe.map((p) => (
+                  <tr key={p.id} className="hover:bg-slate-800/40">
+                    <td className="p-3 text-slate-400 whitespace-nowrap">{formatTanggal(p.tanggal)}</td>
+                    <td className="p-3">
+                      <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded">{p.jenis}</span>
+                    </td>
+                    <td className="p-3 text-slate-300">{p.keterangan || '-'}</td>
+                    <td className="p-3 text-right font-mono text-rose-400">{formatRupiah(p.nominal)}</td>
+                    <td className="p-3 text-right">
+                      <div className="flex gap-1 justify-end">
+                        <button
+                          onClick={() => setModalEditPengeluaran(p)}
+                          title="Edit"
+                          className="text-blue-400 hover:text-blue-300 text-[10px] font-semibold px-1"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => handleHapusPengeluaran(p)}
+                          title="Hapus"
+                          className="text-rose-400 hover:text-rose-300 text-[10px] font-semibold px-1"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
