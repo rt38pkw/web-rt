@@ -1,10 +1,10 @@
 import { formatRupiah, formatTanggal, tarifWarga } from '../../lib/keuangan/helpers';
 
 export default function TabDeposit({
-  warga,
-  tarifList,
-  depositList,
-  getSaldoDepositWarga,
+  warga = [],
+  tarifList = [],
+  depositList = [],
+  getSaldoDepositWarga = () => 0,
   depWargaId,
   setDepWargaId,
   depTgl,
@@ -21,12 +21,27 @@ export default function TabDeposit({
   handleHapusDeposit,
   handleUndoDistribusi,
 }) {
-  const wargaDenganSaldo = warga
+  const wargaList = Array.isArray(warga) ? warga : [];
+  const tarifListSafe = Array.isArray(tarifList) ? tarifList : [];
+  const depositListSafe = Array.isArray(depositList) ? depositList : [];
+
+  const wargaDenganSaldo = wargaList
     .map((w) => ({ ...w, saldo: getSaldoDepositWarga(w.id) }))
     .filter((w) => w.saldo !== 0)
     .sort((a, b) => b.saldo - a.saldo);
 
   const totalSaldo = wargaDenganSaldo.reduce((s, w) => s + w.saldo, 0);
+
+  const cekSudahDipakai = (depositMasuk) => {
+    const totalMasuk = depositListSafe
+      .filter((x) => x.warga_id === depositMasuk.warga_id && x.tipe === 'masuk')
+      .reduce((s, x) => s + Number(x.jumlah || 0), 0);
+    const totalPakai = depositListSafe
+      .filter((x) => x.warga_id === depositMasuk.warga_id && x.tipe === 'pakai')
+      .reduce((s, x) => s + Number(x.jumlah || 0), 0);
+    const sisaSaldo = totalMasuk - totalPakai;
+    return Number(depositMasuk.jumlah) > sisaSaldo;
+  };
 
   return (
     <div className="space-y-4">
@@ -51,7 +66,7 @@ export default function TabDeposit({
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
             >
               <option value="">-- Pilih Warga --</option>
-              {warga.map((x) => (
+              {wargaList.map((x) => (
                 <option key={x.id} value={x.id}>
                   {x.no_rumah} - {x.nama_lengkap}
                 </option>
@@ -133,7 +148,7 @@ export default function TabDeposit({
                   </tr>
                 ) : (
                   wargaDenganSaldo.map((w) => {
-                    const tarif = tarifWarga(w, tarifList, 2026);
+                    const tarif = tarifWarga(w, tarifListSafe, 2026);
                     const estimasiBulan = Math.floor(w.saldo / tarif);
                     return (
                       <tr key={w.id} className="hover:bg-slate-800/40">
@@ -179,7 +194,7 @@ export default function TabDeposit({
         <div className="p-4 border-b border-slate-800">
           <h3 className="text-sm font-bold text-white">📜 Riwayat Mutasi Deposit</h3>
           <p className="text-[10px] text-slate-500 mt-1">
-            Masuk = setoran warga. Pakai = dipakai untuk iuran. Undo untuk batalkan distribusi.
+            ✏️ Edit · 🗑️ Hapus · ↩️ Undo · 🔒 Terkunci
           </p>
         </div>
         <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
@@ -195,15 +210,17 @@ export default function TabDeposit({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {depositList.length === 0 ? (
+              {depositListSafe.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="p-6 text-center text-slate-500">
                     Belum ada mutasi.
                   </td>
                 </tr>
               ) : (
-                depositList.map((d) => {
-                  const w = warga.find((x) => x.id === d.warga_id);
+                depositListSafe.map((d) => {
+                  const w = wargaList.find((x) => x.id === d.warga_id);
+                  const sudahDipakai = d.tipe === 'masuk' ? cekSudahDipakai(d) : false;
+
                   return (
                     <tr key={d.id} className="hover:bg-slate-800/40">
                       <td className="p-3 text-slate-400 whitespace-nowrap">
@@ -232,8 +249,8 @@ export default function TabDeposit({
                         {d.tipe === 'masuk' ? '+' : '-'} {formatRupiah(d.jumlah)}
                       </td>
                       <td className="p-3 text-right">
-                        <div className="flex gap-1 justify-end">
-                          {d.tipe === 'masuk' && (
+                        <div className="flex gap-1 justify-end items-center">
+                          {d.tipe === 'masuk' && !sudahDipakai && (
                             <>
                               <button
                                 onClick={() => setModalEditDeposit(d)}
@@ -251,10 +268,15 @@ export default function TabDeposit({
                               </button>
                             </>
                           )}
+                          {d.tipe === 'masuk' && sudahDipakai && (
+                            <span title="Sudah dipakai" className="text-slate-500 text-[10px] px-1">
+                              🔒
+                            </span>
+                          )}
                           {d.tipe === 'pakai' && (
                             <button
                               onClick={() => handleUndoDistribusi(d)}
-                              title="Undo distribusi ini"
+                              title="Undo"
                               className="text-amber-400 hover:text-amber-300 text-[10px] font-semibold px-1"
                             >
                               ↩️ Undo
