@@ -16,7 +16,7 @@ const MENU_MAIN = [
   { key: 'riwayat', i: '📋', l: 'Riwayat', path: '/keuangan/riwayat' },
 ];
 
-// ═══ MENU PROYEK (untuk operator) ═══
+// ═══ MENU PROYEK (operator) ═══
 const MENU_PROYEK = [
   { key: 'projek', i: '🏗️', l: 'Projek', path: '/keuangan/projek' },
 ];
@@ -37,7 +37,7 @@ export default function Layout({ user, pendingCount = 0, children }) {
   const handleLogout = () => {
     if (!confirm('Keluar dari akun pengurus?')) return;
     sessionStorage.removeItem('pengurusSession');
-    window.location.href = '/';
+    window.location.replace('/');
   };
 
   return (
@@ -57,7 +57,7 @@ export default function Layout({ user, pendingCount = 0, children }) {
             {!isOperatorProyek && <InstallButton />}
             {user && <NotifToggle userId={user.id} userType="pengurus" />}
 
-            {/* ← Kembali hanya untuk ketua */}
+            {/* ← Admin hanya untuk ketua */}
             {isKetua && (
               <Link
                 href="/admin"
@@ -67,7 +67,7 @@ export default function Layout({ user, pendingCount = 0, children }) {
               </Link>
             )}
 
-            {/* Keluar untuk semua role */}
+            {/* Keluar untuk semua */}
             <button
               onClick={handleLogout}
               className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-2 rounded-lg border border-rose-500/20 font-medium"
