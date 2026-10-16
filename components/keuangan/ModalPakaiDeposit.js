@@ -5,15 +5,19 @@ export default function ModalPakaiDeposit({
   setModalPakaiDeposit,
   pakaiTahun,
   setPakaiTahun,
-  pakaiBulan,
+  pakaiBulan = [],
   setPakaiBulan,
-  bulanPakaiDeposit,
-  tarifPakaiDeposit,
-  totalPakaiDeposit,
-  saldoDepositWargaIni,
-  sisaDepositSetelah,
+  bulanPakaiDeposit = [],
+  tarifPakaiDeposit = 0,
+  totalPakaiDeposit = 0,
+  saldoDepositWargaIni = 0,
+  sisaDepositSetelah = 0,
   handleSubmitPakaiDeposit,
 }) {
+  // ── Guard: pastikan bulanPakaiDeposit adalah array ──
+  const bulanList = Array.isArray(bulanPakaiDeposit) ? bulanPakaiDeposit : [];
+  const pakaiBulanSafe = Array.isArray(pakaiBulan) ? pakaiBulan : [];
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-6 space-y-4 shadow-2xl my-8">
@@ -57,33 +61,39 @@ export default function ModalPakaiDeposit({
         <div>
           <label className="block text-xs font-semibold text-slate-300 mb-2">Pilih Bulan</label>
           <div className="grid grid-cols-3 gap-1.5">
-            {bulanPakaiDeposit.map((b) => {
-              const checked = pakaiBulan.includes(b.kode);
-              return (
-                <label
-                  key={b.kode}
-                  className={`p-2 rounded-xl border text-xs flex items-center gap-1.5 cursor-pointer transition ${
-                    checked
-                      ? 'bg-purple-600/20 border-purple-500/50 text-white'
-                      : 'bg-slate-950/60 border-slate-800 text-slate-300'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() =>
-                      setPakaiBulan((prev) =>
-                        prev.includes(b.kode)
-                          ? prev.filter((x) => x !== b.kode)
-                          : [...prev, b.kode]
-                      )
-                    }
-                    className="accent-purple-500"
-                  />
-                  <span className="truncate">{b.nama.substring(0, 3)}</span>
-                </label>
-              );
-            })}
+            {bulanList.length === 0 ? (
+              <div className="col-span-3 text-center text-xs text-slate-500 py-4">
+                Tarif tahun ini belum di-set.
+              </div>
+            ) : (
+              bulanList.map((b) => {
+                const checked = pakaiBulanSafe.includes(b.kode);
+                return (
+                  <label
+                    key={b.kode}
+                    className={`p-2 rounded-xl border text-xs flex items-center gap-1.5 cursor-pointer transition ${
+                      checked
+                        ? 'bg-purple-600/20 border-purple-500/50 text-white'
+                        : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() =>
+                        setPakaiBulan((prev) =>
+                          prev.includes(b.kode)
+                            ? prev.filter((x) => x !== b.kode)
+                            : [...prev, b.kode]
+                        )
+                      }
+                      className="accent-purple-500"
+                    />
+                    <span className="truncate">{b.nama.substring(0, 3)}</span>
+                  </label>
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -91,7 +101,7 @@ export default function ModalPakaiDeposit({
           <div className="flex justify-between text-xs">
             <span className="text-slate-400">Total Pakai:</span>
             <strong className="text-white">
-              {formatRupiah(totalPakaiDeposit)} ({pakaiBulan.length} bulan)
+              {formatRupiah(totalPakaiDeposit)} ({pakaiBulanSafe.length} bulan)
             </strong>
           </div>
           <div className="flex justify-between text-xs">
@@ -118,7 +128,7 @@ export default function ModalPakaiDeposit({
           </button>
           <button
             onClick={handleSubmitPakaiDeposit}
-            disabled={pakaiBulan.length === 0 || sisaDepositSetelah < 0}
+            disabled={pakaiBulanSafe.length === 0 || sisaDepositSetelah < 0}
             className="w-1/2 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-xs"
           >
             Konfirmasi Pakai
