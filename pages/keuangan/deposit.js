@@ -4,6 +4,7 @@ import KeuanganLayout from '../../components/keuangan/Layout';
 import TabDeposit from '../../components/keuangan/TabDeposit';
 import ModalPakaiDeposit from '../../components/keuangan/ModalPakaiDeposit';
 import ModalAutoDistribute from '../../components/keuangan/ModalAutoDistribute';
+import ModalEditDeposit from '../../components/keuangan/ModalEditDeposit';
 import { getBulanTahun } from '../../lib/keuangan/constants';
 import { tarifWarga } from '../../lib/keuangan/helpers';
 import {
@@ -23,6 +24,7 @@ export default function PageDeposit() {
 
   const [modalPakaiDeposit, setModalPakaiDeposit] = useState(null);
   const [modalAutoDistribute, setModalAutoDistribute] = useState(null);
+  const [modalEditDeposit, setModalEditDeposit] = useState(null);
   const [pakaiTahun, setPakaiTahun] = useState(2027);
   const [pakaiBulan, setPakaiBulan] = useState([]);
 
@@ -59,6 +61,112 @@ export default function PageDeposit() {
     }
   }
 
+  // ===== EDIT DEPOSIT =====
+  async function handleSaveEditDeposit({ id, tanggal, jumlah, keterangan }) {
+    try {
+      const { error } = await supabase
+        .from('deposit_warga')
+        .update({ tanggal, jumlah, keterangan })
+        .eq('id', id);
+      if (error) throw error;
+      alert('✅ Deposit berhasil diupdate!');
+      setModalEditDeposit(null);
+      invalidateKeuanganCache();
+      refetch();
+    } catch (err) {
+      alert('Gagal: ' + err.message);
+    }
+  }
+
+  // ===== HAPUS DEPOSIT MASUK =====
+  async function handleHapusDeposit(d) {
+    // Cek apakah deposit ini sudah dipakai (ada tipe pakai untuk warga ini)
+    const totalMasuk = depositList
+      .filter((x) => x.warga_id === d.warga_id && x.tipe === 'masuk')
+      .reduce((s, x) => s + Number(x.jumlah || 0), 0);
+    const totalPakai = depositList
+      .filter((x) => x.warga_id === d.warga_id && x.tipe === 'pakai')
+      .reduce((s, x) => s + Number(x.jumlah || 0), 0);
+
+    // Kalau deposit mau dihapus > sisa saldo → berarti ada bagian yang sudah dipakai
+    const sisaSaldo = totalMasuk - totalPakai;
+    if (Number(d.jumlah) > sisaSaldo) {
+      alert(
+        `⚠️ Deposit ini sudah sebagian dipakai untuk iuran.\n\n` +
+        `Total deposit: Rp ${totalMasuk.toLocaleString('id-ID')}\n` +
+        `Sudah dipakai: Rp ${totalPakai.toLocaleString('id-ID')}\n` +
+        `Sisa saldo: Rp ${sisaSaldo.toLocaleString('id-ID')}\n\n` +
+        `Hapus dulu distribusi pakai-nya (via Undo) sebelum hapus deposit masuk ini.`
+      );
+      return;
+    }
+
+    if (!confirm(`Hapus deposit Rp ${Number(d.jumlah).toLocaleString('id-ID')}?\n\nTindakan ini tidak bisa dibatalkan.`)) return;
+    try {
+      const { error } = await supabase.from('deposit_warga').delete().eq('id', d.id);
+      if (error) throw error;
+      alert('✅ Deposit dihapus.');
+      invalidateKeuanganCache();
+      refetch();
+    } catch (err) {
+      alert('Gagal: ' + err.message);
+    }
+  }
+
+  // ===== UNDO DISTRIBUSI (pakai) =====
+  async function handleUndoDistribusi(d) {
+    if (
+      !confirm(
+        `↩️ Undo distribusi deposit ini?\n\n` +
+        `Jumlah: Rp ${Number(d.jumlah).toLocaleString('id-ID')}\n` +
+        `Keterangan: ${d.keterangan || '-'}\n\n` +
+        `Semua iuran yang dihasilkan dari distribusi ini AKAN DIHAPUS.\n` +
+        `Saldo deposit warga akan kembali.\n\n` +
+        `Lanjutkan?`
+      )
+    ) return;
+
+    try {
+      // Cari record iuran yang match: warga sama, metode deposit, tanggal_transaksi sama,
+      // catatan mengandung timestamp hari yang sama dengan distribusi ini
+      // Pendekatan paling aman: cari iuran dengan catatan yang mengandung tanggal d.tanggal
+      const tanggalStr = d.tanggal; // format 'YYYY-MM-DD'
+
+      // Ambil semua iuran warga dengan metode deposit di sekitar tanggal itu
+      const { data: iuranTerkait, error: err1 } = await supabase
+        .from('iuran')
+        .select('id, bulan_tahun, jumlah, catatan, tanggal_transaksi')
+        .eq('warga_id', d.warga_id)
+        .eq('metode', 'deposit')
+        .eq('tanggal_transaksi', tanggalStr);
+
+      if (err1) throw err1;
+
+      if (!iuranTerkait || iuranTerkait.length === 0) {
+        if (!confirm('Tidak ditemukan iuran terkait. Hapus record pakai saja?')) return;
+      } else {
+        if (!confirm(`Akan menghapus ${iuranTerkait.length} record iuran. Lanjut?`)) return;
+      }
+
+      // Hapus iuran terkait
+      if (iuranTerkait && iuranTerkait.length > 0) {
+        const ids = iuranTerkait.map((i) => i.id);
+        const { error: err2 } = await supabase.from('iuran').delete().in('id', ids);
+        if (err2) throw err2;
+      }
+
+      // Hapus record pakai
+      const { error: err3 } = await supabase.from('deposit_warga').delete().eq('id', d.id);
+      if (err3) throw err3;
+
+      alert('✅ Distribusi berhasil di-undo. Saldo deposit dikembalikan.');
+      invalidateKeuanganCache();
+      refetch();
+    } catch (err) {
+      alert('Gagal: ' + err.message);
+    }
+  }
+
   // ===== PAKAI DEPOSIT MANUAL =====
   const bulanPakaiDeposit = getBulanTahun(pakaiTahun);
   const wargaPakaiDeposit = warga.find((w) => w.id === modalPakaiDeposit?.wargaId);
@@ -77,7 +185,7 @@ export default function PageDeposit() {
       return;
     }
     if (tarifPakaiDeposit === 0) {
-      alert(`Tarif tahun ${pakaiTahun} belum ditetapkan. Set dulu di tab 💰 Tarif.`);
+      alert(`Tarif tahun ${pakaiTahun} belum ditetapkan.`);
       return;
     }
     if (totalPakaiDeposit > saldoDepositWargaIni) {
@@ -195,9 +303,12 @@ export default function PageDeposit() {
         handleSubmitDeposit={handleSubmitDeposit}
         setModalPakaiDeposit={setModalPakaiDeposit}
         setModalAutoDistribute={setModalAutoDistribute}
+        setModalEditDeposit={setModalEditDeposit}
+        handleHapusDeposit={handleHapusDeposit}
+        handleUndoDistribusi={handleUndoDistribusi}
       />
 
-      {/* ── Modal Pakai Manual ── */}
+      {/* Modal Pakai Manual */}
       {modalPakaiDeposit && wargaPakaiDeposit && (
         <ModalPakaiDeposit
           modalPakaiDeposit={modalPakaiDeposit}
@@ -215,7 +326,7 @@ export default function PageDeposit() {
         />
       )}
 
-      {/* ── Modal Auto-Distribute ── */}
+      {/* Modal Auto-Distribute */}
       {modalAutoDistribute && (() => {
         const w = warga.find((x) => x.id === modalAutoDistribute.wargaId);
         if (!w) return null;
@@ -230,6 +341,16 @@ export default function PageDeposit() {
           />
         );
       })()}
+
+      {/* Modal Edit Deposit */}
+      {modalEditDeposit && (
+        <ModalEditDeposit
+          data={modalEditDeposit}
+          warga={warga}
+          onClose={() => setModalEditDeposit(null)}
+          onSave={handleSaveEditDeposit}
+        />
+      )}
     </KeuanganLayout>
   );
 }
