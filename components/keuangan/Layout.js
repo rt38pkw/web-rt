@@ -3,7 +3,8 @@ import { useRouter } from 'next/router';
 import NotifToggle from '../NotifToggle';
 import InstallButton from '../InstallButton';
 
-const MENU = [
+// ═══ MENU UTAMA ═══
+const MENU_MAIN = [
   { key: 'dashboard', i: '📊', l: 'Dashboard', path: '/keuangan/dashboard' },
   { key: 'tarif', i: '💰', l: 'Tarif', path: '/keuangan/tarif' },
   { key: 'verifikasi', i: '⏳', l: 'Verifikasi', path: '/keuangan/verifikasi' },
@@ -15,20 +16,36 @@ const MENU = [
   { key: 'riwayat', i: '📋', l: 'Riwayat', path: '/keuangan/riwayat' },
 ];
 
+// ═══ MENU PROYEK ═══
+const MENU_PROYEK = [
+  { key: 'projek', i: '🏗️', l: 'Projek', path: '/keuangan/projek' },
+];
+
 export default function Layout({ user, pendingCount = 0, children }) {
   const router = useRouter();
-  const activeKey = MENU.find((m) => router.pathname === m.path)?.key || 'dashboard';
+
+  // ── Cek role ──
+  const isOperatorProyek = user?.role === 'bendahara_2';
+
+  // ── Menu yang ditampilkan sesuai role ──
+  const MENU = isOperatorProyek ? MENU_PROYEK : MENU_MAIN;
+
+  const activeKey = MENU.find((m) => router.pathname.startsWith(m.path))?.key;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
       <div className="bg-slate-900/70 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center gap-2">
           <div className="min-w-0">
-            <h1 className="text-base sm:text-lg font-bold text-white truncate">💰 Dashboard Keuangan</h1>
-            <p className="text-[11px] text-slate-400">RT 38 Puri Kencana Wagir</p>
+            <h1 className="text-base sm:text-lg font-bold text-white truncate">
+              {isOperatorProyek ? '🏗️ Operator Proyek' : '💰 Dashboard Keuangan'}
+            </h1>
+            <p className="text-[11px] text-slate-400">
+              {isOperatorProyek ? `RT 38 — ${user?.nama || ''}` : 'RT 38 Puri Kencana Wagir'}
+            </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <InstallButton />
+            {!isOperatorProyek && <InstallButton />}
             {user && <NotifToggle userId={user.id} userType="pengurus" />}
             <Link
               href="/admin"
