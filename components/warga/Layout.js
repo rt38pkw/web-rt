@@ -40,32 +40,26 @@ export default function Layout({ children, warga, onLogout }) {
         </div>
       </header>
 
-      <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-6 my-1">
-        {children}
-
-        <div className="pt-2">
-          <div className="flex items-center justify-between mb-3 px-1">
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              Menu Navigasi
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            {MENU.map((t) => (
-              <Link
-                key={t.key}
-                href={t.path}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 flex items-center gap-2 shrink-0 ${
-                  activeKey === t.key
-                    ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/20'
-                    : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
-                }`}
-              >
-                <span>{t.icon}</span> {t.label}
-              </Link>
-            ))}
-          </div>
+      <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-4 my-1">
+        {/* ═══ MENU NAVIGASI DI ATAS ═══ */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {MENU.map((t) => (
+            <Link
+              key={t.key}
+              href={t.path}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 flex items-center gap-2 shrink-0 ${
+                activeKey === t.key
+                  ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/20'
+                  : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
+              }`}
+            >
+              <span>{t.icon}</span> {t.label}
+            </Link>
+          ))}
         </div>
+
+        {/* ═══ KONTEN HALAMAN ═══ */}
+        <div className="space-y-6">{children}</div>
       </main>
 
       <footer className="p-4 text-center text-xs text-slate-500 border-t border-slate-900 bg-slate-950">
