@@ -15,7 +15,15 @@ export default function ModalAutoDistribute({
   const [tahun, setTahun] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(false);
 
-  const bulanList = getBulanTahun(tahun);
+  import { PERIODE_BULAN, getBulanTahun } from '../../lib/keuangan/constants';
+
+// ...
+
+// 2026 = April–Des (kas baru terbentuk April)
+// 2027+ = Jan–Des (tahun penuh)
+const bulanList = tahun === 2026
+  ? PERIODE_BULAN
+  : getBulanTahun(tahun);
   const tarif = tarifWarga(warga, tarifList, tahun);
   const tarifBelumDiset = tarif === 0;
 
