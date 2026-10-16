@@ -8,7 +8,12 @@ import IuranGrid from '../../components/warga/IuranGrid';
 import ModalBayar from '../../components/warga/ModalBayar';
 import ModalRekap from '../../components/warga/ModalRekap';
 import ModalDetailBulan from '../../components/warga/ModalDetailBulan';
-import { PERIODE_BULAN, isWargaUsaha } from '../../lib/iuran/constants';
+import {
+  getPeriodeBulan,
+  TAHUN_TERSEDIA,
+  getTahunSekarang,
+  isWargaUsaha,
+} from '../../lib/iuran/constants';
 import { getInfoBulan, hitungBelumLunas, formatTanggal } from '../../lib/iuran/calculations';
 import {
   fetchWargaById,
@@ -34,6 +39,9 @@ export default function DashboardWargaIuran() {
   const [showModalBayar, setShowModalBayar] = useState(false);
   const [bulanDipilih, setBulanDipilih] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+
+  // ═══ TAHUN TERPILIH ═══
+  const [tahunTerpilih, setTahunTerpilih] = useState(getTahunSekarang());
 
   const router = useRouter();
 
@@ -120,7 +128,9 @@ export default function DashboardWargaIuran() {
 
   if (!warga) return null;
 
-  const tarifBulanan = getTarifWarga(warga, tarifList, 2026);
+  // ═══ PERIODE & TARIF sesuai tahun terpilih ═══
+  const periodeBulanAktif = getPeriodeBulan(tahunTerpilih);
+  const tarifBulanan = getTarifWarga(warga, tarifList, tahunTerpilih);
   const usaha = isWargaUsaha(warga);
 
   const totalDisetor = iuranList
@@ -135,10 +145,12 @@ export default function DashboardWargaIuran() {
   const estimasiBulan = tarifBulanan > 0 ? Math.floor(saldoDeposit / tarifBulanan) : 0;
 
   const adaPending = iuranList.some((i) => i.status === 'pending');
-  const belumLunasList = hitungBelumLunas(iuranList, PERIODE_BULAN, tarifBulanan);
+
+  // ═══ BELUM LUNAS — hanya untuk tahun terpilih ═══
+  const belumLunasList = hitungBelumLunas(iuranList, periodeBulanAktif, tarifBulanan);
   const bulanTombolBayar = belumLunasList[0]?.kode || null;
 
-  // ═══ RIWAYAT TRANSAKSI (gabungan iuran + deposit) ═══
+  // ═══ RIWAYAT TRANSAKSI ═══
   const riwayatTransaksi = (() => {
     const iuranItems = iuranList.map((i) => ({
       id: 'i-' + i.id,
@@ -226,7 +238,6 @@ export default function DashboardWargaIuran() {
       <Layout warga={warga} onLogout={handleLogout}>
         <ProfileCard warga={warga} tarifBulanan={tarifBulanan} isUsaha={usaha} />
 
-        {/* ═══ BANNER TRANSPARANSI ═══ */}
         <div className="bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/30 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
             <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -245,7 +256,6 @@ export default function DashboardWargaIuran() {
           </button>
         </div>
 
-        {/* ═══ 3 KARTU: SETOR / DONASI / DEPOSIT ═══ */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between">
             <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
@@ -278,7 +288,6 @@ export default function DashboardWargaIuran() {
           </div>
         </div>
 
-        {/* ═══ GRID IURAN ═══ */}
         {loading ? (
           <div className="py-12 text-center text-xs text-slate-500">Memuat data iuran...</div>
         ) : (
@@ -289,10 +298,13 @@ export default function DashboardWargaIuran() {
             bulanTombolBayar={bulanTombolBayar}
             onKlikDetail={setSelectedBulanDetail}
             onBayar={handleOpenModalBayar}
+            periodeBulan={periodeBulanAktif}
+            tahunTerpilih={tahunTerpilih}
+            tahunTersedia={TAHUN_TERSEDIA}
+            onGantiTahun={setTahunTerpilih}
           />
         )}
 
-        {/* ═══ RIWAYAT TRANSAKSI ═══ */}
         <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl overflow-hidden shadow-xl">
           <div className="p-4 sm:p-5 border-b border-slate-800">
             <h3 className="text-sm font-bold text-white">📜 Riwayat Transaksi Anda</h3>
@@ -380,6 +392,7 @@ export default function DashboardWargaIuran() {
         setBulanDipilih={setBulanDipilih}
         onSubmit={handleSubmitBayar}
         submitting={submitting}
+        tahun={tahunTerpilih}
       />
 
       <ModalRekap
