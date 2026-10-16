@@ -12,6 +12,7 @@ export default function ModalBayar({
   setBulanDipilih,
   onSubmit,
   submitting,
+  tahun,
 }) {
   const [fileBukti, setFileBukti] = useState([null, null, null]);
   const [previewBukti, setPreviewBukti] = useState([null, null, null]);
@@ -27,6 +28,7 @@ export default function ModalBayar({
 
   if (!show) return null;
 
+  const tahunAktif = tahun || new Date().getFullYear();
   const totalBayar = hitungTotalBayar(bulanDipilih, iuranList, tarifBulanan);
 
   const handleFileChange = (slotIndex, e) => {
@@ -78,8 +80,12 @@ export default function ModalBayar({
       <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xl my-8">
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <div>
-            <h3 className="font-bold text-white text-base">📱 Bayar via QRIS</h3>
-            <p className="text-[11px] text-slate-400">Scan QR, transfer, lalu upload bukti</p>
+            <h3 className="font-bold text-white text-base">
+              📱 Bayar Iuran {tahunAktif}
+            </h3>
+            <p className="text-[11px] text-slate-400">
+              Scan QR, transfer, lalu upload bukti
+            </p>
           </div>
           <button
             onClick={() => !submitting && onClose()}
@@ -90,6 +96,7 @@ export default function ModalBayar({
           </button>
         </div>
 
+        {/* QRIS */}
         <div className="bg-white rounded-2xl p-3 flex flex-col items-center">
           <img src="/qris.png" alt="QRIS RT 38" className="w-48 h-48 object-contain" />
           <p className="text-[10px] text-slate-600 mt-2 font-medium">
@@ -113,6 +120,7 @@ export default function ModalBayar({
           </button>
         </div>
 
+        {/* Checklist bulan */}
         <div>
           <label className="text-xs font-semibold text-slate-300 block mb-2">
             Pilih Bulan <span className="text-slate-500">(bisa pilih beberapa)</span>
@@ -163,6 +171,7 @@ export default function ModalBayar({
           </div>
         </div>
 
+        {/* Upload 3 slot */}
         <div>
           <label className="text-xs font-semibold text-slate-300 block mb-2">
             Upload Bukti Transfer <span className="text-slate-500">(slot 1 wajib)</span>
@@ -220,6 +229,7 @@ export default function ModalBayar({
           <p className="text-[10px] text-slate-500 mt-1.5">JPG / PNG / WebP • maks 3 MB per file</p>
         </div>
 
+        {/* Catatan */}
         <div>
           <label className="text-xs font-semibold text-slate-300 block mb-2">
             Catatan (opsional)
@@ -233,6 +243,7 @@ export default function ModalBayar({
           />
         </div>
 
+        {/* Total & Submit */}
         <div className="flex items-center justify-between border-t border-slate-800 pt-3">
           <div>
             <div className="text-[10px] text-slate-400 uppercase">Total Bayar</div>
