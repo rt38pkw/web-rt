@@ -1,28 +1,55 @@
-import { PERIODE_BULAN, isWargaUsaha, TARIF_NORMAL, TARIF_USAHA } from '../../lib/iuran/constants';
+import { useState } from 'react';
+import {
+  getPeriodeBulan,
+  TAHUN_TERSEDIA,
+  getTahunSekarang,
+  isWargaUsaha,
+  TARIF_NORMAL,
+  TARIF_USAHA,
+} from '../../lib/iuran/constants';
 import { getTarifWarga } from '../../lib/iuran/tarif';
 
 export default function ModalRekap({ show, onClose, allWargaList, allIuranList, tarifList }) {
+  const [tahunTerpilih, setTahunTerpilih] = useState(getTahunSekarang());
+
   if (!show) return null;
 
   const wargaList = Array.isArray(allWargaList) ? allWargaList : [];
   const iuranList = Array.isArray(allIuranList) ? allIuranList : [];
+  const tarifListSafe = Array.isArray(tarifList) ? tarifList : [];
+  const periodeBulan = getPeriodeBulan(tahunTerpilih);
 
-  // ── Bulan sekarang (format: 'YYYY-MM') ──
+  // ── Bulan sekarang ──
   const now = new Date();
   const bulanSekarang = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
       <div className="bg-slate-900 border border-slate-800 w-full max-w-6xl h-[90vh] rounded-3xl flex flex-col shadow-2xl overflow-hidden">
-        <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/60">
-          <div className="min-w-0">
+        {/* Header */}
+        <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/60 gap-2">
+          <div className="min-w-0 flex-1">
             <h3 className="font-bold text-white text-xs sm:text-base truncate">
-              📋 Rekap Iuran RT 38 (2026)
+              📋 Rekap Iuran RT 38
             </h3>
             <p className="text-[10px] sm:text-[11px] text-slate-400">
               Transparansi kas dan status setoran warga
             </p>
           </div>
+
+          {/* Dropdown Tahun */}
+          <select
+            value={tahunTerpilih}
+            onChange={(e) => setTahunTerpilih(Number(e.target.value))}
+            className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-semibold shrink-0"
+          >
+            {TAHUN_TERSEDIA.map((thn) => (
+              <option key={thn} value={thn}>
+                {thn}
+              </option>
+            ))}
+          </select>
+
           <button
             onClick={onClose}
             className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center text-sm transition shrink-0"
@@ -31,6 +58,7 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList, 
           </button>
         </div>
 
+        {/* Body */}
         <div className="flex-1 overflow-auto">
           <table className="w-full border-collapse" style={{ minWidth: '440px' }}>
             <thead className="sticky top-0 z-30 bg-slate-950">
@@ -38,7 +66,7 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList, 
                 <th className="p-1.5 sm:p-3 text-[10px] sm:text-xs text-left sticky left-0 bg-slate-950 z-30 w-[80px] sm:w-[200px] border-r border-slate-800/80">
                   Warga
                 </th>
-                {PERIODE_BULAN.map((b, i) => {
+                {periodeBulan.map((b, i) => {
                   const isJatuhTempo = b.kode <= bulanSekarang;
                   return (
                     <th
@@ -58,13 +86,15 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList, 
               {wargaList.map((w, idx) => {
                 const usaha = isWargaUsaha(w);
                 const tarifWarga =
-                  tarifList && tarifList.length > 0
-                    ? getTarifWarga(w, tarifList, 2026)
+                  tarifListSafe.length > 0
+                    ? getTarifWarga(w, tarifListSafe, tahunTerpilih)
                     : usaha
                     ? TARIF_USAHA
                     : TARIF_NORMAL;
 
-                const iuranWarga = iuranList.filter((i) => i.warga_id === w.id);
+                const iuranWarga = iuranList.filter(
+                  (i) => i.warga_id === w.id && i.bulan_tahun.startsWith(String(tahunTerpilih))
+                );
                 const totalWargaSetor = iuranWarga
                   .filter((i) => i.status === 'approved')
                   .reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
@@ -98,7 +128,7 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList, 
                         </div>
                       </div>
                     </td>
-                    {PERIODE_BULAN.map((bln, bIdx) => {
+                    {periodeBulan.map((bln, bIdx) => {
                       const recsBulan = iuranWarga.filter((i) => i.bulan_tahun === bln.kode);
                       const totalApproved = recsBulan
                         .filter((r) => r.status === 'approved')
@@ -109,13 +139,10 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList, 
                       const sebagian =
                         !adaPendingBulan && totalApproved > 0 && totalApproved < tarifWarga;
                       const kurang = tarifWarga - totalApproved;
-
-                      // ── Jatuh tempo ──
                       const isJatuhTempo = bln.kode <= bulanSekarang;
 
-                      // ── Warna sel ──
+                      // Kosong
                       if (kosong) {
-                        // Kosong: merah (jatuh tempo) atau abu (belum)
                         if (isJatuhTempo) {
                           return (
                             <td key={bIdx} className="p-0.5 sm:p-2 text-center align-middle">
@@ -132,6 +159,7 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList, 
                         );
                       }
 
+                      // Pending
                       if (adaPendingBulan) {
                         return (
                           <td key={bIdx} className="p-0.5 sm:p-2 text-center align-middle">
@@ -142,6 +170,7 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList, 
                         );
                       }
 
+                      // Ada isi
                       return (
                         <td key={bIdx} className="p-0.5 sm:p-2 text-center align-middle">
                           <div className="inline-flex flex-col items-center justify-center">
@@ -170,7 +199,7 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList, 
           </table>
         </div>
 
-        {/* ═══ FOOTER + LEGENDA ═══ */}
+        {/* Footer */}
         <div className="px-3 sm:px-6 py-3 border-t border-slate-800 bg-slate-950/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-[10px] sm:text-xs text-slate-400">
           <div className="flex flex-wrap gap-2.5">
             <div className="flex items-center gap-1">
