@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import KeuanganLayout from '../../components/keuangan/Layout';
 import TabDeposit from '../../components/keuangan/TabDeposit';
 import ModalPakaiDeposit from '../../components/keuangan/ModalPakaiDeposit';
+import ModalAutoDistribute from '../../components/keuangan/ModalAutoDistribute';
 import { getBulanTahun } from '../../lib/keuangan/constants';
 import { tarifWarga } from '../../lib/keuangan/helpers';
 import {
@@ -21,9 +22,11 @@ export default function PageDeposit() {
   const [depSubmitting, setDepSubmitting] = useState(false);
 
   const [modalPakaiDeposit, setModalPakaiDeposit] = useState(null);
+  const [modalAutoDistribute, setModalAutoDistribute] = useState(null);
   const [pakaiTahun, setPakaiTahun] = useState(2027);
   const [pakaiBulan, setPakaiBulan] = useState([]);
 
+  // ===== INPUT DEPOSIT MASUK =====
   async function handleSubmitDeposit(e) {
     e.preventDefault();
     if (!depWargaId || !depJumlah) {
@@ -56,6 +59,7 @@ export default function PageDeposit() {
     }
   }
 
+  // ===== PAKAI DEPOSIT MANUAL =====
   const bulanPakaiDeposit = getBulanTahun(pakaiTahun);
   const wargaPakaiDeposit = warga.find((w) => w.id === modalPakaiDeposit?.wargaId);
   const saldoDepositWargaIni = wargaPakaiDeposit
@@ -120,6 +124,49 @@ export default function PageDeposit() {
     }
   }
 
+  // ===== AUTO-DISTRIBUTE =====
+  async function handleConfirmAutoDistribute({ tahun, hasil, totalPakai, tarif }) {
+    try {
+      const batchId = crypto.randomUUID();
+      const today = new Date().toISOString().split('T')[0];
+
+      const iuranRecords = hasil.map((h) => ({
+        warga_id: modalAutoDistribute.wargaId,
+        bulan_tahun: h.bulan,
+        jumlah: h.nominal,
+        status: 'approved',
+        metode: 'deposit',
+        batch_id: batchId,
+        bukti_urls: null,
+        catatan: `Auto-distribute deposit ${today}${h.tipe === 'kurang' ? ` (kurang ${h.sisaKurang})` : ''}`,
+        tanggal_transaksi: today,
+      }));
+
+      const { error: e1 } = await supabase.from('iuran').insert(iuranRecords);
+      if (e1) throw e1;
+
+      const { error: e2 } = await supabase.from('deposit_warga').insert([
+        {
+          warga_id: modalAutoDistribute.wargaId,
+          tanggal: today,
+          tipe: 'pakai',
+          jumlah: totalPakai,
+          keterangan: `Auto-distribute untuk ${hasil.length} bulan tahun ${tahun}`,
+          created_by: user.id,
+        },
+      ]);
+      if (e2) throw e2;
+
+      alert('✅ Auto-distribute berhasil!');
+      setModalAutoDistribute(null);
+      invalidateKeuanganCache();
+      refetch();
+    } catch (err) {
+      alert('Gagal: ' + err.message);
+    }
+  }
+
+  // ===== LOADING =====
   if (loading) {
     return (
       <KeuanganLayout user={user}>
@@ -128,6 +175,7 @@ export default function PageDeposit() {
     );
   }
 
+  // ===== RENDER =====
   return (
     <KeuanganLayout user={user} pendingCount={getPendingBatches(iuran).length}>
       <TabDeposit
@@ -146,8 +194,10 @@ export default function PageDeposit() {
         depSubmitting={depSubmitting}
         handleSubmitDeposit={handleSubmitDeposit}
         setModalPakaiDeposit={setModalPakaiDeposit}
+        setModalAutoDistribute={setModalAutoDistribute}
       />
 
+      {/* ── Modal Pakai Manual ── */}
       {modalPakaiDeposit && wargaPakaiDeposit && (
         <ModalPakaiDeposit
           modalPakaiDeposit={modalPakaiDeposit}
@@ -164,6 +214,22 @@ export default function PageDeposit() {
           handleSubmitPakaiDeposit={handleSubmitPakaiDeposit}
         />
       )}
+
+      {/* ── Modal Auto-Distribute ── */}
+      {modalAutoDistribute && (() => {
+        const w = warga.find((x) => x.id === modalAutoDistribute.wargaId);
+        if (!w) return null;
+        return (
+          <ModalAutoDistribute
+            warga={w}
+            tarifList={tarifList}
+            saldoDeposit={getSaldoDepositWarga(depositList, w.id)}
+            iuranWarga={iuran.filter((i) => i.warga_id === w.id)}
+            onClose={() => setModalAutoDistribute(null)}
+            onConfirm={handleConfirmAutoDistribute}
+          />
+        );
+      })()}
     </KeuanganLayout>
   );
 }
