@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
-import { formatRupiah } from '../../lib/keuangan/helpers';
-import { getBulanTahun } from '../../lib/keuangan/constants';
+import { useState } from 'react';
+import { formatRupiah, tarifWarga } from '../../lib/keuangan/helpers';
+import { PERIODE_BULAN, getBulanTahun } from '../../lib/keuangan/constants';
 import { hitungDistribusiAuto } from '../../lib/keuangan/hooks';
-import { tarifWarga } from '../../lib/keuangan/helpers';
 
 export default function ModalAutoDistribute({
   warga,
@@ -12,18 +11,12 @@ export default function ModalAutoDistribute({
   onClose,
   onConfirm,
 }) {
-  const [tahun, setTahun] = useState(new Date().getFullYear());
+  const [tahun, setTahun] = useState(2026);
   const [loading, setLoading] = useState(false);
 
-  import { PERIODE_BULAN, getBulanTahun } from '../../lib/keuangan/constants';
+  // ── FIX: 2026 pakai PERIODE_BULAN (April–Des), tahun lain pakai 12 bulan ──
+  const bulanList = tahun === 2026 ? PERIODE_BULAN : getBulanTahun(tahun);
 
-// ...
-
-// 2026 = April–Des (kas baru terbentuk April)
-// 2027+ = Jan–Des (tahun penuh)
-const bulanList = tahun === 2026
-  ? PERIODE_BULAN
-  : getBulanTahun(tahun);
   const tarif = tarifWarga(warga, tarifList, tahun);
   const tarifBelumDiset = tarif === 0;
 
@@ -55,7 +48,7 @@ const bulanList = tahun === 2026
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <div>
             <h3 className="font-bold text-white text-base">⚡ Auto Distribusi Deposit</h3>
-            <p className="text-[11px] text-slate-400">Otomatis isi iuran dari bulan paling awal</p>
+            <p className="text-[11px] text-slate-400">Otomatis isi iuran dari bulan paling awal yang belum lunas</p>
           </div>
           <button
             onClick={onClose}
@@ -87,11 +80,9 @@ const bulanList = tahun === 2026
             onChange={(e) => setTahun(Number(e.target.value))}
             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
           >
-            {[2026, 2027, 2028, 2029].map((thn) => (
-              <option key={thn} value={thn}>
-                {thn}
-              </option>
-            ))}
+            <option value={2026}>2026 (April – Desember)</option>
+            <option value={2027}>2027 (Januari – Desember)</option>
+            <option value={2028}>2028 (Januari – Desember)</option>
           </select>
         </div>
 
@@ -165,6 +156,11 @@ const bulanList = tahun === 2026
                 <span className="text-slate-400">Sisa Deposit:</span>
                 <strong className="text-purple-400">{formatRupiah(sisaSaldo)}</strong>
               </div>
+              {sisaSaldo > 0 && (
+                <p className="text-[10px] text-slate-500 pt-1 border-t border-slate-800 mt-1">
+                  💡 Sisa {formatRupiah(sisaSaldo)} tetap tersimpan di deposit — bisa dipakai setelah tarif tahun depan di-set.
+                </p>
+              )}
             </div>
           </>
         )}
