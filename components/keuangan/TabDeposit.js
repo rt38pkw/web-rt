@@ -17,6 +17,9 @@ export default function TabDeposit({
   handleSubmitDeposit,
   setModalPakaiDeposit,
   setModalAutoDistribute,
+  setModalEditDeposit,
+  handleHapusDeposit,
+  handleUndoDistribusi,
 }) {
   const wargaDenganSaldo = warga
     .map((w) => ({ ...w, saldo: getSaldoDepositWarga(w.id) }))
@@ -175,8 +178,11 @@ export default function TabDeposit({
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
         <div className="p-4 border-b border-slate-800">
           <h3 className="text-sm font-bold text-white">📜 Riwayat Mutasi Deposit</h3>
+          <p className="text-[10px] text-slate-500 mt-1">
+            Masuk = setoran warga. Pakai = dipakai untuk iuran. Undo untuk batalkan distribusi.
+          </p>
         </div>
-        <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+        <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] sticky top-0">
               <tr>
@@ -185,12 +191,13 @@ export default function TabDeposit({
                 <th className="p-3">Tipe</th>
                 <th className="p-3">Keterangan</th>
                 <th className="p-3 text-right">Jumlah</th>
+                <th className="p-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {depositList.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="p-6 text-center text-slate-500">
+                  <td colSpan="6" className="p-6 text-center text-slate-500">
                     Belum ada mutasi.
                   </td>
                 </tr>
@@ -223,6 +230,37 @@ export default function TabDeposit({
                         }`}
                       >
                         {d.tipe === 'masuk' ? '+' : '-'} {formatRupiah(d.jumlah)}
+                      </td>
+                      <td className="p-3 text-right">
+                        <div className="flex gap-1 justify-end">
+                          {d.tipe === 'masuk' && (
+                            <>
+                              <button
+                                onClick={() => setModalEditDeposit(d)}
+                                title="Edit"
+                                className="text-blue-400 hover:text-blue-300 text-[10px] font-semibold px-1"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => handleHapusDeposit(d)}
+                                title="Hapus"
+                                className="text-rose-400 hover:text-rose-300 text-[10px] font-semibold px-1"
+                              >
+                                🗑️
+                              </button>
+                            </>
+                          )}
+                          {d.tipe === 'pakai' && (
+                            <button
+                              onClick={() => handleUndoDistribusi(d)}
+                              title="Undo distribusi ini"
+                              className="text-amber-400 hover:text-amber-300 text-[10px] font-semibold px-1"
+                            >
+                              ↩️ Undo
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
