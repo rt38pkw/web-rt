@@ -2,7 +2,7 @@ import { formatRupiah, formatTanggal } from '../../lib/keuangan/helpers';
 import { JENIS_PEMASUKAN } from '../../lib/keuangan/constants';
 
 export default function TabPemasukan({
-  pemasukanLain,
+  pemasukanLain = [],
   masukTgl,
   setMasukTgl,
   masukJenis,
@@ -15,8 +15,11 @@ export default function TabPemasukan({
   setMasukNominal,
   masukSubmitting,
   handleSubmitPemasukan,
+  setModalEditPemasukan,
+  handleHapusPemasukan,
 }) {
-  const total = pemasukanLain.reduce((s, p) => s + Number(p.nominal || 0), 0);
+  const pemasukanSafe = Array.isArray(pemasukanLain) ? pemasukanLain : [];
+  const total = pemasukanSafe.reduce((s, p) => s + Number(p.nominal || 0), 0);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -25,14 +28,10 @@ export default function TabPemasukan({
         className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 h-fit"
       >
         <h3 className="text-sm font-bold text-white">➕ Catat Pemasukan</h3>
-        <p className="text-[10px] text-slate-500">
-          Pemasukan non-iuran: donasi, mutasi saldo, bunga, dll.
-        </p>
+        <p className="text-[10px] text-slate-500">Pemasukan non-iuran: donasi, mutasi, dll.</p>
 
         <div>
-          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-            Tanggal
-          </label>
+          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Tanggal</label>
           <input
             type="date"
             value={masukTgl}
@@ -43,9 +42,7 @@ export default function TabPemasukan({
         </div>
 
         <div>
-          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-            Jenis
-          </label>
+          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Jenis</label>
           <select
             value={masukJenis}
             onChange={(e) => setMasukJenis(e.target.value)}
@@ -68,9 +65,7 @@ export default function TabPemasukan({
         )}
 
         <div>
-          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-            Keterangan
-          </label>
+          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Keterangan</label>
           <textarea
             value={masukKet}
             onChange={(e) => setMasukKet(e.target.value)}
@@ -81,9 +76,7 @@ export default function TabPemasukan({
         </div>
 
         <div>
-          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-            Nominal (Rp)
-          </label>
+          <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Nominal (Rp)</label>
           <input
             type="number"
             value={masukNominal}
@@ -105,9 +98,7 @@ export default function TabPemasukan({
 
       <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
         <div className="p-4 border-b border-slate-800 flex justify-between items-center">
-          <h3 className="text-sm font-bold text-white">
-            📋 Daftar Pemasukan ({pemasukanLain.length})
-          </h3>
+          <h3 className="text-sm font-bold text-white">📋 Daftar Pemasukan ({pemasukanSafe.length})</h3>
           <span className="text-xs text-emerald-400 font-bold">Total: {formatRupiah(total)}</span>
         </div>
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
@@ -118,27 +109,40 @@ export default function TabPemasukan({
                 <th className="p-3">Jenis</th>
                 <th className="p-3">Keterangan</th>
                 <th className="p-3 text-right">Nominal</th>
+                <th className="p-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {pemasukanLain.length === 0 ? (
+              {pemasukanSafe.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="p-6 text-center text-slate-500">
-                    Belum ada pemasukan.
-                  </td>
+                  <td colSpan="5" className="p-6 text-center text-slate-500">Belum ada pemasukan.</td>
                 </tr>
               ) : (
-                pemasukanLain.map((p) => (
+                pemasukanSafe.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-800/40">
-                    <td className="p-3 text-slate-400 whitespace-nowrap">
-                      {formatTanggal(p.tanggal)}
-                    </td>
+                    <td className="p-3 text-slate-400 whitespace-nowrap">{formatTanggal(p.tanggal)}</td>
                     <td className="p-3">
                       <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded">{p.jenis}</span>
                     </td>
                     <td className="p-3 text-slate-300">{p.keterangan || '-'}</td>
-                    <td className="p-3 text-right font-mono text-emerald-400">
-                      {formatRupiah(p.nominal)}
+                    <td className="p-3 text-right font-mono text-emerald-400">{formatRupiah(p.nominal)}</td>
+                    <td className="p-3 text-right">
+                      <div className="flex gap-1 justify-end">
+                        <button
+                          onClick={() => setModalEditPemasukan(p)}
+                          title="Edit"
+                          className="text-blue-400 hover:text-blue-300 text-[10px] font-semibold px-1"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => handleHapusPemasukan(p)}
+                          title="Hapus"
+                          className="text-rose-400 hover:text-rose-300 text-[10px] font-semibold px-1"
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
