@@ -4,8 +4,8 @@ import KeuanganLayout from '../../components/keuangan/Layout';
 import TabTunai from '../../components/keuangan/TabTunai';
 import ModalEditTunai from '../../components/keuangan/ModalEditTunai';
 import ModalKonfirmasiHapus from '../../components/keuangan/ModalKonfirmasiHapus';
-import { PERIODE_BULAN } from '../../lib/keuangan/constants';
-import { tarifWarga, formatRupiah } from '../../lib/keuangan/helpers';
+import { formatRupiah } from '../../lib/keuangan/helpers';
+import { distribusikanTunai } from '../../lib/keuangan/tunai';
 import {
   useKeuanganData,
   getPendingBatches,
@@ -23,7 +23,7 @@ export default function PageTunai() {
   } = useKeuanganData();
 
   const [tunaiWargaId, setTunaiWargaId] = useState('');
-  const [tunaiBulan, setTunaiBulan] = useState([]);
+  const [tunaiNominal, setTunaiNominal] = useState('');
   const [tunaiTanggal, setTunaiTanggal] = useState(new Date().toISOString().split('T')[0]);
   const [tunaiCatatan, setTunaiCatatan] = useState('');
   const [tunaiSubmitting, setTunaiSubmitting] = useState(false);
@@ -34,9 +34,8 @@ export default function PageTunai() {
 
   const iuranList = Array.isArray(iuran) ? iuran : [];
   const wargaList = Array.isArray(warga) ? warga : [];
-  const tarifListSafe = Array.isArray(tarifList) ? tarifList : [];
 
-  // ═══ RIWAYAT TUNAI (grup per batch_id) ═══
+  // ═══ RIWAYAT TUNAI ═══
   const riwayatTunai = useMemo(() => {
     const tunaiRecords = iuranList.filter((i) => i.metode === 'tunai');
     const grouped = {};
@@ -62,82 +61,88 @@ export default function PageTunai() {
     );
   }
 
-  const iuranWargaTerpilih = iuranList.filter((i) => i.warga_id === tunaiWargaId);
-  const wargaTerpilih = wargaList.find((w) => w.id === tunaiWargaId);
-  const tarifTerpilih = wargaTerpilih ? tarifWarga(wargaTerpilih, tarifListSafe, 2026) : 0;
-
-  const bulanBelumLunas = PERIODE_BULAN.filter((bln) => {
-    const totalApproved = iuranWargaTerpilih
-      .filter((i) => i.bulan_tahun === bln.kode && i.status === 'approved')
-      .reduce((s, i) => s + Number(i.jumlah || 0), 0);
-    const adaPending = iuranWargaTerpilih.some(
-      (i) => i.bulan_tahun === bln.kode && i.status === 'pending'
-    );
-    return !adaPending && totalApproved < tarifTerpilih;
-  });
-
-  const totalTunai = (() => {
-    if (!wargaTerpilih || tarifTerpilih === 0) return 0;
-    return tunaiBulan.reduce((sum, bln) => {
-      const totalApproved = iuranWargaTerpilih
-        .filter((i) => i.bulan_tahun === bln && i.status === 'approved')
-        .reduce((s, i) => s + Number(i.jumlah || 0), 0);
-      return sum + Math.max(0, tarifTerpilih - totalApproved);
-    }, 0);
-  })();
-
   // ═══ INPUT TUNAI BARU ═══
   async function handleSubmitTunai(e) {
     e.preventDefault();
-    if (!tunaiWargaId || tunaiBulan.length === 0) {
-      alert('Pilih warga dan minimal 1 bulan');
-      return;
-    }
-    if (tarifTerpilih === 0) {
-      alert('Tarif 2026 belum ditetapkan.');
+    const nominal = Number(tunaiNominal) || 0;
+    if (!tunaiWargaId || nominal <= 0) {
+      alert('Pilih warga dan isi nominal');
       return;
     }
 
     const w = wargaList.find((x) => x.id === tunaiWargaId);
-    const namaBulan = tunaiBulan
-      .map((k) => PERIODE_BULAN.find((b) => b.kode === k)?.nama || k)
-      .join(', ');
+    const tarif = w?.kategori === 'Usaha' ? 30000 : 15000;
+    const iuranWarga = iuranList.filter((i) => i.warga_id === tunaiWargaId);
 
-    if (!window.confirm(
+    const bulanList = [
+      { kode: '2026-04', nama: 'April' },
+      { kode: '2026-05', nama: 'Mei' },
+      { kode: '2026-06', nama: 'Juni' },
+      { kode: '2026-07', nama: 'Juli' },
+      { kode: '2026-08', nama: 'Agustus' },
+      { kode: '2026-09', nama: 'September' },
+      { kode: '2026-10', nama: 'Oktober' },
+      { kode: '2026-11', nama: 'November' },
+      { kode: '2026-12', nama: 'Desember' },
+    ];
+
+    const { hasil, totalPakai, sisaUang } = distribusikanTunai(nominal, bulanList, iuranWarga, tarif);
+
+    if (hasil.length === 0) {
+      alert('Semua bulan sudah lunas. Tidak ada yang bisa dibayar.');
+      return;
+    }
+
+    // Konfirmasi
+    const detail = hasil
+      .map((h) => `${h.namaBulan}: ${formatRupiah(h.nominal)} (${h.tipe})`)
+      .join('\n');
+    const confirmMsg =
       `Konfirmasi:\n\n` +
       `Warga: ${w?.no_rumah} - ${w?.nama_lengkap}\n` +
-      `Bulan: ${namaBulan}\n` +
-      `Total: ${formatRupiah(totalTunai)}\n\n` +
-      `Yakin?`
-    )) return;
+      `Nominal: ${formatRupiah(nominal)}\n\n` +
+      `Distribusi:\n${detail}\n\n` +
+      (sisaUang > 0 ? `Sisa jadi deposit: ${formatRupiah(sisaUang)}\n\n` : '') +
+      `Lanjutkan?`;
+
+    if (!window.confirm(confirmMsg)) return;
 
     setTunaiSubmitting(true);
     try {
       const batchId = crypto.randomUUID();
-      const records = tunaiBulan
-        .map((bln) => {
-          const totalApproved = iuranWargaTerpilih
-            .filter((i) => i.bulan_tahun === bln && i.status === 'approved')
-            .reduce((s, i) => s + Number(i.jumlah || 0), 0);
-          return {
-            warga_id: tunaiWargaId,
-            bulan_tahun: bln,
-            jumlah: Math.max(0, tarifTerpilih - totalApproved),
-            status: 'approved',
-            metode: 'tunai',
-            batch_id: batchId,
-            bukti_urls: null,
-            catatan: tunaiCatatan || null,
-            tanggal_transaksi: tunaiTanggal,
-          };
-        })
-        .filter((r) => r.jumlah > 0);
-      if (records.length === 0) throw new Error('Tidak ada nominal');
+      const records = hasil.map((h) => ({
+        warga_id: tunaiWargaId,
+        bulan_tahun: h.bulan,
+        jumlah: h.nominal,
+        status: 'approved',
+        metode: 'tunai',
+        batch_id: batchId,
+        bukti_urls: null,
+        catatan: tunaiCatatan || null,
+        tanggal_transaksi: tunaiTanggal,
+      }));
+
       const { error } = await supabase.from('iuran').insert(records);
       if (error) throw error;
-      alert('✅ Iuran tunai berhasil dicatat!');
+
+      // Kalau ada sisa uang, simpan sebagai deposit
+      if (sisaUang > 0) {
+        const { error: errDep } = await supabase.from('deposit_warga').insert([
+          {
+            warga_id: tunaiWargaId,
+            tanggal: tunaiTanggal,
+            tipe: 'masuk',
+            jumlah: sisaUang,
+            keterangan: `Sisa uang tunai ${formatRupiah(nominal)} (tunai batch)`,
+            created_by: user?.id,
+          },
+        ]);
+        if (errDep) throw errDep;
+      }
+
+      alert(`✅ Iuran tunai berhasil! ${hasil.length} bulan terisi${sisaUang > 0 ? `, sisa ${formatRupiah(sisaUang)} jadi deposit` : ''}`);
       setTunaiWargaId('');
-      setTunaiBulan([]);
+      setTunaiNominal('');
       setTunaiCatatan('');
       invalidateKeuanganCache();
       refetch();
@@ -155,14 +160,8 @@ export default function PageTunai() {
 
   async function handleSaveEditTunai({ batchId, items, catatan, tanggal }) {
     try {
-      // Hapus semua record lama dengan batchId
-      const { error: errDel } = await supabase
-        .from('iuran')
-        .delete()
-        .eq('batch_id', batchId);
-      if (errDel) throw errDel;
+      await supabase.from('iuran').delete().eq('batch_id', batchId);
 
-      // Insert ulang dengan data baru
       const newRecords = items.map((item) => {
         const wargaId = modalEditTunai.items[0]?.warga_id;
         return {
@@ -178,8 +177,8 @@ export default function PageTunai() {
         };
       });
 
-      const { error: errIns } = await supabase.from('iuran').insert(newRecords);
-      if (errIns) throw errIns;
+      const { error } = await supabase.from('iuran').insert(newRecords);
+      if (error) throw error;
 
       alert('✅ Iuran tunai berhasil diupdate!');
       setModalEditTunai(null);
@@ -226,17 +225,16 @@ export default function PageTunai() {
     <KeuanganLayout user={user} pendingCount={getPendingBatches(iuranList).length}>
       <TabTunai
         warga={wargaList}
-        tarifList={tarifListSafe}
+        tarifList={tarifList}
+        iuran={iuranList}
         tunaiWargaId={tunaiWargaId}
         setTunaiWargaId={setTunaiWargaId}
-        tunaiBulan={tunaiBulan}
-        setTunaiBulan={setTunaiBulan}
+        tunaiNominal={tunaiNominal}
+        setTunaiNominal={setTunaiNominal}
         tunaiTanggal={tunaiTanggal}
         setTunaiTanggal={setTunaiTanggal}
         tunaiCatatan={tunaiCatatan}
         setTunaiCatatan={setTunaiCatatan}
-        bulanBelumLunas={bulanBelumLunas}
-        totalTunai={totalTunai}
         tunaiSubmitting={tunaiSubmitting}
         handleSubmitTunai={handleSubmitTunai}
         riwayatTunai={riwayatTunai}
@@ -248,7 +246,7 @@ export default function PageTunai() {
         <ModalEditTunai
           batch={modalEditTunai}
           warga={wargaList.find((x) => x.id === modalEditTunai.items[0]?.warga_id)}
-          tarifList={tarifListSafe}
+          tarifList={tarifList}
           onClose={() => setModalEditTunai(null)}
           onSave={handleSaveEditTunai}
         />
