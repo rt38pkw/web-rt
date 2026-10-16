@@ -25,6 +25,22 @@ export default function AdminDashboard() {
     const savedUser = sessionStorage.getItem('pengurusSession');
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser);
+
+      // ── Redirect non-ketua ke dashboard mereka ──
+      if (parsedUser.role === 'bendahara') {
+        window.location.replace('/keuangan/dashboard');
+        return;
+      }
+      if (parsedUser.role === 'bendahara_2') {
+        window.location.replace('/keuangan/projek');
+        return;
+      }
+      // Sekretaris sementara tetap di /admin (nanti pindah ke /sekretariat)
+      // if (parsedUser.role === 'sekretaris') {
+      //   window.location.replace('/sekretariat/dashboard');
+      //   return;
+      // }
+
       setUser(parsedUser);
       fetchStats();
     }
@@ -48,27 +64,29 @@ export default function AdminDashboard() {
       return;
     }
 
-        setUser(data);
+    setUser(data);
     sessionStorage.setItem('pengurusSession', JSON.stringify(data));
 
-    // Bendahara → redirect ke dashboard keuangan
+    // Bendahara → ke dashboard keuangan
     if (data.role === 'bendahara') {
-      window.location.href = '/keuangan/dashboard';
+      window.location.replace('/keuangan/dashboard');
       return;
     }
 
-    // Bendahara 2 (operator proyek) → redirect ke halaman proyek
+    // Bendahara 2 (operator proyek) → ke halaman projek
     if (data.role === 'bendahara_2') {
-      window.location.href = '/keuangan/projek';
+      window.location.replace('/keuangan/projek');
       return;
     }
 
+    // Ketua & sekretaris tetap di /admin
     fetchStats();
   };
 
   const handleLogout = () => {
+    if (!confirm('Keluar dari akun pengurus?')) return;
     sessionStorage.removeItem('pengurusSession');
-    setUser(null);
+    window.location.replace('/');
   };
 
   async function fetchStats() {
