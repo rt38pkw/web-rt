@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 
-export default function ModalEditDeposit({ data, warga, onClose, onSave }) {
+export default function ModalEditDeposit({ data, warga = [], onClose, onSave }) {
   const [tgl, setTgl] = useState('');
   const [jumlah, setJumlah] = useState('');
   const [keterangan, setKeterangan] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const wargaList = Array.isArray(warga) ? warga : [];
 
   useEffect(() => {
     if (data) {
@@ -35,7 +37,7 @@ export default function ModalEditDeposit({ data, warga, onClose, onSave }) {
     }
   };
 
-  const w = warga?.find((x) => x.id === data.warga_id);
+  const w = wargaList.find((x) => x.id === data.warga_id);
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
