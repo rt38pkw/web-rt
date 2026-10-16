@@ -5,33 +5,36 @@ import { hitungDistribusiAuto } from '../../lib/keuangan/hooks';
 
 export default function ModalAutoDistribute({
   warga,
-  tarifList,
-  saldoDeposit,
-  iuranWarga,
+  tarifList = [],
+  saldoDeposit = 0,
+  iuranWarga = [],
   onClose,
   onConfirm,
 }) {
   const [tahun, setTahun] = useState(2026);
   const [loading, setLoading] = useState(false);
 
-  // ── FIX: 2026 pakai PERIODE_BULAN (April–Des), tahun lain pakai 12 bulan ──
-  const bulanList = tahun === 2026 ? PERIODE_BULAN : getBulanTahun(tahun);
+  // ── Guard: pastikan warga ada ──
+  if (!warga) return null;
 
-  const tarif = tarifWarga(warga, tarifList, tahun);
+  const tarifListSafe = Array.isArray(tarifList) ? tarifList : [];
+  const iuranWargaSafe = Array.isArray(iuranWarga) ? iuranWarga : [];
+
+  const bulanList = tahun === 2026 ? PERIODE_BULAN : getBulanTahun(tahun);
+  const tarif = tarifWarga(warga, tarifListSafe, tahun);
   const tarifBelumDiset = tarif === 0;
 
-  // Hitung distribusi otomatis
-  const { hasil, totalPakai, sisaSaldo } = tarifBelumDiset
+  const { hasil = [], totalPakai = 0, sisaSaldo = saldoDeposit } = tarifBelumDiset
     ? { hasil: [], totalPakai: 0, sisaSaldo: saldoDeposit }
-    : hitungDistribusiAuto(saldoDeposit, tarif, bulanList, iuranWarga);
+    : hitungDistribusiAuto(saldoDeposit, tarif, bulanList, iuranWargaSafe);
 
   const handleConfirm = async () => {
     if (tarifBelumDiset) {
-      alert(`Tarif ${tahun} belum ditetapkan. Set dulu di tab 💰 Tarif.`);
+      alert(`Tarif ${tahun} belum ditetapkan.`);
       return;
     }
-    if (hasil.length === 0) {
-      alert('Tidak ada bulan yang bisa diisi — semua sudah lunas atau saldo kosong.');
+    if (!hasil || hasil.length === 0) {
+      alert('Tidak ada bulan yang bisa diisi.');
       return;
     }
     setLoading(true);
@@ -48,7 +51,7 @@ export default function ModalAutoDistribute({
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <div>
             <h3 className="font-bold text-white text-base">⚡ Auto Distribusi Deposit</h3>
-            <p className="text-[11px] text-slate-400">Otomatis isi iuran dari bulan paling awal yang belum lunas</p>
+            <p className="text-[11px] text-slate-400">Otomatis isi iuran dari bulan paling awal</p>
           </div>
           <button
             onClick={onClose}
@@ -58,7 +61,6 @@ export default function ModalAutoDistribute({
           </button>
         </div>
 
-        {/* Info Warga */}
         <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-1">
           <div className="flex justify-between text-xs">
             <span className="text-slate-400">Warga:</span>
@@ -72,7 +74,6 @@ export default function ModalAutoDistribute({
           </div>
         </div>
 
-        {/* Pilih Tahun */}
         <div>
           <label className="block text-xs font-semibold text-slate-300 mb-2">Tahun</label>
           <select
@@ -86,10 +87,9 @@ export default function ModalAutoDistribute({
           </select>
         </div>
 
-        {/* Info Tarif */}
         {tarifBelumDiset ? (
           <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-xs text-rose-400">
-            ⚠️ Tarif {tahun} belum ditetapkan. Set dulu di tab 💰 Tarif.
+            ⚠️ Tarif {tahun} belum ditetapkan.
           </div>
         ) : (
           <>
@@ -100,15 +100,13 @@ export default function ModalAutoDistribute({
               </div>
             </div>
 
-            {/* Preview Distribusi */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-2">
                 Preview Distribusi
               </label>
-
               {hasil.length === 0 ? (
                 <div className="text-center text-xs text-slate-500 py-4 bg-slate-950 rounded-xl">
-                  Semua bulan {tahun} sudah lunas, atau saldo tidak cukup.
+                  Semua bulan sudah lunas atau saldo tidak cukup.
                 </div>
               ) : (
                 <div className="bg-slate-950 border border-slate-800 rounded-xl max-h-64 overflow-y-auto">
@@ -131,11 +129,6 @@ export default function ModalAutoDistribute({
                           <td className="p-2 text-right font-mono text-white">
                             {formatRupiah(h.nominal)}
                           </td>
-                          {h.tipe === 'kurang' && (
-                            <td className="p-2 text-right text-[10px] text-amber-400">
-                              sisa {formatRupiah(h.sisaKurang)}
-                            </td>
-                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -144,7 +137,6 @@ export default function ModalAutoDistribute({
               )}
             </div>
 
-            {/* Ringkasan */}
             <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-1">
               <div className="flex justify-between text-xs">
                 <span className="text-slate-400">Total Pakai:</span>
@@ -156,16 +148,10 @@ export default function ModalAutoDistribute({
                 <span className="text-slate-400">Sisa Deposit:</span>
                 <strong className="text-purple-400">{formatRupiah(sisaSaldo)}</strong>
               </div>
-              {sisaSaldo > 0 && (
-                <p className="text-[10px] text-slate-500 pt-1 border-t border-slate-800 mt-1">
-                  💡 Sisa {formatRupiah(sisaSaldo)} tetap tersimpan di deposit — bisa dipakai setelah tarif tahun depan di-set.
-                </p>
-              )}
             </div>
           </>
         )}
 
-        {/* Tombol */}
         <div className="flex gap-3 pt-2">
           <button
             type="button"
