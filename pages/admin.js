@@ -48,12 +48,18 @@ export default function AdminDashboard() {
       return;
     }
 
-       setUser(data);
+        setUser(data);
     sessionStorage.setItem('pengurusSession', JSON.stringify(data));
 
-    // BONUS: Bendahara langsung ke halaman keuangan
+    // Bendahara → redirect ke dashboard keuangan
     if (data.role === 'bendahara') {
       window.location.href = '/keuangan/dashboard';
+      return;
+    }
+
+    // Bendahara 2 (operator proyek) → redirect ke halaman proyek
+    if (data.role === 'bendahara_2') {
+      window.location.href = '/keuangan/projek';
       return;
     }
 
