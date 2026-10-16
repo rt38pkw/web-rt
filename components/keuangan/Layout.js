@@ -16,7 +16,7 @@ const MENU_MAIN = [
   { key: 'riwayat', i: '📋', l: 'Riwayat', path: '/keuangan/riwayat' },
 ];
 
-// ═══ MENU PROYEK ═══
+// ═══ MENU PROYEK (untuk operator) ═══
 const MENU_PROYEK = [
   { key: 'projek', i: '🏗️', l: 'Projek', path: '/keuangan/projek' },
 ];
@@ -26,11 +26,19 @@ export default function Layout({ user, pendingCount = 0, children }) {
 
   // ── Cek role ──
   const isOperatorProyek = user?.role === 'bendahara_2';
+  const isKetua = user?.role === 'ketua';
 
-  // ── Menu yang ditampilkan sesuai role ──
+  // ── Menu sesuai role ──
   const MENU = isOperatorProyek ? MENU_PROYEK : MENU_MAIN;
 
   const activeKey = MENU.find((m) => router.pathname.startsWith(m.path))?.key;
+
+  // ── Logout ──
+  const handleLogout = () => {
+    if (!confirm('Keluar dari akun pengurus?')) return;
+    sessionStorage.removeItem('pengurusSession');
+    window.location.href = '/';
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
@@ -41,18 +49,31 @@ export default function Layout({ user, pendingCount = 0, children }) {
               {isOperatorProyek ? '🏗️ Operator Proyek' : '💰 Dashboard Keuangan'}
             </h1>
             <p className="text-[11px] text-slate-400">
-              {isOperatorProyek ? `RT 38 — ${user?.nama || ''}` : 'RT 38 Puri Kencana Wagir'}
+              {user?.nama ? `${user.nama} — ${user.role}` : 'RT 38 Puri Kencana Wagir'}
             </p>
           </div>
+
           <div className="flex items-center gap-2 shrink-0">
             {!isOperatorProyek && <InstallButton />}
             {user && <NotifToggle userId={user.id} userType="pengurus" />}
-            <Link
-              href="/admin"
-              className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg text-slate-300 border border-slate-700"
+
+            {/* ← Kembali hanya untuk ketua */}
+            {isKetua && (
+              <Link
+                href="/admin"
+                className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg text-slate-300 border border-slate-700"
+              >
+                ← Admin
+              </Link>
+            )}
+
+            {/* Keluar untuk semua role */}
+            <button
+              onClick={handleLogout}
+              className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-2 rounded-lg border border-rose-500/20 font-medium"
             >
-              ← Kembali
-            </Link>
+              🚪 Keluar
+            </button>
           </div>
         </div>
       </div>
