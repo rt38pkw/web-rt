@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import KeuanganLayout from '../../components/keuangan/Layout';
 import TabTunai from '../../components/keuangan/TabTunai';
@@ -14,9 +14,18 @@ import {
 } from '../../lib/keuangan/hooks';
 
 export default function PageTunai() {
-  // PERHATIKAN: Pastikan hook mengembalikan data 'deposit'. 
-  // Jika namanya 'depositWarga', ganti jadi: deposit: depositWarga = []
   const { user, iuran = [], warga = [], tarifList = [], deposit = [], loading, refetch } = useKeuanganData();
+
+  // PENARIKAN DATA DEPOSIT MANUAL (ANTISIPASI HOOK TIDAK MENYEDIAKAN DATA)
+  const [manualDeposits, setManualDeposits] = useState([]);
+  
+  useEffect(() => {
+    const fetchDeposits = async () => {
+      const { data, error } = await supabase.from('deposit_warga').select('*').eq('tipe', 'masuk');
+      if (!error && data) setManualDeposits(data);
+    };
+    fetchDeposits();
+  }, [iuran, refetch]);
 
   const [tunaiWargaId, setTunaiWargaId] = useState('');
   const [tunaiNominal, setTunaiNominal] = useState('');
@@ -30,11 +39,13 @@ export default function PageTunai() {
 
   const iuranList = Array.isArray(iuran) ? iuran : [];
   const wargaList = Array.isArray(warga) ? warga : [];
-  const depositList = Array.isArray(deposit) ? deposit : [];
+  
+  // GABUNGKAN DEPOSIT DARI HOOK ATAU DARI DATABASE MANUAL
+  const depositList = manualDeposits.length > 0 ? manualDeposits : (Array.isArray(deposit) ? deposit : []);
 
   const bulanList = useMemo(() => getPeriodeBulan(2026), []);
 
-  // ═══ PERBAIKAN: PENGCOCOKAN DEPOSIT DI TABEL RIWAYAT ═══
+  // PENGCOCOKAN DATA IURAN + DEPOSIT UNTUK RIWAYAT
   const riwayatTunai = useMemo(() => {
     const tunaiRecords = iuranList.filter((i) => i.metode === 'tunai');
     const grouped = {};
@@ -42,10 +53,10 @@ export default function PageTunai() {
     tunaiRecords.forEach((i) => {
       const key = i.batch_id || i.id;
       if (!grouped[key]) {
-        // 1. Cari berdasarkan Batch ID di keterangan
-        let dep = depositList.find(d => d.keterangan?.includes(key.slice(0, 8)));
+        // 1. Cari berdasarkan 8 karakter pertama Batch ID di keterangan deposit
+        let dep = depositList.find(d => d.keterangan && d.keterangan.includes(key.slice(0, 8)));
         
-        // 2. Kalau gagal, cari berdasarkan Warga & Tanggal (Abaikan jam/menit)
+        // 2. Kalau gagal, cari berdasarkan Warga ID dan Tanggal (abaikan jam)
         if (!dep) {
           const iuranDateStr = i.tanggal_transaksi ? i.tanggal_transaksi.split('T')[0] : '';
           dep = depositList.find(d => {
@@ -59,7 +70,7 @@ export default function PageTunai() {
         grouped[key] = { 
           batchId: key, 
           items: [],
-          totalDeposit: dep ? dep.jumlah : 0 
+          totalDeposit: dep ? Number(dep.jumlah) : 0 
         };
       }
       grouped[key].items.push(i);
