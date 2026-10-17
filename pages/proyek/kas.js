@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import Layout from '../../components/proyek/Layout';
 import ModalKasProyek from '../../components/proyek/ModalKasProyek';
 import ModalKonfirmasiHapus from '../../components/keuangan/ModalKonfirmasiHapus';
+import ModalRefundMassal from '../../components/proyek/ModalRefundMassal';
 import { useProyekData, getPendingProyekCount, invalidateProyekCache } from '../../lib/proyek/hooks';
 import { formatRupiahProyek, formatTanggalProyek } from '../../lib/proyek/constants';
 import { getRingkasanKasProyek } from '../../lib/proyek/calculations';
@@ -17,12 +18,17 @@ export default function PageProyekKas() {
   const [editData, setEditData] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   
+  const [showRefundList, setShowRefundList] = useState(false);
+
   const [showHapus, setShowHapus] = useState(false);
   const [hapusData, setHapusData] = useState(null);
 
   if (typeof window === 'undefined') return null;
 
   const proyekAktif = proyekList.find(p => p.id === proyekTerpilihId) || proyekList[0];
+  
+  // HANYA muncul jika statusnya 'batal'
+  const isProyekBatal = proyekAktif?.status === 'batal';
 
   if (loading) {
     return (
@@ -43,29 +49,50 @@ export default function PageProyekKas() {
         });
         alert('✅ Transaksi berhasil diupdate!');
       } else {
-        // ═══ VALIDASI REFUND: Nominal tidak boleh melebihi saldo proyek ═══
-        if (data.tipe === 'refund') {
-          const kasSaatIni = getRingkasanKasProyek(iuranProyekList, kasProyekList, data.proyek_id);
-          
-          if (data.nominal > kasSaatIni.saldo) {
-            alert(`❌ Gagal Refund!\n\nNominal refund (Rp ${data.nominal.toLocaleString('id-ID')}) ` +
-                  `melebihi Saldo Kas Proyek yang tersedia (Rp ${kasSaatIni.saldo.toLocaleString('id-ID')}).`);
-            setSubmitting(false);
-            return;
-          }
-        }
-
         await insertKasProyek({
           proyek_id: data.proyek_id,
           warga_id: data.warga_id,
-          tipe: data.tipe,
+          tipe: data.tipe, // 'pengeluaran'
           tanggal: data.tanggal,
           nominal: data.nominal,
           keterangan: data.keterangan,
         });
-        alert(`✅ ${modalMode === 'pengeluaran' ? 'Pengeluaran' : 'Refund'} dicatat!`);
+        alert(`✅ Pengeluaran dicatat!`);
       }
       setShowModal(false);
+      invalidateProyekCache();
+      refetch();
+    } catch (err) {
+      alert('Gagal: ' + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ═══ HANDLER REFUND (LIST) ═══
+  const handleProcessRefundList = async (wargaTerpilih, tanggal) => {
+    // 🛡️ VALIDASI GANDA: Pastikan proyek memang batal sebelum memproses
+    if (proyekAktif?.status !== 'batal') {
+      alert('❌ Gagal: Refund hanya bisa diproses untuk proyek yang dibatalkan!');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const insertData = wargaTerpilih.map(w => ({
+        proyek_id: proyekAktif.id,
+        warga_id: w.id,
+        tipe: 'refund',
+        tanggal: tanggal,
+        nominal: w.refundable,
+        keterangan: `Refund pembatalan proyek`,
+      }));
+
+      const { error } = await supabase.from('kas_proyek').insert(insertData);
+      if (error) throw error;
+
+      alert(`✅ Berhasil memproses refund untuk ${wargaTerpilih.length} warga!`);
+      setShowRefundList(false);
       invalidateProyekCache();
       refetch();
     } catch (err) {
@@ -107,8 +134,8 @@ export default function PageProyekKas() {
   return (
     <Layout user={user} pendingCount={getPendingProyekCount(iuranProyekList)}>
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-900 border border-slate-800 rounded-2xl p-4">
-          <div className="flex-1 min-w-[200px]">
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3 bg-slate-900 border border-slate-800 rounded-2xl p-4">
+          <div className="flex-1 min-w-[200px] w-full">
             <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-1">Pilih Proyek Kas</label>
             <select
               value={proyekAktif?.id || ''}
@@ -124,17 +151,21 @@ export default function PageProyekKas() {
               )}
             </select>
           </div>
-          <div className="flex gap-2 w-full sm:w-auto mt-3 sm:mt-0">
+          
+          <div className="flex flex-wrap gap-2 w-full xl:w-auto mt-2 xl:mt-0">
             <button
               onClick={() => { setModalMode('pengeluaran'); setShowModal(true); }}
               disabled={!proyekAktif}
               className="flex-1 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-[11px] font-semibold px-4 py-2 rounded-lg"
             >💸 Catat Pengeluaran</button>
-            <button
-              onClick={() => { setModalMode('refund'); setShowModal(true); }}
-              disabled={!proyekAktif}
-              className="flex-1 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-[11px] font-semibold px-4 py-2 rounded-lg"
-            >↩️ Refund Warga</button>
+            
+            {/* TOMBOL REFUND: Hanya dirender kalau statusnya 'batal' */}
+            {isProyekBatal && (
+              <button
+                onClick={() => setShowRefundList(true)}
+                className="flex-1 bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-semibold px-4 py-2 rounded-lg"
+              >↩️ Refund Warga</button>
+            )}
           </div>
         </div>
 
@@ -190,7 +221,6 @@ export default function PageProyekKas() {
                 ) : (
                   riwayatKas.map((k) => {
                     const w = warga.find(x => x.id === k.warga_id);
-                    // ═══ LOGIKA TIPE & WARNA DIPERBAIKI ═══
                     const isPengeluaran = k.tipe === 'pengeluaran';
                     const isDonasi = k.tipe === 'donasi';
                     
@@ -245,6 +275,17 @@ export default function PageProyekKas() {
         kasProyekList={kasProyekList}
         dataEdit={editData}
         onSubmit={handleSubmit}
+        submitting={submitting}
+      />
+
+      <ModalRefundMassal
+        show={showRefundList}
+        onClose={() => setShowRefundList(false)}
+        proyek={proyekAktif}
+        wargaList={warga}
+        iuranList={iuranProyekList}
+        kasList={kasProyekList}
+        onProcess={handleProcessRefundList}
         submitting={submitting}
       />
 
