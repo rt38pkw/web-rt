@@ -75,14 +75,10 @@ export default function PageTunai() {
     const iuranWarga = iuranList.filter((i) => i.warga_id === tunaiWargaId);
 
     const bulanList = [
-      { kode: '2026-04', nama: 'April' },
-      { kode: '2026-05', nama: 'Mei' },
-      { kode: '2026-06', nama: 'Juni' },
-      { kode: '2026-07', nama: 'Juli' },
-      { kode: '2026-08', nama: 'Agustus' },
-      { kode: '2026-09', nama: 'September' },
-      { kode: '2026-10', nama: 'Oktober' },
-      { kode: '2026-11', nama: 'November' },
+      { kode: '2026-04', nama: 'April' }, { kode: '2026-05', nama: 'Mei' },
+      { kode: '2026-06', nama: 'Juni' }, { kode: '2026-07', nama: 'Juli' },
+      { kode: '2026-08', nama: 'Agustus' }, { kode: '2026-09', nama: 'September' },
+      { kode: '2026-10', nama: 'Oktober' }, { kode: '2026-11', nama: 'November' },
       { kode: '2026-12', nama: 'Desember' },
     ];
 
@@ -93,17 +89,8 @@ export default function PageTunai() {
       return;
     }
 
-    // Konfirmasi
-    const detail = hasil
-      .map((h) => `${h.namaBulan}: ${formatRupiah(h.nominal)} (${h.tipe})`)
-      .join('\n');
-    const confirmMsg =
-      `Konfirmasi:\n\n` +
-      `Warga: ${w?.no_rumah} - ${w?.nama_lengkap}\n` +
-      `Nominal: ${formatRupiah(nominal)}\n\n` +
-      `Distribusi:\n${detail}\n\n` +
-      (sisaUang > 0 ? `Sisa jadi deposit: ${formatRupiah(sisaUang)}\n\n` : '') +
-      `Lanjutkan?`;
+    const detail = hasil.map((h) => `${h.namaBulan}: ${formatRupiah(h.nominal)} (${h.tipe})`).join('\n');
+    const confirmMsg = `Konfirmasi:\n\nWarga: ${w?.no_rumah} - ${w?.nama_lengkap}\nNominal: ${formatRupiah(nominal)}\n\nDistribusi:\n${detail}\n\n` + (sisaUang > 0 ? `Sisa jadi deposit: ${formatRupiah(sisaUang)}\n\n` : '') + `Lanjutkan?`;
 
     if (!window.confirm(confirmMsg)) return;
 
@@ -111,41 +98,24 @@ export default function PageTunai() {
     try {
       const batchId = crypto.randomUUID();
       const records = hasil.map((h) => ({
-        warga_id: tunaiWargaId,
-        bulan_tahun: h.bulan,
-        jumlah: h.nominal,
-        status: 'approved',
-        metode: 'tunai',
-        batch_id: batchId,
-        bukti_urls: null,
-        catatan: tunaiCatatan || null,
-        tanggal_transaksi: tunaiTanggal,
+        warga_id: tunaiWargaId, bulan_tahun: h.bulan, jumlah: h.nominal, status: 'approved',
+        metode: 'tunai', batch_id: batchId, bukti_urls: null, catatan: tunaiCatatan || null, tanggal_transaksi: tunaiTanggal,
       }));
 
       const { error } = await supabase.from('iuran').insert(records);
       if (error) throw error;
 
-      // Kalau ada sisa uang, simpan sebagai deposit (Sertakan batchId di keterangan)
       if (sisaUang > 0) {
-        const { error: errDep } = await supabase.from('deposit_warga').insert([
-          {
-            warga_id: tunaiWargaId,
-            tanggal: tunaiTanggal,
-            tipe: 'masuk',
-            jumlah: sisaUang,
-            keterangan: `Sisa uang tunai ${formatRupiah(nominal)} (batch ${batchId.slice(0, 8)})`,
-            created_by: user?.id,
-          },
-        ]);
+        const { error: errDep } = await supabase.from('deposit_warga').insert([{
+          warga_id: tunaiWargaId, tanggal: tunaiTanggal, tipe: 'masuk', jumlah: sisaUang,
+          keterangan: `Sisa uang tunai ${formatRupiah(nominal)} (batch ${batchId.slice(0, 8)})`, created_by: user?.id,
+        }]);
         if (errDep) throw errDep;
       }
 
-      alert(`✅ Iuran tunai berhasil! ${hasil.length} bulan terisi${sisaUang > 0 ? `, sisa ${formatRupiah(sisaUang)} jadi deposit` : ''}`);
-      setTunaiWargaId('');
-      setTunaiNominal('');
-      setTunaiCatatan('');
-      invalidateKeuanganCache();
-      refetch();
+      alert(`✅ Iuran tunai berhasil!`);
+      setTunaiWargaId(''); setTunaiNominal(''); setTunaiCatatan('');
+      invalidateKeuanganCache(); refetch();
     } catch (err) {
       alert('Gagal: ' + err.message);
     } finally {
@@ -153,76 +123,65 @@ export default function PageTunai() {
     }
   }
 
-  // ═══ EDIT TUNAI ═══
+  // ═══ EDIT TUNAI (LOGIKA BARU: DISTRIBUSI ULANG) ═══
   function handleEditTunai(batch) {
     setModalEditTunai(batch);
   }
 
-  async function handleSaveEditTunai({ batchId, items, catatan, tanggal }) {
+  async function handleSaveEditTunai({ batchId, nominalTotal, catatan, tanggal }) {
     try {
-      // 1. Hitung total lama & total baru
-      const oldTotal = modalEditTunai.items.reduce((s, i) => s + Number(i.jumlah || 0), 0);
-      const newTotal = items.reduce((s, i) => s + Number(i.jumlah || 0), 0);
+      const wargaId = modalEditTunai.items[0]?.warga_id;
+      const w = wargaList.find((x) => x.id === wargaId);
+      const tarif = w?.kategori === 'Usaha' ? 30000 : 15000;
 
-      // 2. Cari data deposit lama berdasarkan batchId
+      // 1. Hapus iuran lama di batch ini
+      await supabase.from('iuran').delete().eq('batch_id', batchId);
+
+      // 2. Ambil sisa iuran warga (tanpa batch ini) untuk didistribusi ulang
+      const iuranWargaLain = iuranList.filter((i) => i.warga_id === wargaId && i.batch_id !== batchId);
+
+      const bulanList = [
+        { kode: '2026-04', nama: 'April' }, { kode: '2026-05', nama: 'Mei' },
+        { kode: '2026-06', nama: 'Juni' }, { kode: '2026-07', nama: 'Juli' },
+        { kode: '2026-08', nama: 'Agustus' }, { kode: '2026-09', nama: 'September' },
+        { kode: '2026-10', nama: 'Oktober' }, { kode: '2026-11', nama: 'November' },
+        { kode: '2026-12', nama: 'Desember' },
+      ];
+
+      // 3. Hitung ulang distribusi
+      const { hasil, sisaUang } = distribusikanTunai(nominalTotal, bulanList, iuranWargaLain, tarif);
+
+      // 4. Insert Iuran Baru
+      const newRecords = hasil.map((h) => ({
+        warga_id: wargaId, bulan_tahun: h.bulan, jumlah: h.nominal, status: 'approved',
+        metode: 'tunai', batch_id: batchId, bukti_urls: null, catatan: catatan || null, tanggal_transaksi: tanggal,
+      }));
+      const { error } = await supabase.from('iuran').insert(newRecords);
+      if (error) throw error;
+
+      // 5. Sinkronisasi Deposit
       const { data: oldDep } = await supabase
         .from('deposit_warga')
         .select('*')
         .like('keterangan', `%batch ${batchId.slice(0, 8)}%`)
         .maybeSingle();
 
-      const oldDepositAmount = oldDep ? oldDep.jumlah : 0;
-      const totalUangAsli = oldTotal + oldDepositAmount; // Total uang yang diserahkan warga
-      
-      // 3. Hitung deposit baru (Total uang asli - total iuran baru)
-      const newDepositAmount = totalUangAsli - newTotal;
-
-      // 4. Update tabel iuran (Hapus & Insert ulang)
-      await supabase.from('iuran').delete().eq('batch_id', batchId);
-
-      const newRecords = items.map((item) => {
-        const wargaId = modalEditTunai.items[0]?.warga_id;
-        return {
-          warga_id: wargaId,
-          bulan_tahun: item.bulan_tahun,
-          jumlah: item.jumlah,
-          status: 'approved',
-          metode: 'tunai',
-          batch_id: batchId,
-          bukti_urls: null,
-          catatan: catatan || null,
-          tanggal_transaksi: tanggal,
-        };
-      });
-
-      const { error } = await supabase.from('iuran').insert(newRecords);
-      if (error) throw error;
-
-      // 5. Sinkronisasi Deposit
-      if (newDepositAmount > 0) {
+      if (sisaUang > 0) {
         if (oldDep) {
-          // Update deposit lama
-          await supabase.from('deposit_warga').update({ jumlah: newDepositAmount, tanggal }).eq('id', oldDep.id);
+          await supabase.from('deposit_warga').update({ jumlah: sisaUang, tanggal }).eq('id', oldDep.id);
         } else {
-          // Buat deposit baru (jika sebelumnya tidak ada, tapi diedit jadi lebih)
           await supabase.from('deposit_warga').insert([{
-            warga_id: modalEditTunai.items[0]?.warga_id,
-            tanggal: tanggal,
-            tipe: 'masuk',
-            jumlah: newDepositAmount,
-            keterangan: `Sisa uang tunai (batch ${batchId.slice(0, 8)})`,
-            created_by: user?.id,
+            warga_id: wargaId, tanggal: tanggal, tipe: 'masuk', jumlah: sisaUang,
+            keterangan: `Sisa uang tunai (batch ${batchId.slice(0, 8)})`, created_by: user?.id,
           }]);
         }
       } else if (oldDep) {
-        // Hapus deposit jika diedit jadi pas/kurang
         await supabase.from('deposit_warga').delete().eq('id', oldDep.id);
       }
 
       alert('✅ Iuran tunai & deposit berhasil disesuaikan!');
       setModalEditTunai(null);
-      invalidateKeuanganCache();
-      refetch();
+      invalidateKeuanganCache(); refetch();
     } catch (err) {
       alert('Gagal: ' + err.message);
     }
@@ -237,24 +196,14 @@ export default function PageTunai() {
     if (!modalHapusTunai) return;
     setHapusSubmitting(true);
     try {
-      // 1. Hapus Iuran
-      const { error } = await supabase
-        .from('iuran')
-        .delete()
-        .eq('batch_id', modalHapusTunai.batchId);
-      if (error) throw error;
-
-      // 2. Hapus Deposit terkait
-      const { error: errDep } = await supabase
-        .from('deposit_warga')
-        .delete()
-        .like('keterangan', `%batch ${modalHapusTunai.batchId.slice(0, 8)}%`);
-      if (errDep) throw errDep;
+      await supabase.from('iuran').delete().eq('batch_id', modalHapusTunai.batchId);
+      
+      // Hapus deposit terkait (hanya jika data baru yang punya batch ID)
+      await supabase.from('deposit_warga').delete().like('keterangan', `%batch ${modalHapusTunai.batchId.slice(0, 8)}%`);
 
       alert('✅ Iuran tunai & deposit terkait berhasil dihapus.');
       setModalHapusTunai(null);
-      invalidateKeuanganCache();
-      refetch();
+      invalidateKeuanganCache(); refetch();
     } catch (err) {
       alert('Gagal: ' + err.message);
     } finally {
@@ -262,69 +211,32 @@ export default function PageTunai() {
     }
   }
 
-  const wargaModalHapus = modalHapusTunai
-    ? wargaList.find((x) => x.id === modalHapusTunai.items[0]?.warga_id)
-    : null;
-  const totalHapus = modalHapusTunai
-    ? modalHapusTunai.items.reduce((s, i) => s + Number(i.jumlah || 0), 0)
-    : 0;
+  const wargaModalHapus = modalHapusTunai ? wargaList.find((x) => x.id === modalHapusTunai.items[0]?.warga_id) : null;
+  const totalHapus = modalHapusTunai ? modalHapusTunai.items.reduce((s, i) => s + Number(i.jumlah || 0), 0) : 0;
 
   return (
     <KeuanganLayout user={user} pendingCount={getPendingBatches(iuranList).length}>
       <TabTunai
-        warga={wargaList}
-        tarifList={tarifList}
-        iuran={iuranList}
-        tunaiWargaId={tunaiWargaId}
-        setTunaiWargaId={setTunaiWargaId}
-        tunaiNominal={tunaiNominal}
-        setTunaiNominal={setTunaiNominal}
-        tunaiTanggal={tunaiTanggal}
-        setTunaiTanggal={setTunaiTanggal}
-        tunaiCatatan={tunaiCatatan}
-        setTunaiCatatan={setTunaiCatatan}
-        tunaiSubmitting={tunaiSubmitting}
-        handleSubmitTunai={handleSubmitTunai}
-        riwayatTunai={riwayatTunai}
-        handleEditTunai={handleEditTunai}
-        handleHapusTunai={handleHapusTunai}
+        warga={wargaList} tarifList={tarifList} iuran={iuranList} tunaiWargaId={tunaiWargaId}
+        setTunaiWargaId={setTunaiWargaId} tunaiNominal={tunaiNominal} setTunaiNominal={setTunaiNominal}
+        tunaiTanggal={tunaiTanggal} setTunaiTanggal={setTunaiTanggal} tunaiCatatan={tunaiCatatan}
+        setTunaiCatatan={setTunaiCatatan} tunaiSubmitting={tunaiSubmitting} handleSubmitTunai={handleSubmitTunai}
+        riwayatTunai={riwayatTunai} handleEditTunai={handleEditTunai} handleHapusTunai={handleHapusTunai}
       />
 
       {modalEditTunai && (
         <ModalEditTunai
           batch={modalEditTunai}
           warga={wargaList.find((x) => x.id === modalEditTunai.items[0]?.warga_id)}
-          tarifList={tarifList}
-          onClose={() => setModalEditTunai(null)}
-          onSave={handleSaveEditTunai}
+          tarifList={tarifList} onClose={() => setModalEditTunai(null)} onSave={handleSaveEditTunai}
         />
       )}
 
       <ModalKonfirmasiHapus
-        open={!!modalHapusTunai}
-        onClose={() => setModalHapusTunai(null)}
-        onConfirm={confirmHapusTunai}
-        submitting={hapusSubmitting}
-        title="Hapus Iuran Tunai"
-        data={
-          modalHapusTunai
-            ? {
-                Warga: `${wargaModalHapus?.no_rumah} - ${wargaModalHapus?.nama_lengkap}`,
-                Bulan: `${modalHapusTunai.items.length} bulan`,
-                Total: formatRupiah(totalHapus),
-              }
-            : {}
-        }
-        warning={
-          <>
-            ⚠️ <strong>Dampak:</strong>
-            <div className="mt-1 text-[10px]">
-              • Saldo kas <strong>turun</strong> {formatRupiah(totalHapus)}<br />
-              • <strong>Deposit terkait juga akan dihapus</strong><br />
-              • Grid bulan yang dihapus <strong>kembali kuning/belum</strong>
-            </div>
-          </>
-        }
+        open={!!modalHapusTunai} onClose={() => setModalHapusTunai(null)} onConfirm={confirmHapusTunai}
+        submitting={hapusSubmitting} title="Hapus Iuran Tunai"
+        data={modalHapusTunai ? { Warga: `${wargaModalHapus?.no_rumah} - ${wargaModalHapus?.nama_lengkap}`, Bulan: `${modalHapusTunai.items.length} bulan`, Total: formatRupiah(totalHapus) } : {}}
+        warning={<><span className="text-rose-400 font-bold">⚠️ Dampak:</span><div className="mt-1 text-[10px]">• Saldo kas <strong>turun</strong> {formatRupiah(totalHapus)}<br />• <strong>Deposit terkait juga akan dihapus</strong><br />• Grid bulan yang dihapus <strong>kembali kuning/belum</strong></div></>}
       />
     </KeuanganLayout>
   );
