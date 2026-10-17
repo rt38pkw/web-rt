@@ -6,7 +6,7 @@ import ModalEditTunai from '../../components/keuangan/ModalEditTunai';
 import ModalKonfirmasiHapus from '../../components/keuangan/ModalKonfirmasiHapus';
 import { formatRupiah } from '../../lib/keuangan/helpers';
 import { distribusikanTunai } from '../../lib/keuangan/tunai';
-import { getPeriodeBulan, TAHUN_TERSEDIA } from '../../lib/keuangan/constants'; 
+import { getPeriodeBulan } from '../../lib/keuangan/constants'; 
 import {
   useKeuanganData,
   getPendingBatches,
@@ -32,12 +32,12 @@ export default function PageTunai() {
   const wargaList = Array.isArray(warga) ? warga : [];
   const depositList = Array.isArray(deposit) ? deposit : [];
 
-  // GENERATE BULAN DINAMIS (2026, 2027, 2028)
+  // FULL 1 TAHUN (April - Desember 2026) untuk alokasi pembayaran
   const bulanList = useMemo(() => {
-    return TAHUN_TERSEDIA.flatMap(tahun => getPeriodeBulan(tahun));
+    return getPeriodeBulan(2026);
   }, []);
 
-  // RIWAYAT TUNAI (Gabungkan data Iuran + Deposit)
+  // RIWAYAT TUNAI
   const riwayatTunai = useMemo(() => {
     const tunaiRecords = iuranList.filter((i) => i.metode === 'tunai');
     const grouped = {};
@@ -85,11 +85,11 @@ export default function PageTunai() {
     const tarif = w?.kategori === 'Usaha' ? 30000 : 15000;
     const iuranWarga = iuranList.filter((i) => i.warga_id === tunaiWargaId);
 
+    // Alokasi menggunakan list full 1 tahun
     const { hasil, sisaUang } = distribusikanTunai(nominal, bulanList, iuranWarga, tarif);
 
     if (hasil.length === 0) {
-      alert('Semua bulan sudah lunas. Tidak ada yang bisa dibayar.');
-      return;
+      alert('Semua bulan (April-Desember) sudah lunas. Uang akan masuk ke Deposit.');
     }
 
     const detail = hasil.map((h) => `${h.namaBulan}: ${formatRupiah(h.nominal)}`).join('\n');
@@ -100,13 +100,15 @@ export default function PageTunai() {
     setTunaiSubmitting(true);
     try {
       const batchId = crypto.randomUUID();
-      const records = hasil.map((h) => ({
-        warga_id: tunaiWargaId, bulan_tahun: h.bulan, jumlah: h.nominal, status: 'approved',
-        metode: 'tunai', batch_id: batchId, bukti_urls: null, catatan: tunaiCatatan || null, tanggal_transaksi: tunaiTanggal,
-      }));
-
-      const { error } = await supabase.from('iuran').insert(records);
-      if (error) throw error;
+      
+      if (hasil.length > 0) {
+        const records = hasil.map((h) => ({
+          warga_id: tunaiWargaId, bulan_tahun: h.bulan, jumlah: h.nominal, status: 'approved',
+          metode: 'tunai', batch_id: batchId, bukti_urls: null, catatan: tunaiCatatan || null, tanggal_transaksi: tunaiTanggal,
+        }));
+        const { error } = await supabase.from('iuran').insert(records);
+        if (error) throw error;
+      }
 
       if (sisaUang > 0) {
         const { error: errDep } = await supabase.from('deposit_warga').insert([{
@@ -144,12 +146,14 @@ export default function PageTunai() {
 
       const { hasil, sisaUang } = distribusikanTunai(nominalTotal, bulanList, iuranWargaLain, tarif);
 
-      const newRecords = hasil.map((h) => ({
-        warga_id: wargaId, bulan_tahun: h.bulan, jumlah: h.nominal, status: 'approved',
-        metode: 'tunai', batch_id: batchId, bukti_urls: null, catatan: catatan || null, tanggal_transaksi: tanggal,
-      }));
-      const { error } = await supabase.from('iuran').insert(newRecords);
-      if (error) throw error;
+      if (hasil.length > 0) {
+        const newRecords = hasil.map((h) => ({
+          warga_id: wargaId, bulan_tahun: h.bulan, jumlah: h.nominal, status: 'approved',
+          metode: 'tunai', batch_id: batchId, bukti_urls: null, catatan: catatan || null, tanggal_transaksi: tanggal,
+        }));
+        const { error } = await supabase.from('iuran').insert(newRecords);
+        if (error) throw error;
+      }
 
       const { data: oldDep } = await supabase
         .from('deposit_warga').select('*').like('keterangan', `%batch ${batchId.slice(0, 8)}%`).maybeSingle();
