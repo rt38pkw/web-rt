@@ -32,7 +32,7 @@ export default function PageTunai() {
   const wargaList = Array.isArray(warga) ? warga : [];
   const depositList = Array.isArray(deposit) ? deposit : [];
 
-  // FULL 1 TAHUN (April - Desember 2026) untuk alokasi pembayaran
+  // FULL 1 TAHUN (April - Desember 2026)
   const bulanList = useMemo(() => {
     return getPeriodeBulan(2026);
   }, []);
@@ -45,7 +45,18 @@ export default function PageTunai() {
     tunaiRecords.forEach((i) => {
       const key = i.batch_id || i.id;
       if (!grouped[key]) {
-        const dep = depositList.find(d => d.keterangan?.includes(key.slice(0, 8)));
+        // Cari deposit berdasarkan batch ID
+        let dep = depositList.find(d => d.keterangan?.includes(key.slice(0, 8)));
+        
+        // Fallback: Cari berdasarkan warga & tanggal (untuk data lama)
+        if (!dep) {
+          dep = depositList.find(d => 
+            d.warga_id === i.warga_id && 
+            d.tanggal === i.tanggal_transaksi && 
+            d.tipe === 'masuk'
+          );
+        }
+
         grouped[key] = { 
           batchId: key, 
           items: [],
@@ -85,7 +96,6 @@ export default function PageTunai() {
     const tarif = w?.kategori === 'Usaha' ? 30000 : 15000;
     const iuranWarga = iuranList.filter((i) => i.warga_id === tunaiWargaId);
 
-    // Alokasi menggunakan list full 1 tahun
     const { hasil, sisaUang } = distribusikanTunai(nominal, bulanList, iuranWarga, tarif);
 
     if (hasil.length === 0) {
