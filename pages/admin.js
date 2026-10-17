@@ -32,14 +32,9 @@ export default function AdminDashboard() {
         return;
       }
       if (parsedUser.role === 'bendahara_2') {
-        window.location.replace('/keuangan/projek');
+        window.location.replace('/proyek/dashboard');
         return;
       }
-      // Sekretaris sementara tetap di /admin (nanti pindah ke /sekretariat)
-      // if (parsedUser.role === 'sekretaris') {
-      //   window.location.replace('/sekretariat/dashboard');
-      //   return;
-      // }
 
       setUser(parsedUser);
       fetchStats();
@@ -67,19 +62,18 @@ export default function AdminDashboard() {
     setUser(data);
     sessionStorage.setItem('pengurusSession', JSON.stringify(data));
 
-    // Bendahara → ke dashboard keuangan
+    // Bendahara → dashboard keuangan
     if (data.role === 'bendahara') {
       window.location.replace('/keuangan/dashboard');
       return;
     }
 
-    // Bendahara 2 (operator proyek) → ke halaman projek
+    // Bendahara 2 (operator proyek) → halaman proyek
     if (data.role === 'bendahara_2') {
-      window.location.replace('/keuangan/projek');
+      window.location.replace('/proyek/dashboard');
       return;
     }
 
-    // Ketua & sekretaris tetap di /admin
     fetchStats();
   };
 
@@ -219,6 +213,7 @@ export default function AdminDashboard() {
 
   const canAccessKeuangan = user.role === 'ketua' || user.role === 'bendahara';
   const canAccessWarga = user.role === 'ketua' || user.role === 'sekretaris';
+  const canAccessProyek = user.role === 'ketua' || user.role === 'bendahara_2';
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased font-sans">
@@ -358,6 +353,24 @@ export default function AdminDashboard() {
               <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-xl mb-4 text-slate-500">🔒</div>
               <h4 className="text-lg font-bold text-slate-500">Data Warga</h4>
               <p className="text-xs text-slate-600 mt-1">Khusus akses Ketua & Sekretaris.</p>
+            </div>
+          )}
+
+          {/* ═══ Kartu Proyek — hanya ketua ═══ */}
+          {canAccessProyek ? (
+            <Link href="/proyek/dashboard" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
+              <div>
+                <div className="w-12 h-12 bg-amber-500/10 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition mb-4 text-amber-400">🏗️</div>
+                <h4 className="text-lg font-bold text-white group-hover:text-amber-400 transition">Proyek</h4>
+                <p className="text-xs text-slate-400 mt-1">Kelola proyek RT: iuran khusus, cicilan, dan verifikasi.</p>
+              </div>
+              <div className="mt-6 flex items-center text-xs font-semibold text-amber-400 group-hover:translate-x-1 transition">Buka Layanan &rarr;</div>
+            </Link>
+          ) : (
+            <div className="bg-slate-900/30 border border-slate-800/50 rounded-2xl p-6 opacity-40 cursor-not-allowed">
+              <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-xl mb-4 text-slate-500">🔒</div>
+              <h4 className="text-lg font-bold text-slate-500">Proyek</h4>
+              <p className="text-xs text-slate-600 mt-1">Khusus akses Ketua & Operator Proyek.</p>
             </div>
           )}
 
