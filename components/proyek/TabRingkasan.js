@@ -1,28 +1,60 @@
 import { formatRupiahProyek, formatTanggalProyek, isProyekTelat } from '../../lib/proyek/constants';
-import { getProgressProyek } from '../../lib/proyek/calculations';
+import {
+  getProgressProyek,
+  getRingkasanKasProyek,
+  getSaldoTotalSemuaProyek,
+} from '../../lib/proyek/calculations';
 
-export default function TabRingkasan({ proyekList = [], iuranProyekList = [], wargaList = [] }) {
+export default function TabRingkasan({
+  proyekList = [],
+  iuranProyekList = [],
+  kasProyekList = [],
+  wargaList = [],
+}) {
+  const saldoTotal = getSaldoTotalSemuaProyek(iuranProyekList, kasProyekList, proyekList);
+
   if (proyekList.length === 0) {
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
-        <div className="text-4xl mb-2">🏗️</div>
-        <h3 className="text-base font-bold text-white mb-1">Belum Ada Proyek</h3>
-        <p className="text-xs text-slate-400">
-          Buat proyek baru di sub-tab <strong className="text-amber-400">➕ Kelola Proyek</strong>
-        </p>
+      <div className="space-y-4">
+        <div className="bg-gradient-to-br from-amber-950/40 to-slate-900 border border-amber-500/30 rounded-2xl p-5">
+          <span className="text-[10px] text-amber-300 uppercase tracking-wider font-semibold">
+            💰 Total Uang Kas Proyek (di tangan operator)
+          </span>
+          <div className="text-3xl font-black text-white mt-1">{formatRupiahProyek(saldoTotal)}</div>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
+          <div className="text-4xl mb-2">🏗️</div>
+          <h3 className="text-base font-bold text-white mb-1">Belum Ada Proyek</h3>
+          <p className="text-xs text-slate-400">
+            Buat proyek baru di sub-tab <strong className="text-amber-400">➕ Kelola</strong>
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
+      {/* ═══ KARTU TOTAL KAS SEMUA PROYEK ═══ */}
+      <div className="bg-gradient-to-br from-amber-950/40 to-slate-900 border border-amber-500/30 rounded-2xl p-5">
+        <span className="text-[10px] text-amber-300 uppercase tracking-wider font-semibold">
+          💰 Total Uang Kas Proyek (di tangan operator)
+        </span>
+        <div className="text-3xl font-black text-white mt-1">{formatRupiahProyek(saldoTotal)}</div>
+        <p className="text-[10px] text-slate-500 mt-1">
+          Iuran + Donasi − Pengeluaran − Refund dari {proyekList.length} proyek
+        </p>
+      </div>
+
+      {/* ═══ LIST KARTU PROYEK ═══ */}
       {proyekList.map((proyek) => {
         const progress = getProgressProyek(iuranProyekList, wargaList, proyek);
+        const kas = getRingkasanKasProyek(iuranProyekList, kasProyekList, proyek.id);
         const telat = isProyekTelat(proyek);
 
         return (
           <div key={proyek.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-            {/* Header Proyek */}
+            {/* Header */}
             <div className="p-4 border-b border-slate-800 flex justify-between items-start gap-2 flex-wrap">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -42,6 +74,11 @@ export default function TabRingkasan({ proyekList = [], iuranProyekList = [], wa
                       Selesai
                     </span>
                   )}
+                  {proyek.status === 'batal' && (
+                    <span className="text-[10px] bg-slate-500/10 text-slate-400 border border-slate-500/20 px-2 py-0.5 rounded">
+                      Dibatalkan
+                    </span>
+                  )}
                 </div>
                 {proyek.deskripsi && (
                   <p className="text-[11px] text-slate-400 mt-1">{proyek.deskripsi}</p>
@@ -56,7 +93,7 @@ export default function TabRingkasan({ proyekList = [], iuranProyekList = [], wa
               </div>
             </div>
 
-            {/* Stats */}
+            {/* Stats Progress */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4">
               <div className="bg-slate-950 rounded-xl p-3">
                 <div className="text-[10px] text-slate-500 uppercase tracking-wider">Total Target</div>
@@ -67,7 +104,7 @@ export default function TabRingkasan({ proyekList = [], iuranProyekList = [], wa
                 <div className="text-sm font-bold text-emerald-400 mt-1">{formatRupiahProyek(progress.totalTerbayar)}</div>
               </div>
               <div className="bg-slate-950 rounded-xl p-3">
-                <div className="text-[10px] text-amber-400 uppercase tracking-wider">Sisa</div>
+                <div className="text-[10px] text-amber-400 uppercase tracking-wider">Sisa Target</div>
                 <div className="text-sm font-bold text-amber-400 mt-1">{formatRupiahProyek(progress.totalSisa)}</div>
               </div>
               <div className="bg-slate-950 rounded-xl p-3">
@@ -79,7 +116,7 @@ export default function TabRingkasan({ proyekList = [], iuranProyekList = [], wa
             </div>
 
             {/* Progress Bar */}
-            <div className="px-4 pb-4">
+            <div className="px-4 pb-3">
               <div className="flex justify-between text-[10px] text-slate-400 mb-1.5">
                 <span>Progress keseluruhan</span>
                 <span className="text-white font-bold">{progress.persen}%</span>
@@ -93,6 +130,28 @@ export default function TabRingkasan({ proyekList = [], iuranProyekList = [], wa
                   }`}
                   style={{ width: `${progress.persen}%` }}
                 />
+              </div>
+            </div>
+
+            {/* ═══ INFO SALDO KAS PROYEK ═══ */}
+            <div className="px-4 pb-4">
+              <div className="bg-amber-950/20 border border-amber-500/20 rounded-xl p-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
+                <div>
+                  <span className="text-slate-500">Iuran:</span>
+                  <div className="text-white font-bold">{formatRupiahProyek(kas.totalIuran)}</div>
+                </div>
+                <div>
+                  <span className="text-slate-500">Donasi:</span>
+                  <div className="text-purple-400 font-bold">{formatRupiahProyek(kas.totalDonasi)}</div>
+                </div>
+                <div>
+                  <span className="text-slate-500">Pengeluaran:</span>
+                  <div className="text-rose-400 font-bold">{formatRupiahProyek(kas.totalPengeluaran)}</div>
+                </div>
+                <div className="border-l border-amber-500/20 pl-2">
+                  <span className="text-slate-500">Saldo:</span>
+                  <div className="text-amber-300 font-black text-sm">{formatRupiahProyek(kas.saldo)}</div>
+                </div>
               </div>
             </div>
           </div>
