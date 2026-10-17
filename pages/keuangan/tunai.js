@@ -125,7 +125,7 @@ export default function PageTunai() {
       const { error } = await supabase.from('iuran').insert(records);
       if (error) throw error;
 
-      // Kalau ada sisa uang, simpan sebagai deposit
+      // Kalau ada sisa uang, simpan sebagai deposit (Sertakan batchId di keterangan)
       if (sisaUang > 0) {
         const { error: errDep } = await supabase.from('deposit_warga').insert([
           {
@@ -133,7 +133,7 @@ export default function PageTunai() {
             tanggal: tunaiTanggal,
             tipe: 'masuk',
             jumlah: sisaUang,
-            keterangan: `Sisa uang tunai ${formatRupiah(nominal)} (tunai batch)`,
+            keterangan: `Sisa uang tunai ${formatRupiah(nominal)} (batch ${batchId.slice(0, 8)})`,
             created_by: user?.id,
           },
         ]);
@@ -160,6 +160,24 @@ export default function PageTunai() {
 
   async function handleSaveEditTunai({ batchId, items, catatan, tanggal }) {
     try {
+      // 1. Hitung total lama & total baru
+      const oldTotal = modalEditTunai.items.reduce((s, i) => s + Number(i.jumlah || 0), 0);
+      const newTotal = items.reduce((s, i) => s + Number(i.jumlah || 0), 0);
+
+      // 2. Cari data deposit lama berdasarkan batchId
+      const { data: oldDep } = await supabase
+        .from('deposit_warga')
+        .select('*')
+        .like('keterangan', `%batch ${batchId.slice(0, 8)}%`)
+        .maybeSingle();
+
+      const oldDepositAmount = oldDep ? oldDep.jumlah : 0;
+      const totalUangAsli = oldTotal + oldDepositAmount; // Total uang yang diserahkan warga
+      
+      // 3. Hitung deposit baru (Total uang asli - total iuran baru)
+      const newDepositAmount = totalUangAsli - newTotal;
+
+      // 4. Update tabel iuran (Hapus & Insert ulang)
       await supabase.from('iuran').delete().eq('batch_id', batchId);
 
       const newRecords = items.map((item) => {
@@ -180,7 +198,28 @@ export default function PageTunai() {
       const { error } = await supabase.from('iuran').insert(newRecords);
       if (error) throw error;
 
-      alert('✅ Iuran tunai berhasil diupdate!');
+      // 5. Sinkronisasi Deposit
+      if (newDepositAmount > 0) {
+        if (oldDep) {
+          // Update deposit lama
+          await supabase.from('deposit_warga').update({ jumlah: newDepositAmount, tanggal }).eq('id', oldDep.id);
+        } else {
+          // Buat deposit baru (jika sebelumnya tidak ada, tapi diedit jadi lebih)
+          await supabase.from('deposit_warga').insert([{
+            warga_id: modalEditTunai.items[0]?.warga_id,
+            tanggal: tanggal,
+            tipe: 'masuk',
+            jumlah: newDepositAmount,
+            keterangan: `Sisa uang tunai (batch ${batchId.slice(0, 8)})`,
+            created_by: user?.id,
+          }]);
+        }
+      } else if (oldDep) {
+        // Hapus deposit jika diedit jadi pas/kurang
+        await supabase.from('deposit_warga').delete().eq('id', oldDep.id);
+      }
+
+      alert('✅ Iuran tunai & deposit berhasil disesuaikan!');
       setModalEditTunai(null);
       invalidateKeuanganCache();
       refetch();
@@ -198,12 +237,21 @@ export default function PageTunai() {
     if (!modalHapusTunai) return;
     setHapusSubmitting(true);
     try {
+      // 1. Hapus Iuran
       const { error } = await supabase
         .from('iuran')
         .delete()
         .eq('batch_id', modalHapusTunai.batchId);
       if (error) throw error;
-      alert('✅ Iuran tunai dihapus.');
+
+      // 2. Hapus Deposit terkait
+      const { error: errDep } = await supabase
+        .from('deposit_warga')
+        .delete()
+        .like('keterangan', `%batch ${modalHapusTunai.batchId.slice(0, 8)}%`);
+      if (errDep) throw errDep;
+
+      alert('✅ Iuran tunai & deposit terkait berhasil dihapus.');
       setModalHapusTunai(null);
       invalidateKeuanganCache();
       refetch();
@@ -272,8 +320,8 @@ export default function PageTunai() {
             ⚠️ <strong>Dampak:</strong>
             <div className="mt-1 text-[10px]">
               • Saldo kas <strong>turun</strong> {formatRupiah(totalHapus)}<br />
-              • Grid bulan yang dihapus <strong>kembali kuning/belum</strong><br />
-              • Tunggakan warga akan muncul
+              • <strong>Deposit terkait juga akan dihapus</strong><br />
+              • Grid bulan yang dihapus <strong>kembali kuning/belum</strong>
             </div>
           </>
         }
