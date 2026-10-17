@@ -117,9 +117,12 @@ export default function PageProyekTunai() {
       const itemLama = modalEdit;
       const proyek = proyekList.find((p) => p.id === itemLama.proyek_id);
       
+      // Ambil nominal iuran asli dari database (bukan total)
+      const iuranAsli = itemLama._original_iuran !== undefined ? itemLama._original_iuran : itemLama.jumlah;
+      
       // 1. Hitung sisa SEBELUM transaksi ini diedit
       const sisaSaatIni = getSisaWarga(iuranProyekList, itemLama.warga_id, proyek);
-      const sisaTanpaIni = sisaSaatIni + itemLama.jumlah;
+      const sisaTanpaIni = sisaSaatIni + iuranAsli;
 
       // 2. Hitung ulang alokasi (Iuran vs Donasi)
       const iuranBaru = Math.min(jumlah, sisaTanpaIni);
@@ -405,7 +408,15 @@ export default function PageProyekTunai() {
                         <td className="p-3 text-right">
                           <div className="flex gap-1 justify-end">
                             <button
-                              onClick={() => setModalEdit(item)}
+                              onClick={() => {
+                                // Simpan nilai iuran asli, dan oper TOTAL ke modal edit
+                                const totalNominal = item.jumlah + nominalDonasi;
+                                setModalEdit({
+                                  ...item,
+                                  _original_iuran: item.jumlah,
+                                  jumlah: totalNominal,
+                                });
+                              }}
                               className="text-blue-400 hover:text-blue-300 text-[10px] font-semibold px-1"
                             >✏️</button>
                             <button
