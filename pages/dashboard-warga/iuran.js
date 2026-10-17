@@ -101,29 +101,20 @@ export default function DashboardWargaIuran() {
     }
   };
 
-  // ═══════════════════════════════════════════════════════════
-  // FUNGSI REKAP DENGAN ALERT DEBUG
-  // ═══════════════════════════════════════════════════════════
   const loadRekap = async () => {
-    alert("TES 1: Tombol diklik, mulai ambil data...");
+    if (allWargaList.length > 0) {
+      setShowRekapModal(true);
+      return;
+    }
     setLoadingRekap(true);
     try {
-      alert("TES 2: Menghubungi database Supabase...");
-      const [wargaData, iuranData] = await Promise.all([
-        fetchAllWarga(),
-        fetchAllIuran(),
-      ]);
-      
-      alert("TES 3: Data berhasil diambil! Warga: " + wargaData.length + ", Iuran: " + iuranData.length);
-      
+      const [wargaData, iuranData] = await Promise.all([fetchAllWarga(), fetchAllIuran()]);
       setAllWargaList(wargaData);
       setAllIuranList(iuranData);
-      
-      alert("TES 4: Membuka modal rekap...");
       setShowRekapModal(true);
     } catch (err) {
-      alert("ERROR ASLI: " + err.message);
-      console.error(err);
+      console.error('Gagal memuat rekap:', err);
+      alert('Gagal memuat rekap. Cek koneksi internet.');
     } finally {
       setLoadingRekap(false);
     }
@@ -209,10 +200,8 @@ export default function DashboardWargaIuran() {
         <title>Status Iuran - Portal Warga RT 38</title>
       </Head>
       <Layout warga={warga} onLogout={handleLogout}>
-        {/* Profil Warga */}
         <ProfileCard warga={warga} tarifBulanan={tarifBulanan} isUsaha={usaha} />
 
-        {/* Banner Rekap */}
         <div className="bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/30 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
             <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -231,7 +220,6 @@ export default function DashboardWargaIuran() {
           </button>
         </div>
 
-        {/* 3 Kartu Statistik */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between">
             <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
@@ -264,7 +252,6 @@ export default function DashboardWargaIuran() {
           </div>
         </div>
 
-        {/* Grid Iuran */}
         {loading ? (
           <div className="py-12 text-center text-xs text-slate-500">Memuat data iuran...</div>
         ) : (
@@ -279,13 +266,11 @@ export default function DashboardWargaIuran() {
         )}
       </Layout>
 
-      {/* Modal Detail Bulan */}
       <ModalDetailBulan
         detail={selectedBulanDetail}
         onClose={() => setSelectedBulanDetail(null)}
       />
 
-      {/* Modal Bayar */}
       <ModalBayar
         show={showModalBayar}
         onClose={() => setShowModalBayar(false)}
@@ -299,7 +284,6 @@ export default function DashboardWargaIuran() {
         tahun={tahunTerpilih}
       />
 
-      {/* Modal Rekap (Hanya render kalau showRekapModal bernilai true) */}
       {showRekapModal && (
         <ModalRekap
           show={showRekapModal}
