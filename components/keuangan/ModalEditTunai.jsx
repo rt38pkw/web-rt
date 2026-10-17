@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { formatRupiah } from '../../lib/keuangan/helpers';
 
 export default function ModalEditTunai({ batch, warga, tarifList, onClose, onSave }) {
   const [nominal, setNominal] = useState('');
@@ -9,7 +8,6 @@ export default function ModalEditTunai({ batch, warga, tarifList, onClose, onSav
 
   useEffect(() => {
     if (batch) {
-      // Ambil totalNominal (Iuran + Deposit) yang sudah dihitung dari parent
       setNominal(String(batch.totalNominal || 0));
       setCatatan(batch.items[0]?.catatan || '');
       setTanggal(batch.items[0]?.tanggal_transaksi || new Date().toISOString().split('T')[0]);
@@ -21,18 +19,10 @@ export default function ModalEditTunai({ batch, warga, tarifList, onClose, onSav
   const handleSubmit = async (e) => {
     e.preventDefault();
     const nominalNum = Number(nominal);
-    if (nominalNum <= 0) {
-      alert('Nominal harus lebih dari 0');
-      return;
-    }
+    if (nominalNum <= 0) return alert('Nominal harus lebih dari 0');
     setSubmitting(true);
     try {
-      await onSave({
-        batchId: batch.batchId,
-        nominalTotal: nominalNum,
-        catatan,
-        tanggal,
-      });
+      await onSave({ batchId: batch.batchId, nominalTotal: nominalNum, catatan, tanggal });
     } finally {
       setSubmitting(false);
     }
@@ -44,77 +34,28 @@ export default function ModalEditTunai({ batch, warga, tarifList, onClose, onSav
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <div>
             <h3 className="font-bold text-white text-base">✏️ Edit Iuran Tunai</h3>
-            <p className="text-[11px] text-slate-400">
-              {warga.no_rumah} — {warga.nama_lengkap}
-            </p>
+            <p className="text-[11px] text-slate-400">{warga.no_rumah} — {warga.nama_lengkap}</p>
           </div>
-          <button
-            onClick={onClose}
-            disabled={submitting}
-            className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center text-sm"
-          >
-            ✕
-          </button>
+          <button onClick={onClose} disabled={submitting} className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center text-sm">✕</button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-              Total Diterima (Rp)
-            </label>
-            <input
-              type="number"
-              value={nominal}
-              onChange={(e) => setNominal(e.target.value)}
-              required
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-mono"
-            />
-            <p className="text-[10px] text-slate-500 mt-1">
-              *Sistem akan menghitung ulang bulan mana saja yang lunas & sisa depositnya.
-            </p>
+            <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Total Diterima (Rp)</label>
+            <input type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-mono" />
+            <p className="text-[10px] text-slate-500 mt-1">*Sistem akan menghitung ulang bulan mana saja yang lunas & sisa depositnya.</p>
           </div>
-
           <div>
-            <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-              Tanggal Bayar
-            </label>
-            <input
-              type="date"
-              value={tanggal}
-              onChange={(e) => setTanggal(e.target.value)}
-              required
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
-            />
+            <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Tanggal Bayar</label>
+            <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
           </div>
-
           <div>
-            <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-              Catatan
-            </label>
-            <textarea
-              value={catatan}
-              onChange={(e) => setCatatan(e.target.value)}
-              rows={2}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white resize-none"
-            />
+            <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Catatan</label>
+            <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} rows={2} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white resize-none" />
           </div>
-
           <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="w-1/2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs"
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-1/2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-xs"
-            >
-              {submitting ? 'Menyimpan...' : '💾 Simpan'}
-            </button>
+            <button type="button" onClick={onClose} disabled={submitting} className="w-1/2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs">Batal</button>
+            <button type="submit" disabled={submitting} className="w-1/2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white font-semibold py-2.5 rounded-xl text-xs">{submitting ? 'Menyimpan...' : '💾 Simpan'}</button>
           </div>
         </form>
       </div>
