@@ -293,4 +293,64 @@ export default function PageProyekKelola() {
                   </div>
 
                   {/* Progress */}
-                  <div className="bg-slate-950 rounded-xl p-3
+                  <div className="bg-slate-950 rounded-xl p-3">
+                    <div className="flex justify-between text-[10px] text-slate-400 mb-1.5">
+                      <span>Progress: {progress.jumlahLunas}/{progress.jumlahWarga} lunas</span>
+                      <span className="text-white font-bold">{progress.persen}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                      <div
+                        className={`h-full transition-all ${
+                          progress.persen === 100
+                            ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
+                            : 'bg-gradient-to-r from-amber-500 to-amber-400'
+                        }`}
+                        style={{ width: `${progress.persen}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[10px] mt-1.5">
+                      <span className="text-emerald-400">Terbayar: {formatRupiahProyek(progress.totalTerbayar)}</span>
+                      <span className="text-amber-400">Sisa: {formatRupiahProyek(progress.totalSisa)}</span>
+                    </div>
+                  </div>
+
+                  {/* Aksi */}
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={() => handleEdit(proyek)}
+                      className="text-[11px] bg-blue-600 hover:bg-blue-500 text-white font-semibold px-3 py-1.5 rounded-lg"
+                    >
+                      ✏️ Edit
+                    </button>
+                    {proyek.status === 'aktif' && (
+                      <button
+                        onClick={() => handleUbahStatus(proyek, 'selesai')}
+                        className="text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded-lg"
+                      >
+                        ✓ Tandai Selesai
+                      </button>
+                    )}
+                    {proyek.status === 'selesai' && (
+                      <button
+                        onClick={() => handleUbahStatus(proyek, 'aktif')}
+                        className="text-[11px] bg-amber-600 hover:bg-amber-500 text-white font-semibold px-3 py-1.5 rounded-lg"
+                      >
+                        ↻ Buka Lagi
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleHapus(proyek)}
+                      className="text-[11px] bg-rose-600 hover:bg-rose-500 text-white font-semibold px-3 py-1.5 rounded-lg"
+                    >
+                      🗑️ Hapus
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </Layout>
+  );
+}
