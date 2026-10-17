@@ -302,7 +302,7 @@ export default function TabTunai({
                 <th className="p-3">Tanggal</th>
                 <th className="p-3">Warga</th>
                 <th className="p-3">Bulan</th>
-                <th className="p-3 text-right">Total</th>
+                <th className="p-3 text-right">Total Diterima</th>
                 <th className="p-3 text-right">Aksi</th>
               </tr>
             </thead>
@@ -317,6 +317,9 @@ export default function TabTunai({
                 riwayatTunai.map((batch) => {
                   const wBatch = wargaList.find((x) => x.id === batch.items[0]?.warga_id);
                   const totalIuran = batch.items.reduce((s, i) => s + Number(i.jumlah || 0), 0);
+                  const totalDeposit = batch.totalDeposit || 0;
+                  const totalUang = totalIuran + totalDeposit;
+
                   const bulanStr = batch.items
                     .map((i) => i.bulan_tahun.replace('2026-', ''))
                     .sort()
@@ -335,12 +338,15 @@ export default function TabTunai({
                         {bulanStr}
                       </td>
                       <td className="p-3 text-right">
-                        <div className="font-mono text-emerald-400 font-semibold">
-                          {formatRupiah(totalIuran)}
+                        <div className="font-mono text-white font-bold text-sm">
+                          {formatRupiah(totalUang)}
                         </div>
-                        {batch.totalDeposit > 0 && (
-                          <div className="text-[10px] text-purple-400 mt-0.5 font-semibold">
-                            + Deposit: {formatRupiah(batch.totalDeposit)}
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          Iuran: {formatRupiah(totalIuran)}
+                        </div>
+                        {totalDeposit > 0 && (
+                          <div className="text-[10px] text-purple-400 font-semibold">
+                            Deposit: {formatRupiah(totalDeposit)}
                           </div>
                         )}
                       </td>
