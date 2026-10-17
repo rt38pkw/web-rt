@@ -14,6 +14,8 @@ import {
 } from '../../lib/keuangan/hooks';
 
 export default function PageTunai() {
+  // PERHATIKAN: Pastikan hook mengembalikan data 'deposit'. 
+  // Jika namanya 'depositWarga', ganti jadi: deposit: depositWarga = []
   const { user, iuran = [], warga = [], tarifList = [], deposit = [], loading, refetch } = useKeuanganData();
 
   const [tunaiWargaId, setTunaiWargaId] = useState('');
@@ -32,6 +34,7 @@ export default function PageTunai() {
 
   const bulanList = useMemo(() => getPeriodeBulan(2026), []);
 
+  // ═══ PERBAIKAN: PENGCOCOKAN DEPOSIT DI TABEL RIWAYAT ═══
   const riwayatTunai = useMemo(() => {
     const tunaiRecords = iuranList.filter((i) => i.metode === 'tunai');
     const grouped = {};
@@ -39,11 +42,25 @@ export default function PageTunai() {
     tunaiRecords.forEach((i) => {
       const key = i.batch_id || i.id;
       if (!grouped[key]) {
+        // 1. Cari berdasarkan Batch ID di keterangan
         let dep = depositList.find(d => d.keterangan?.includes(key.slice(0, 8)));
+        
+        // 2. Kalau gagal, cari berdasarkan Warga & Tanggal (Abaikan jam/menit)
         if (!dep) {
-          dep = depositList.find(d => String(d.warga_id) === String(i.warga_id) && d.tanggal === i.tanggal_transaksi && d.tipe === 'masuk');
+          const iuranDateStr = i.tanggal_transaksi ? i.tanggal_transaksi.split('T')[0] : '';
+          dep = depositList.find(d => {
+            const depDateStr = d.tanggal ? d.tanggal.split('T')[0] : '';
+            return String(d.warga_id) === String(i.warga_id) && 
+                   d.tipe === 'masuk' && 
+                   depDateStr === iuranDateStr;
+          });
         }
-        grouped[key] = { batchId: key, items: [], totalDeposit: dep ? dep.jumlah : 0 };
+
+        grouped[key] = { 
+          batchId: key, 
+          items: [],
+          totalDeposit: dep ? dep.jumlah : 0 
+        };
       }
       grouped[key].items.push(i);
     });
@@ -106,12 +123,10 @@ export default function PageTunai() {
     }
   }
 
-  // FUNGSI EDIT: MENGHITUNG IURAN + DEPOSIT = 200.000
   async function handleEditTunai(batch) {
     const totalIuran = batch.items.reduce((s, i) => s + Number(i.jumlah || 0), 0);
     let totalDeposit = batch.totalDeposit || 0;
 
-    // Kalau data deposit tidak ketemu di state, tarik langsung dari DB
     if (totalDeposit === 0) {
       try {
         const { data: deps } = await supabase.from('deposit_warga').select('*').eq('warga_id', batch.items[0].warga_id).eq('tipe', 'masuk').eq('tanggal', batch.items[0].tanggal_transaksi);
