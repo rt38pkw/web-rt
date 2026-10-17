@@ -3,7 +3,7 @@ import TabRingkasan from '../../components/proyek/TabRingkasan';
 import { useProyekData, getPendingProyekCount } from '../../lib/proyek/hooks';
 
 export default function PageProyekDashboard() {
-  const { user, warga, proyekList, iuranProyekList, loading } = useProyekData();
+  const { user, warga, proyekList, iuranProyekList, kasProyekList, loading } = useProyekData();
 
   if (typeof window === 'undefined') return null;
 
@@ -22,6 +22,7 @@ export default function PageProyekDashboard() {
       <TabRingkasan
         proyekList={proyekList}
         iuranProyekList={iuranProyekList}
+        kasProyekList={kasProyekList}
         wargaList={warga}
       />
     </Layout>
