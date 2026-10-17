@@ -6,9 +6,10 @@ import ModalKonfirmasiHapus from '../../components/keuangan/ModalKonfirmasiHapus
 import { useProyekData, getPendingProyekCount, invalidateProyekCache } from '../../lib/proyek/hooks';
 import { formatRupiahProyek, formatTanggalProyek } from '../../lib/proyek/constants';
 import { getTotalTerbayar, getSisaWarga } from '../../lib/proyek/calculations';
+import { insertKasProyek } from '../../lib/proyek/kas';
 
 export default function PageProyekTunai() {
-  const { user, warga, proyekList, iuranProyekList, loading, refetch } = useProyekData();
+  const { user, warga, proyekList, iuranProyekList, kasProyekList, loading, refetch } = useProyekData();
 
   const [proyekId, setProyekId] = useState('');
   const [wargaId, setWargaId] = useState('');
@@ -17,7 +18,6 @@ export default function PageProyekTunai() {
   const [catatan, setCatatan] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Edit & Hapus
   const [modalEdit, setModalEdit] = useState(null);
   const [modalHapus, setModalHapus] = useState(null);
   const [hapusSubmitting, setHapusSubmitting] = useState(false);
@@ -35,10 +35,11 @@ export default function PageProyekTunai() {
     : 0;
 
   const nominalNum = Number(nominal) || 0;
-  const terlaluBesar = nominalNum > sisa;
+  const masukIuran = Math.min(nominalNum, sisa);
+  const masukDonasi = Math.max(0, nominalNum - sisa);
   const terlaluKecil = nominalNum <= 0;
 
-  // ═══ INPUT BARU ═══
+  // ═══ INPUT BARU TUNai (SPLIT) ═══
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -50,39 +51,54 @@ export default function PageProyekTunai() {
       alert('Nominal harus lebih dari 0');
       return;
     }
-    if (terlaluBesar) {
-      alert(`Kelebihan. Maksimal: ${formatRupiahProyek(sisa)}`);
-      return;
-    }
 
-    const konfirmasi = window.confirm(
-      `Konfirmasi input tunai:\n\n` +
+    let pesan = `Konfirmasi input tunai:\n\n` +
       `Proyek: ${proyekTerpilih.nama}\n` +
       `Warga: ${wargaTerpilih.no_rumah} - ${wargaTerpilih.nama_lengkap}\n` +
-      `Nominal: ${formatRupiahProyek(nominalNum)}\n\n` +
-      `Yakin?`
-    );
-    if (!konfirmasi) return;
+      `Nominal: ${formatRupiahProyek(nominalNum)}\n\n`;
+    
+    if (masukDonasi > 0) {
+      pesan += `📊 Rincian:\n• Cicilan: ${formatRupiahProyek(masukIuran)}\n• Donasi: ${formatRupiahProyek(masukDonasi)}\n\n`;
+    }
+
+    if (!window.confirm(pesan + `Lanjutkan?`)) return;
 
     setSubmitting(true);
     try {
-      const { error } = await supabase.from('iuran_proyek').insert([
-        {
+      const batchId = crypto.randomUUID();
+
+      // 1. Simpan Iuran (kalau ada)
+      if (masukIuran > 0) {
+        const { error: errIuran } = await supabase.from('iuran_proyek').insert([
+          {
+            proyek_id: proyekId,
+            warga_id: wargaId,
+            tanggal,
+            jumlah: masukIuran,
+            status: 'approved', // Tunai langsung approved
+            metode: 'tunai',
+            batch_id: batchId,
+            bukti_urls: null,
+            catatan: catatan || null,
+            tanggal_transaksi: tanggal,
+          },
+        ]);
+        if (errIuran) throw errIuran;
+      }
+
+      // 2. Simpan Donasi (kalau ada kelebihan)
+      if (masukDonasi > 0) {
+        await insertKasProyek({
           proyek_id: proyekId,
           warga_id: wargaId,
+          tipe: 'donasi',
           tanggal,
-          jumlah: nominalNum,
-          status: 'approved',
-          metode: 'tunai',
-          batch_id: crypto.randomUUID(),
-          bukti_urls: null,
-          catatan: catatan || null,
-          tanggal_transaksi: tanggal,
-        },
-      ]);
-      if (error) throw error;
+          nominal: masukDonasi,
+          keterangan: `Donasi dari kelebihan bayar tunai (batch ${batchId.slice(0, 8)})`,
+        });
+      }
 
-      alert('✅ Cicilan tunai berhasil dicatat!');
+      alert('✅ Transaksi tunai berhasil dicatat!');
       setWargaId('');
       setNominal('');
       setCatatan('');
@@ -95,7 +111,7 @@ export default function PageProyekTunai() {
     }
   };
 
-  // ═══ EDIT ═══
+  // ═══ EDIT TUNai ═══
   const handleSaveEdit = async ({ id, jumlah, tanggal, catatan }) => {
     try {
       const { error } = await supabase
@@ -103,8 +119,7 @@ export default function PageProyekTunai() {
         .update({ jumlah, tanggal, catatan, tanggal_transaksi: tanggal })
         .eq('id', id);
       if (error) throw error;
-
-      alert('✅ Cicilan berhasil diupdate!');
+      alert('✅ Cicilan tunai diupdate!');
       setModalEdit(null);
       invalidateProyekCache();
       refetch();
@@ -113,11 +128,7 @@ export default function PageProyekTunai() {
     }
   };
 
-  // ═══ HAPUS ═══
-  const handleHapusClick = (item) => {
-    setModalHapus(item);
-  };
-
+  // ═══ HAPUS TUNai ═══
   const confirmHapus = async () => {
     if (!modalHapus) return;
     setHapusSubmitting(true);
@@ -128,7 +139,7 @@ export default function PageProyekTunai() {
         .eq('id', modalHapus.id);
       if (error) throw error;
 
-      alert('✅ Cicilan dihapus.');
+      alert('✅ Cicilan tunai dihapus.');
       setModalHapus(null);
       invalidateProyekCache();
       refetch();
@@ -149,12 +160,10 @@ export default function PageProyekTunai() {
 
   const pendingCount = getPendingProyekCount(iuranProyekList);
 
-  // Riwayat tunai
   const riwayatTunai = iuranProyekList
     .filter((i) => i.metode === 'tunai' && i.status === 'approved')
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-  // Data untuk modal hapus
   const wargaHapus = modalHapus ? warga.find((w) => w.id === modalHapus.warga_id) : null;
   const proyekHapus = modalHapus ? proyekList.find((p) => p.id === modalHapus.proyek_id) : null;
 
@@ -167,7 +176,7 @@ export default function PageProyekTunai() {
           className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 h-fit"
         >
           <h3 className="text-sm font-bold text-white">💵 Input Cicilan Tunai</h3>
-          <p className="text-[10px] text-slate-500">Untuk warga yang bayar tunai langsung ke operator.</p>
+          <p className="text-[10px] text-slate-500">Untuk warga yang bayar tunai. Kelebihan otomatis jadi donasi.</p>
 
           <div>
             <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Proyek</label>
@@ -221,7 +230,7 @@ export default function PageProyekTunai() {
 
           <div>
             <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-              Nominal (Rp) <span className="text-slate-500">— maks sisa</span>
+              Nominal Diterima (Rp)
             </label>
             <input
               type="number"
@@ -229,25 +238,33 @@ export default function PageProyekTunai() {
               onChange={(e) => setNominal(e.target.value)}
               required
               placeholder="0"
-              className={`w-full bg-slate-950 border rounded-xl px-3 py-2 text-sm text-white font-mono ${
-                terlaluBesar ? 'border-rose-500' : 'border-slate-800'
-              }`}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-mono"
             />
-            {terlaluBesar && (
-              <p className="text-[10px] text-rose-400 mt-1">
-                ⚠️ Kelebihan. Maksimal {formatRupiahProyek(sisa)}
-              </p>
-            )}
             {sisa > 0 && (
               <button
                 type="button"
                 onClick={() => setNominal(String(sisa))}
                 className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded mt-1"
               >
-                Isi Lunas Sisa ({formatRupiahProyek(sisa)})
+                Isi Pas Sisa ({formatRupiahProyek(sisa)})
               </button>
             )}
           </div>
+
+          {/* PREVIEW SPLIT */}
+          {nominalNum > 0 && masukDonasi > 0 && (
+            <div className="bg-purple-950/30 border border-purple-500/30 rounded-xl p-3 space-y-2 mt-2">
+              <div className="text-[11px] font-semibold text-purple-300">📊 Rincian:</div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">→ Cicilan Iuran</span>
+                <strong className="text-emerald-400">{formatRupiahProyek(masukIuran)}</strong>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">→ Donasi (kelebihan)</span>
+                <strong className="text-purple-400">+ {formatRupiahProyek(masukDonasi)}</strong>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Tanggal</label>
@@ -273,20 +290,17 @@ export default function PageProyekTunai() {
 
           <button
             type="submit"
-            disabled={submitting || !proyekId || !wargaId || terlaluBesar || terlaluKecil}
+            disabled={submitting || !proyekId || !wargaId || terlaluKecil}
             className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white text-xs font-semibold py-2.5 rounded-xl"
           >
             {submitting ? 'Menyimpan...' : 'Simpan Cicilan Tunai'}
           </button>
         </form>
 
-        {/* Riwayat Tunai + Aksi */}
+        {/* Riwayat Tunai */}
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
           <div className="p-4 border-b border-slate-800">
             <h3 className="text-sm font-bold text-white">📋 Riwayat Tunai ({riwayatTunai.length})</h3>
-            <p className="text-[10px] text-slate-500 mt-0.5">
-              Edit / hapus akan otomatis update progress proyek & tunggakan
-            </p>
           </div>
           <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
             <table className="w-full text-left text-xs">
@@ -327,18 +341,12 @@ export default function PageProyekTunai() {
                           <div className="flex gap-1 justify-end">
                             <button
                               onClick={() => setModalEdit(item)}
-                              title="Edit"
                               className="text-blue-400 hover:text-blue-300 text-[10px] font-semibold px-1"
-                            >
-                              ✏️
-                            </button>
+                            >✏️</button>
                             <button
-                              onClick={() => handleHapusClick(item)}
-                              title="Hapus"
+                              onClick={() => setModalHapus(item)}
                               className="text-rose-400 hover:text-rose-300 text-[10px] font-semibold px-1"
-                            >
-                              🗑️
-                            </button>
+                            >🗑️</button>
                           </div>
                         </td>
                       </tr>
@@ -351,7 +359,6 @@ export default function PageProyekTunai() {
         </div>
       </div>
 
-      {/* Modal Edit */}
       {modalEdit && (
         <ModalEditTunai
           data={modalEdit}
@@ -362,7 +369,6 @@ export default function PageProyekTunai() {
         />
       )}
 
-      {/* Modal Hapus */}
       <ModalKonfirmasiHapus
         open={!!modalHapus}
         onClose={() => setModalHapus(null)}
@@ -370,13 +376,11 @@ export default function PageProyekTunai() {
         submitting={hapusSubmitting}
         title="Hapus Cicilan Tunai"
         data={
-          modalHapus
-            ? {
-                Warga: `${wargaHapus?.no_rumah} - ${wargaHapus?.nama_lengkap}`,
-                Proyek: proyekHapus?.nama,
-                Nominal: formatRupiahProyek(modalHapus.jumlah),
-              }
-            : {}
+          modalHapus ? {
+            Warga: `${wargaHapus?.no_rumah} - ${wargaHapus?.nama_lengkap}`,
+            Proyek: proyekHapus?.nama,
+            Nominal: formatRupiahProyek(modalHapus.jumlah),
+          } : {}
         }
         warning={
           <>
