@@ -14,9 +14,7 @@ import {
 } from '../../lib/keuangan/hooks';
 
 export default function PageTunai() {
-  const {
-    user, iuran = [], warga = [], tarifList = [], deposit = [], loading, refetch,
-  } = useKeuanganData();
+  const { user, iuran = [], warga = [], tarifList = [], deposit = [], loading, refetch } = useKeuanganData();
 
   const [tunaiWargaId, setTunaiWargaId] = useState('');
   const [tunaiNominal, setTunaiNominal] = useState('');
@@ -32,12 +30,8 @@ export default function PageTunai() {
   const wargaList = Array.isArray(warga) ? warga : [];
   const depositList = Array.isArray(deposit) ? deposit : [];
 
-  // FULL 1 TAHUN (April - Desember 2026)
-  const bulanList = useMemo(() => {
-    return getPeriodeBulan(2026);
-  }, []);
+  const bulanList = useMemo(() => getPeriodeBulan(2026), []);
 
-  // RIWAYAT TUNAI
   const riwayatTunai = useMemo(() => {
     const tunaiRecords = iuranList.filter((i) => i.metode === 'tunai');
     const grouped = {};
@@ -45,23 +39,11 @@ export default function PageTunai() {
     tunaiRecords.forEach((i) => {
       const key = i.batch_id || i.id;
       if (!grouped[key]) {
-        // Cari deposit berdasarkan batch ID
         let dep = depositList.find(d => d.keterangan?.includes(key.slice(0, 8)));
-        
-        // Fallback: Cari berdasarkan warga & tanggal (untuk data lama)
         if (!dep) {
-          dep = depositList.find(d => 
-            d.warga_id === i.warga_id && 
-            d.tanggal === i.tanggal_transaksi && 
-            d.tipe === 'masuk'
-          );
+          dep = depositList.find(d => String(d.warga_id) === String(i.warga_id) && d.tanggal === i.tanggal_transaksi && d.tipe === 'masuk');
         }
-
-        grouped[key] = { 
-          batchId: key, 
-          items: [],
-          totalDeposit: dep ? dep.jumlah : 0 
-        };
+        grouped[key] = { batchId: key, items: [], totalDeposit: dep ? dep.jumlah : 0 };
       }
       grouped[key].items.push(i);
     });
@@ -75,22 +57,12 @@ export default function PageTunai() {
 
   if (typeof window === 'undefined') return null;
 
-  if (loading) {
-    return (
-      <KeuanganLayout user={user}>
-        <div className="text-center py-10 text-slate-500 text-xs">Memuat data...</div>
-      </KeuanganLayout>
-    );
-  }
+  if (loading) return <KeuanganLayout user={user}><div className="text-center py-10 text-slate-500 text-xs">Memuat data...</div></KeuanganLayout>;
 
-  // INPUT TUNAI BARU
   async function handleSubmitTunai(e) {
     e.preventDefault();
     const nominal = Number(tunaiNominal) || 0;
-    if (!tunaiWargaId || nominal <= 0) {
-      alert('Pilih warga dan isi nominal');
-      return;
-    }
+    if (!tunaiWargaId || nominal <= 0) return alert('Pilih warga dan isi nominal');
 
     const w = wargaList.find((x) => x.id === tunaiWargaId);
     const tarif = w?.kategori === 'Usaha' ? 30000 : 15000;
@@ -98,9 +70,7 @@ export default function PageTunai() {
 
     const { hasil, sisaUang } = distribusikanTunai(nominal, bulanList, iuranWarga, tarif);
 
-    if (hasil.length === 0) {
-      alert('Semua bulan (April-Desember) sudah lunas. Uang akan masuk ke Deposit.');
-    }
+    if (hasil.length === 0) alert('Semua bulan sudah lunas. Uang akan masuk ke Deposit.');
 
     const detail = hasil.map((h) => `${h.namaBulan}: ${formatRupiah(h.nominal)}`).join('\n');
     const confirmMsg = `Konfirmasi:\n\nWarga: ${w?.no_rumah} - ${w?.nama_lengkap}\nNominal: ${formatRupiah(nominal)}\n\nDistribusi:\n${detail}\n\n` + (sisaUang > 0 ? `Sisa jadi deposit: ${formatRupiah(sisaUang)}\n\n` : '') + `Lanjutkan?`;
@@ -110,7 +80,6 @@ export default function PageTunai() {
     setTunaiSubmitting(true);
     try {
       const batchId = crypto.randomUUID();
-      
       if (hasil.length > 0) {
         const records = hasil.map((h) => ({
           warga_id: tunaiWargaId, bulan_tahun: h.bulan, jumlah: h.nominal, status: 'approved',
@@ -119,7 +88,6 @@ export default function PageTunai() {
         const { error } = await supabase.from('iuran').insert(records);
         if (error) throw error;
       }
-
       if (sisaUang > 0) {
         const { error: errDep } = await supabase.from('deposit_warga').insert([{
           warga_id: tunaiWargaId, tanggal: tunaiTanggal, tipe: 'masuk', jumlah: sisaUang,
@@ -138,11 +106,23 @@ export default function PageTunai() {
     }
   }
 
-  // EDIT TUNAI
-  function handleEditTunai(batch) {
+  // FUNGSI EDIT: MENGHITUNG IURAN + DEPOSIT = 200.000
+  async function handleEditTunai(batch) {
     const totalIuran = batch.items.reduce((s, i) => s + Number(i.jumlah || 0), 0);
-    const totalNominal = totalIuran + (batch.totalDeposit || 0);
-    setModalEditTunai({ ...batch, totalNominal });
+    let totalDeposit = batch.totalDeposit || 0;
+
+    // Kalau data deposit tidak ketemu di state, tarik langsung dari DB
+    if (totalDeposit === 0) {
+      try {
+        const { data: deps } = await supabase.from('deposit_warga').select('*').eq('warga_id', batch.items[0].warga_id).eq('tipe', 'masuk').eq('tanggal', batch.items[0].tanggal_transaksi);
+        if (deps && deps.length > 0) {
+          const match = deps.find(d => d.keterangan?.includes(batch.batchId.slice(0, 8))) || deps[0];
+          totalDeposit = match.jumlah;
+        }
+      } catch (err) {}
+    }
+
+    setModalEditTunai({ ...batch, totalNominal: totalIuran + totalDeposit });
   }
 
   async function handleSaveEditTunai({ batchId, nominalTotal, catatan, tanggal }) {
@@ -165,18 +145,11 @@ export default function PageTunai() {
         if (error) throw error;
       }
 
-      const { data: oldDep } = await supabase
-        .from('deposit_warga').select('*').like('keterangan', `%batch ${batchId.slice(0, 8)}%`).maybeSingle();
+      const { data: oldDep } = await supabase.from('deposit_warga').select('*').like('keterangan', `%batch ${batchId.slice(0, 8)}%`).maybeSingle();
 
       if (sisaUang > 0) {
-        if (oldDep) {
-          await supabase.from('deposit_warga').update({ jumlah: sisaUang, tanggal }).eq('id', oldDep.id);
-        } else {
-          await supabase.from('deposit_warga').insert([{
-            warga_id: wargaId, tanggal, tipe: 'masuk', jumlah: sisaUang,
-            keterangan: `Sisa uang tunai (batch ${batchId.slice(0, 8)})`, created_by: user?.id,
-          }]);
-        }
+        if (oldDep) await supabase.from('deposit_warga').update({ jumlah: sisaUang, tanggal }).eq('id', oldDep.id);
+        else await supabase.from('deposit_warga').insert([{ warga_id: wargaId, tanggal, tipe: 'masuk', jumlah: sisaUang, keterangan: `Sisa uang tunai (batch ${batchId.slice(0, 8)})`, created_by: user?.id }]);
       } else if (oldDep) {
         await supabase.from('deposit_warga').delete().eq('id', oldDep.id);
       }
@@ -188,7 +161,6 @@ export default function PageTunai() {
     }
   }
 
-  // HAPUS TUNAI
   function handleHapusTunai(batch) { setModalHapusTunai(batch); }
 
   async function confirmHapusTunai() {
@@ -211,56 +183,13 @@ export default function PageTunai() {
 
   return (
     <KeuanganLayout user={user} pendingCount={getPendingBatches(iuranList).length}>
-      <TabTunai
-        warga={wargaList} 
-        iuran={iuranList} 
-        bulanList={bulanList}
-        tunaiWargaId={tunaiWargaId}
-        setTunaiWargaId={setTunaiWargaId} 
-        tunaiNominal={tunaiNominal} 
-        setTunaiNominal={setTunaiNominal}
-        tunaiTanggal={tunaiTanggal} 
-        setTunaiTanggal={setTunaiTanggal} 
-        tunaiCatatan={tunaiCatatan}
-        setTunaiCatatan={setTunaiCatatan} 
-        tunaiSubmitting={tunaiSubmitting} 
-        handleSubmitTunai={handleSubmitTunai}
-        riwayatTunai={riwayatTunai} 
-        handleEditTunai={handleEditTunai} 
-        handleHapusTunai={handleHapusTunai}
-      />
+      <TabTunai warga={wargaList} iuran={iuranList} bulanList={bulanList} tunaiWargaId={tunaiWargaId} setTunaiWargaId={setTunaiWargaId} tunaiNominal={tunaiNominal} setTunaiNominal={setTunaiNominal} tunaiTanggal={tunaiTanggal} setTunaiTanggal={setTunaiTanggal} tunaiCatatan={tunaiCatatan} setTunaiCatatan={setTunaiCatatan} tunaiSubmitting={tunaiSubmitting} handleSubmitTunai={handleSubmitTunai} riwayatTunai={riwayatTunai} handleEditTunai={handleEditTunai} handleHapusTunai={handleHapusTunai} />
 
       {modalEditTunai && (
-        <ModalEditTunai 
-          batch={modalEditTunai} 
-          warga={wargaList.find((x) => x.id === modalEditTunai.items[0]?.warga_id)}
-          tarifList={tarifList} 
-          onClose={() => setModalEditTunai(null)} 
-          onSave={handleSaveEditTunai}
-        />
+        <ModalEditTunai batch={modalEditTunai} warga={wargaList.find((x) => x.id === modalEditTunai.items[0]?.warga_id)} tarifList={tarifList} onClose={() => setModalEditTunai(null)} onSave={handleSaveEditTunai} />
       )}
 
-      <ModalKonfirmasiHapus
-        open={!!modalHapusTunai} 
-        onClose={() => setModalHapusTunai(null)} 
-        onConfirm={confirmHapusTunai}
-        submitting={hapusSubmitting} 
-        title="Hapus Iuran Tunai"
-        data={modalHapusTunai ? { 
-          Warga: `${wargaModalHapus?.no_rumah} - ${wargaModalHapus?.nama_lengkap}`, 
-          Bulan: `${modalHapusTunai.items.length} bulan`, 
-          Total: formatRupiah(totalHapus) 
-        } : {}}
-        warning={
-          <>
-            <span className="text-rose-400 font-bold">⚠️ Dampak:</span>
-            <div className="mt-1 text-[10px]">
-              • Saldo kas <strong>turun</strong> {formatRupiah(totalHapus)}<br />
-              • <strong>Deposit terkait juga akan dihapus</strong>
-            </div>
-          </>
-        }
-      />
+      <ModalKonfirmasiHapus open={!!modalHapusTunai} onClose={() => setModalHapusTunai(null)} onConfirm={confirmHapusTunai} submitting={hapusSubmitting} title="Hapus Iuran Tunai" data={modalHapusTunai ? { Warga: `${wargaModalHapus?.no_rumah} - ${wargaModalHapus?.nama_lengkap}`, Bulan: `${modalHapusTunai.items.length} bulan`, Total: formatRupiah(totalHapus) } : {}} warning={<><span className="text-rose-400 font-bold">⚠️ Dampak:</span><div className="mt-1 text-[10px]">• Saldo kas <strong>turun</strong> {formatRupiah(totalHapus)}<br />• <strong>Deposit terkait juga akan dihapus</strong></div></>} />
     </KeuanganLayout>
   );
 }
