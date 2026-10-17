@@ -177,4 +177,89 @@ export default function PageProyekKas() {
                   <th className="p-3">Tanggal</th>
                   <th className="p-3">Tipe</th>
                   <th className="p-3">Warga (jika ada)</th>
-                  <th className="p-3
+                  <th className="p-3">Keterangan</th>
+                  <th className="p-3 text-right">Nominal</th>
+                  <th className="p-3 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {riwayatKas.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="p-6 text-center text-slate-500">Belum ada transaksi pengeluaran/refund.</td>
+                  </tr>
+                ) : (
+                  riwayatKas.map((k) => {
+                    const w = warga.find(x => x.id === k.warga_id);
+                    return (
+                      <tr key={k.id} className="hover:bg-slate-800/40">
+                        <td className="p-3 text-slate-400 whitespace-nowrap text-[10px]">{formatTanggalProyek(k.tanggal)}</td>
+                        <td className="p-3">
+                          <span className={`text-[10px] px-2 py-0.5 rounded border ${
+                            k.tipe === 'pengeluaran' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                          }`}>
+                            {k.tipe === 'pengeluaran' ? '💸 Pengeluaran' : '↩️ Refund'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-300">{w ? `${w.no_rumah} - ${w.nama_lengkap}` : '-'}</td>
+                        <td className="p-3 text-slate-400 text-[11px]">{k.keterangan || '-'}</td>
+                        <td className={`p-3 text-right font-mono font-bold ${k.tipe === 'pengeluaran' ? 'text-rose-400' : 'text-amber-400'}`}>
+                          - {formatRupiahProyek(k.nominal)}
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex gap-1 justify-end">
+                            <button
+                              onClick={() => { setEditData(k); setModalMode('edit'); setShowModal(true); }}
+                              className="text-blue-400 hover:text-blue-300 text-[10px] font-semibold px-1"
+                            >✏️</button>
+                            <button
+                              onClick={() => handleHapusClick(k)}
+                              className="text-rose-400 hover:text-rose-300 text-[10px] font-semibold px-1"
+                            >🗑️</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <ModalKasProyek
+        show={showModal}
+        onClose={() => setShowModal(false)}
+        mode={modalMode}
+        proyekList={proyekList}
+        wargaList={warga}
+        iuranProyekList={iuranProyekList}
+        kasProyekList={kasProyekList}
+        dataEdit={editData}
+        onSubmit={handleSubmit}
+        submitting={submitting}
+      />
+
+      <ModalKonfirmasiHapus
+        open={showHapus}
+        onClose={() => setShowHapus(false)}
+        onConfirm={confirmHapus}
+        submitting={submitting}
+        title="Hapus Transaksi Kas"
+        data={hapusData ? {
+          Tipe: hapusData.tipe === 'pengeluaran' ? 'Pengeluaran' : 'Refund',
+          Nominal: formatRupiahProyek(hapusData.nominal),
+          Keterangan: hapusData.keterangan || '-'
+        } : {}}
+        warning={
+          <>
+            ⚠️ <strong>Dampak:</strong>
+            <div className="mt-1 text-[10px]">
+              Saldo Kas Proyek akan <strong>naik kembali</strong> sebesar {formatRupiahProyek(hapusData?.nominal || 0)}.
+            </div>
+          </>
+        }
+      />
+    </Layout>
+  );
+}
