@@ -1,15 +1,10 @@
 import { useState, useEffect } from 'react';
-import { formatRupiahProyek } from '../../lib/proyek/constants';
+import { getTotalTerbayar } from '../../lib/proyek/calculations';
 
 export default function ModalKasProyek({ 
-  show, 
-  onClose, 
-  mode, // 'pengeluaran' | 'refund' | 'edit'
-  proyekList = [], 
-  wargaList = [],
-  dataEdit = null,
-  onSubmit, 
-  submitting 
+  show, onClose, mode, proyekList = [], wargaList = [],
+  iuranProyekList = [], kasProyekList = [],
+  dataEdit = null, onSubmit, submitting 
 }) {
   const [proyekId, setProyekId] = useState('');
   const [wargaId, setWargaId] = useState('');
@@ -35,6 +30,18 @@ export default function ModalKasProyek({
     }
   }, [show, mode, dataEdit, proyekList]);
 
+  // Auto-fill nominal refund saat pilih warga
+  useEffect(() => {
+    if (mode === 'refund' && wargaId && proyekId) {
+      const totalIuran = getTotalTerbayar(iuranProyekList, wargaId, proyekId);
+      const totalDonasi = kasProyekList
+        .filter(k => k.warga_id === wargaId && k.proyek_id === proyekId && k.tipe === 'donasi')
+        .reduce((s, k) => s + Number(k.nominal), 0);
+      
+      setNominal(String(totalIuran + totalDonasi));
+    }
+  }, [wargaId, proyekId, mode, iuranProyekList, kasProyekList]);
+
   if (!show) return null;
 
   const handleSubmit = (e) => {
@@ -59,7 +66,7 @@ export default function ModalKasProyek({
     });
   };
 
-  const title = mode === 'pengeluaran' ? 'Catat Pengeluaran' : mode === 'refund' ? 'Catat Refund Warga' : 'Edit Transaksi Kas';
+  const title = mode === 'pengeluaran' ? 'Catat Pengeluaran' : mode === 'refund' ? 'Refund ke Warga' : 'Edit Transaksi Kas';
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
@@ -67,22 +74,17 @@ export default function ModalKasProyek({
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <h3 className="font-bold text-white text-base">{title}</h3>
           <button
-            onClick={onClose}
-            disabled={submitting}
+            onClick={onClose} disabled={submitting}
             className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center text-sm"
-          >
-            ✕
-          </button>
+          >✕</button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Proyek</label>
             <select
-              value={proyekId}
-              onChange={(e) => setProyekId(e.target.value)}
-              disabled={mode === 'edit'}
-              required
+              value={proyekId} onChange={(e) => setProyekId(e.target.value)}
+              disabled={mode === 'edit'} required
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white disabled:opacity-50"
             >
               <option value="">-- Pilih Proyek --</option>
@@ -96,10 +98,8 @@ export default function ModalKasProyek({
             <div>
               <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Warga Penerima</label>
               <select
-                value={wargaId}
-                onChange={(e) => setWargaId(e.target.value)}
-                disabled={mode === 'edit'}
-                required
+                value={wargaId} onChange={(e) => setWargaId(e.target.value)}
+                disabled={mode === 'edit'} required
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white disabled:opacity-50"
               >
                 <option value="">-- Pilih Warga --</option>
@@ -113,10 +113,7 @@ export default function ModalKasProyek({
           <div>
             <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Tanggal</label>
             <input
-              type="date"
-              value={tanggal}
-              onChange={(e) => setTanggal(e.target.value)}
-              required
+              type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} required
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
             />
           </div>
@@ -124,10 +121,7 @@ export default function ModalKasProyek({
           <div>
             <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Nominal (Rp)</label>
             <input
-              type="number"
-              value={nominal}
-              onChange={(e) => setNominal(e.target.value)}
-              required
+              type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} required
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-mono"
             />
           </div>
@@ -135,9 +129,7 @@ export default function ModalKasProyek({
           <div>
             <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Keterangan</label>
             <textarea
-              value={keterangan}
-              onChange={(e) => setKeterangan(e.target.value)}
-              rows={2}
+              value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2}
               placeholder="Contoh: Beli 4 kamera CCTV"
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white resize-none"
             />
@@ -145,16 +137,11 @@ export default function ModalKasProyek({
 
           <div className="flex gap-3 pt-2">
             <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
+              type="button" onClick={onClose} disabled={submitting}
               className="w-1/2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs"
-            >
-              Batal
-            </button>
+            >Batal</button>
             <button
-              type="submit"
-              disabled={submitting}
+              type="submit" disabled={submitting}
               className="w-1/2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white font-semibold py-2.5 rounded-xl text-xs"
             >
               {submitting ? 'Menyimpan...' : '💾 Simpan'}
