@@ -24,11 +24,7 @@ export default function TabTunai({
   const tarif = w ? (w.kategori === 'Usaha' ? 30000 : 15000) : 0;
   const iuranWarga = iuran.filter((i) => i.warga_id === tunaiWargaId);
 
-  // LOGIKA INFO TAGIHAN & PREVIEW
-  const { list: infoTagihan } = w
-    ? getInfoTagihan(bulanList, iuranWarga, tarif)
-    : { list: [] };
-
+  const { list: infoTagihan } = w ? getInfoTagihan(bulanList, iuranWarga, tarif) : { list: [] };
   const nominalNum = Number(tunaiNominal) || 0;
   
   const { hasil: previewDistribusi, totalPakai, sisaUang } = w && nominalNum > 0
@@ -37,12 +33,10 @@ export default function TabTunai({
 
   const bisaSimpan = !tunaiSubmitting && tunaiWargaId && nominalNum > 0;
 
-  // BULAN BERJALAN
   const today = new Date();
-  const currentMonth = today.getMonth() + 1; // 1-12
+  const currentMonth = today.getMonth() + 1;
   const currentYear = today.getFullYear();
 
-  // HITUNG TOTAL TAGIHAN HANYA SAMPAI BULAN INI
   const totalTagihanSampaiSekarang = infoTagihan
     .filter((b) => {
       const [tahun, bulan] = b.kode.split('-').map(Number);
@@ -56,29 +50,16 @@ export default function TabTunai({
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         
-        {/* FORM INPUT KIRI */}
-        <form
-          onSubmit={handleSubmitTunai}
-          className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 h-fit"
-        >
+        <form onSubmit={handleSubmitTunai} className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 h-fit">
           <h3 className="text-sm font-bold text-white">💵 Input Iuran Tunai</h3>
-          <p className="text-[10px] text-slate-500">
-            Input nominal yang diterima. Sistem otomatis distribusi ke bulan-bulan.
-          </p>
+          <p className="text-[10px] text-slate-500">Input nominal yang diterima. Sistem otomatis distribusi ke bulan-bulan.</p>
           
           <div>
             <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Warga</label>
-            <select
-              value={tunaiWargaId}
-              onChange={(e) => setTunaiWargaId(e.target.value)}
-              required
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
-            >
+            <select value={tunaiWargaId} onChange={(e) => setTunaiWargaId(e.target.value)} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
               <option value="">-- Pilih Warga --</option>
               {wargaList.map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.no_rumah} - {x.nama_lengkap} ({x.kategori || 'Rumah'})
-                </option>
+                <option key={x.id} value={x.id}>{x.no_rumah} - {x.nama_lengkap} ({x.kategori || 'Rumah'})</option>
               ))}
             </select>
           </div>
@@ -90,80 +71,39 @@ export default function TabTunai({
           )}
 
           <div>
-            <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-              Nominal Diterima (Rp)
-            </label>
-            <input
-              type="number"
-              value={tunaiNominal}
-              onChange={(e) => setTunaiNominal(e.target.value)}
-              required
-              placeholder="Contoh: 20000"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-mono"
-            />
-            <p className="text-[9px] text-slate-500 mt-1">
-              Nominal bebas — bisa kurang/lebih dari total tagihan
-            </p>
+            <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Nominal Diterima (Rp)</label>
+            <input type="number" value={tunaiNominal} onChange={(e) => setTunaiNominal(e.target.value)} required placeholder="Contoh: 20000" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-mono" />
+            <p className="text-[9px] text-slate-500 mt-1">Nominal bebas — bisa kurang/lebih dari total tagihan</p>
           </div>
 
           <div>
-            <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-              Tanggal Bayar
-            </label>
-            <input
-              type="date"
-              value={tunaiTanggal}
-              onChange={(e) => setTunaiTanggal(e.target.value)}
-              required
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
-            />
+            <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Tanggal Bayar</label>
+            <input type="date" value={tunaiTanggal} onChange={(e) => setTunaiTanggal(e.target.value)} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" />
           </div>
 
           <div>
-            <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-              Catatan (opsional)
-            </label>
-            <textarea
-              value={tunaiCatatan}
-              onChange={(e) => setTunaiCatatan(e.target.value)}
-              rows={2}
-              placeholder="Contoh: diterima langsung dari istri"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white resize-none"
-            />
+            <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Catatan (opsional)</label>
+            <textarea value={tunaiCatatan} onChange={(e) => setTunaiCatatan(e.target.value)} rows={2} placeholder="Contoh: diterima langsung dari istri" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white resize-none" />
           </div>
 
           <div className="flex justify-between items-center pt-3 border-t border-slate-800 mt-2">
             <div>
-              <div className="text-[10px] text-slate-500 uppercase">
-                Total Tagihan<br/><span className="text-[8px]">(s.d Bulan Ini)</span>
-              </div>
+              <div className="text-[10px] text-slate-500 uppercase">Total Tagihan<br/><span className="text-[8px]">(s.d Bulan Ini)</span></div>
               <div className="text-sm font-bold text-amber-400">{formatRupiah(totalTagihanSampaiSekarang)}</div>
             </div>
-            <button
-              type="submit"
-              disabled={!bisaSimpan}
-              className={`text-xs font-semibold px-6 py-2.5 rounded-xl transition ${
-                bisaSimpan
-                  ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                  : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-              }`}
-            >
+            <button type="submit" disabled={!bisaSimpan} className={`text-xs font-semibold px-6 py-2.5 rounded-xl transition ${bisaSimpan ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}>
               {tunaiSubmitting ? 'Menyimpan...' : 'Simpan'}
             </button>
           </div>
         </form>
 
-        {/* PANEL KANAN: INFO TAGIHAN & PREVIEW DISTRIBUSI */}
         <div className="lg:col-span-2 space-y-4">
           {w ? (
             <>
-              {/* Info Tagihan */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
                 <div className="p-3 border-b border-slate-800 flex justify-between items-center">
                   <h3 className="text-xs font-bold text-white">📊 Info Tagihan</h3>
-                  <span className="text-[10px] text-amber-400 font-bold">
-                    Total s.d Bulan Ini: {formatRupiah(totalTagihanSampaiSekarang)}
-                  </span>
+                  <span className="text-[10px] text-amber-400 font-bold">Total s.d Bulan Ini: {formatRupiah(totalTagihanSampaiSekarang)}</span>
                 </div>
                 <div className="overflow-x-auto max-h-[250px] overflow-y-auto">
                   <table className="w-full text-left text-xs">
@@ -172,43 +112,18 @@ export default function TabTunai({
                         const [tahun, bulan] = b.kode.split('-').map(Number);
                         const isCurrentMonth = tahun === currentYear && bulan === currentMonth;
                         const isPastMonth = tahun < currentYear || (tahun === currentYear && bulan < currentMonth);
-                        
-                        // JIKA SUDAH MASUK BULAN INI ATAU SEBELUMNYA, DAN BELUM LUNAS = TUNGGAKAN
                         const isTunggakan = (isCurrentMonth || isPastMonth) && b.status !== 'lunas';
 
                         return (
-                          <tr 
-                            key={b.kode} 
-                            className={isTunggakan ? 'bg-rose-950/20 border-l-4 border-rose-500' : 'hover:bg-slate-800/40'}
-                          >
+                          <tr key={b.kode} className={isTunggakan ? 'bg-rose-950/20 border-l-4 border-rose-500' : 'hover:bg-slate-800/40'}>
                             <td className={`p-2 ${isTunggakan ? 'text-white font-bold' : 'text-slate-300'}`}>
                               {b.nama} {isCurrentMonth && <span className="text-[9px] text-rose-400 font-normal ml-1">(Bulan Ini)</span>}
                             </td>
                             <td className="p-2 text-right">
-                              {b.status === 'lunas' && (
-                                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">
-                                  ✓ Lunas
-                                </span>
-                              )}
-                              {b.status === 'kurang' && (
-                                <span className={`text-[10px] px-2 py-0.5 rounded border ${
-                                  isTunggakan ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                }`}>
-                                  {isTunggakan ? '🔴' : '🟡'} Kurang {formatRupiah(b.kekurangan)}
-                                </span>
-                              )}
-                              {b.status === 'belum' && (
-                                <span className={`text-[10px] px-2 py-0.5 rounded border ${
-                                  isTunggakan ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' : 'bg-slate-800 text-slate-400 border-slate-700'
-                                }`}>
-                                  ⚫ Belum
-                                </span>
-                              )}
-                              {b.status === 'pending' && (
-                                <span className="text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded">
-                                  ⏳ Pending
-                                </span>
-                              )}
+                              {b.status === 'lunas' && <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">✓ Lunas</span>}
+                              {b.status === 'kurang' && <span className={`text-[10px] px-2 py-0.5 rounded border ${isTunggakan ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>{isTunggakan ? '🔴' : '🟡'} Kurang {formatRupiah(b.kekurangan)}</span>}
+                              {b.status === 'belum' && <span className={`text-[10px] px-2 py-0.5 rounded border ${isTunggakan ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>⚫ Belum</span>}
+                              {b.status === 'pending' && <span className="text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded">⏳ Pending</span>}
                             </td>
                             <td className={`p-2 text-right font-mono text-[10px] ${isTunggakan ? 'text-rose-300 font-bold' : 'text-slate-400'}`}>
                               {b.kekurangan > 0 ? formatRupiah(b.kekurangan) : '-'}
@@ -221,20 +136,15 @@ export default function TabTunai({
                 </div>
               </div>
 
-              {/* Preview Distribusi */}
               {nominalNum > 0 && (
                 <div className="bg-slate-900 border border-blue-500/30 rounded-2xl overflow-hidden">
                   <div className="p-3 border-b border-slate-800">
                     <h3 className="text-xs font-bold text-white">🔄 Preview Distribusi</h3>
-                    <p className="text-[10px] text-slate-500 mt-0.5">
-                      Sistem otomatis alokasikan uang ke bulan paling awal (April - Desember)
-                    </p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Sistem otomatis alokasikan uang ke bulan paling awal (April - Desember)</p>
                   </div>
                   <div className="overflow-x-auto max-h-[240px] overflow-y-auto">
                     {previewDistribusi.length === 0 ? (
-                      <div className="p-4 text-center text-xs text-slate-500">
-                        Semua bulan (April - Desember) sudah lunas. Kelebihan: {formatRupiah(nominalNum)}
-                      </div>
+                      <div className="p-4 text-center text-xs text-slate-500">Semua bulan (April - Desember) sudah lunas. Kelebihan: {formatRupiah(nominalNum)}</div>
                     ) : (
                       <table className="w-full text-left text-xs">
                         <tbody className="divide-y divide-slate-800/60">
@@ -242,19 +152,9 @@ export default function TabTunai({
                             <tr key={i}>
                               <td className="p-2 text-slate-300">{h.namaBulan}</td>
                               <td className="p-2 text-right">
-                                {h.tipe === 'lunas' ? (
-                                  <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">
-                                    ✓ Lunas
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded">
-                                    🟡 Kurang {formatRupiah(h.sisaKurang)}
-                                  </span>
-                                )}
+                                {h.tipe === 'lunas' ? <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">✓ Lunas</span> : <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded">🟡 Kurang {formatRupiah(h.sisaKurang)}</span>}
                               </td>
-                              <td className="p-2 text-right font-mono text-white text-[10px]">
-                                {formatRupiah(h.nominal)}
-                              </td>
+                              <td className="p-2 text-right font-mono text-white text-[10px]">{formatRupiah(h.nominal)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -262,21 +162,9 @@ export default function TabTunai({
                     )}
                   </div>
                   <div className="p-3 border-t border-slate-800 space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-400">Total Dialokasikan:</span>
-                      <strong className="text-white">{formatRupiah(totalPakai)}</strong>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-400">Sisa Uang:</span>
-                      <strong className={sisaUang > 0 ? 'text-amber-400' : 'text-slate-400'}>
-                        {formatRupiah(sisaUang)}
-                      </strong>
-                    </div>
-                    {sisaUang > 0 && (
-                      <div className="text-[10px] text-amber-400 pt-1 border-t border-slate-800">
-                        💡 Sisa {formatRupiah(sisaUang)} akan disimpan sebagai deposit warga
-                      </div>
-                    )}
+                    <div className="flex justify-between text-xs"><span className="text-slate-400">Total Dialokasikan:</span><strong className="text-white">{formatRupiah(totalPakai)}</strong></div>
+                    <div className="flex justify-between text-xs"><span className="text-slate-400">Sisa Uang:</span><strong className={sisaUang > 0 ? 'text-amber-400' : 'text-slate-400'}>{formatRupiah(sisaUang)}</strong></div>
+                    {sisaUang > 0 && <div className="text-[10px] text-amber-400 pt-1 border-t border-slate-800">💡 Sisa {formatRupiah(sisaUang)} akan disimpan sebagai deposit warga</div>}
                   </div>
                 </div>
               )}
@@ -290,7 +178,6 @@ export default function TabTunai({
         </div>
       </div>
 
-      {/* TABEL RIWAYAT TUNAI */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
         <div className="p-4 border-b border-slate-800">
           <h3 className="text-sm font-bold text-white">📋 Riwayat Iuran Tunai ({riwayatTunai.length})</h3>
@@ -302,70 +189,43 @@ export default function TabTunai({
                 <th className="p-3">Tanggal</th>
                 <th className="p-3">Warga</th>
                 <th className="p-3">Bulan</th>
-                <th className="p-3 text-right">Total Diterima</th>
+                <th className="p-3 text-right">Total</th>
                 <th className="p-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {riwayatTunai.length === 0 ? (
-                <tr>
-                  <td colSpan="5" className="p-6 text-center text-slate-500">
-                    Belum ada riwayat iuran tunai.
-                  </td>
-                </tr>
+                <tr><td colSpan="5" className="p-6 text-center text-slate-500">Belum ada riwayat iuran tunai.</td></tr>
               ) : (
                 riwayatTunai.map((batch) => {
                   const wBatch = wargaList.find((x) => x.id === batch.items[0]?.warga_id);
                   const totalIuran = batch.items.reduce((s, i) => s + Number(i.jumlah || 0), 0);
                   const totalDeposit = batch.totalDeposit || 0;
-                  const totalUang = totalIuran + totalDeposit;
-
-                  const bulanStr = batch.items
-                    .map((i) => i.bulan_tahun.replace('2026-', ''))
-                    .sort()
-                    .join(', ');
+                  const bulanStr = batch.items.map((i) => i.bulan_tahun.replace('2026-', '')).sort().join(', ');
 
                   return (
                     <tr key={batch.batchId} className="hover:bg-slate-800/40">
-                      <td className="p-3 text-slate-400 whitespace-nowrap">
-                        {formatTanggal(batch.items[0]?.tanggal_transaksi)}
-                      </td>
+                      <td className="p-3 text-slate-400 whitespace-nowrap">{formatTanggal(batch.items[0]?.tanggal_transaksi)}</td>
                       <td className="p-3">
                         <div className="font-semibold text-white">{wBatch?.nama_lengkap || '-'}</div>
                         <div className="text-[10px] text-slate-500">{wBatch?.no_rumah}</div>
                       </td>
-                      <td className="p-3 text-[10px] text-slate-400 max-w-[200px]">
-                        {bulanStr}
-                      </td>
+                      <td className="p-3 text-[10px] text-slate-400 max-w-[200px]">{bulanStr}</td>
                       <td className="p-3 text-right">
-                        <div className="font-mono text-white font-bold text-sm">
-                          {formatRupiah(totalUang)}
-                        </div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">
-                          Iuran: {formatRupiah(totalIuran)}
+                        {/* INI YANG KAMU MAU: TOTAL IURAN DULU, BARU DEPOSIT */}
+                        <div className="font-mono text-emerald-400 font-semibold">
+                          {formatRupiah(totalIuran)}
                         </div>
                         {totalDeposit > 0 && (
-                          <div className="text-[10px] text-purple-400 font-semibold">
-                            Deposit: {formatRupiah(totalDeposit)}
+                          <div className="text-[10px] text-purple-400 mt-0.5 font-semibold">
+                            + Deposit: {formatRupiah(totalDeposit)}
                           </div>
                         )}
                       </td>
                       <td className="p-3 text-right">
                         <div className="flex gap-1 justify-end">
-                          <button
-                            onClick={() => handleEditTunai(batch)}
-                            title="Edit"
-                            className="text-blue-400 hover:text-blue-300 text-[10px] font-semibold px-1"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            onClick={() => handleHapusTunai(batch)}
-                            title="Hapus"
-                            className="text-rose-400 hover:text-rose-300 text-[10px] font-semibold px-1"
-                          >
-                            🗑️
-                          </button>
+                          <button onClick={() => handleEditTunai(batch)} title="Edit" className="text-blue-400 hover:text-blue-300 text-[10px] font-semibold px-1">✏️</button>
+                          <button onClick={() => handleHapusTunai(batch)} title="Hapus" className="text-rose-400 hover:text-rose-300 text-[10px] font-semibold px-1">🗑️</button>
                         </div>
                       </td>
                     </tr>
