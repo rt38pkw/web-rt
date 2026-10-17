@@ -1,3 +1,4 @@
+import { PERIODE_BULAN } from '../../lib/iuran/constants';
 import { getInfoBulan } from '../../lib/iuran/calculations';
 
 export default function IuranGrid({
@@ -7,56 +8,37 @@ export default function IuranGrid({
   bulanTombolBayar,
   onKlikDetail,
   onBayar,
-  periodeBulan,
-  tahunTerpilih,
-  tahunTersedia,
-  onGantiTahun,
 }) {
-  const bulanList = Array.isArray(periodeBulan) ? periodeBulan : [];
-
-  // ── Bulan sekarang ──
   const now = new Date();
   const bulanSekarang = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   return (
     <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-5 sm:p-6 shadow-xl">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
+      <div className="flex justify-between items-center mb-5">
         <div>
           <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
-            Grid Iuran {tahunTerpilih}
+            Grid Iuran Bulanan 2026
           </h3>
           <p className="text-xs text-slate-400">Klik grid untuk detail tanggal</p>
         </div>
-
-        {/* ═══ DROPDOWN TAHUN ═══ */}
-        <select
-          value={tahunTerpilih}
-          onChange={(e) => onGantiTahun(Number(e.target.value))}
-          className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-semibold"
-        >
-          {tahunTersedia.map((thn) => (
-            <option key={thn} value={thn}>
-              {thn}{thn === new Date().getFullYear() ? ' (tahun ini)' : ''}
-            </option>
-          ))}
-        </select>
+        <span className="text-xs bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 font-medium">
+          9 Bulan
+        </span>
       </div>
 
       {adaPending && (
         <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-xl text-xs text-orange-300">
-          ⏳ Ada pengajuan yang menunggu approve bendahara. Tunggu sampai disetujui sebelum mengajukan lagi.
+          ⏳ Ada pengajuan yang menunggu approve bendahara.
         </div>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-        {bulanList.map((bln, idx) => {
+        {PERIODE_BULAN.map((bln, idx) => {
           const info = getInfoBulan(iuranList, bln.kode, tarifBulanan);
           const isPending = info.adaPendingBulan;
           const isLunas = !isPending && info.totalApproved >= tarifBulanan;
           const isSebagian = !isPending && info.totalApproved > 0 && info.totalApproved < tarifBulanan;
           const isKosong = info.recs.length === 0;
-
-          // ── Jatuh tempo (bulan <= sekarang) ──
           const isJatuhTempo = bln.kode <= bulanSekarang;
 
           const isTombolBayar =
@@ -117,7 +99,7 @@ export default function IuranGrid({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-white tracking-wide">{bln.nama}</span>
-                  <span className="text-[10px] text-slate-400">{tahunTerpilih}</span>
+                  <span className="text-[10px] text-slate-400">2026</span>
                 </div>
                 <span
                   className={`inline-block text-[10px] px-2.5 py-1 rounded-xl font-semibold border ${badgeClass}`}
@@ -150,30 +132,6 @@ export default function IuranGrid({
             </div>
           );
         })}
-      </div>
-
-      {/* Legenda */}
-      <div className="mt-4 pt-4 border-t border-slate-800/60 flex flex-wrap gap-3 text-[10px] text-slate-400">
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-emerald-500/40 border border-emerald-500/60"></span>
-          <span>Lunas</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-amber-500/40 border border-amber-500/60"></span>
-          <span>Kurang bayar</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-orange-500/40 border border-orange-500/60"></span>
-          <span>Menunggu approve</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-rose-500/40 border border-rose-500/60"></span>
-          <span>⚠️ Telat</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-slate-700/60 border border-slate-600/60"></span>
-          <span>Belum tempo</span>
-        </div>
       </div>
     </div>
   );
