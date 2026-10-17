@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import Layout from '../../components/warga/Layout';
 import ProjectsCard from '../../components/warga/ProjekCard';
 import ModalBayarProjek from '../../components/warga/ModalBayarProjek';
+import ModalRekapProjek from '../../components/warga/ModalRekapProjek';
 import { formatRupiahProyek, formatTanggalProyek } from '../../lib/proyek/constants';
 import {
   getTotalTerbayar,
@@ -19,9 +20,18 @@ export default function DashboardWargaProjek() {
   const [iuranProyekList, setIuranProyekList] = useState([]);
   const [kasProyekList, setKasProyekList] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Modal bayar
   const [showModalBayar, setShowModalBayar] = useState(false);
   const [proyekDipilih, setProyekDipilih] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Modal rekap
+  const [showRekap, setShowRekap] = useState(false);
+  const [rekapProyek, setRekapProyek] = useState(null);
+  const [allWargaList, setAllWargaList] = useState([]);
+  const [allIuranList, setAllIuranList] = useState([]);
+  const [loadingRekap, setLoadingRekap] = useState(false);
 
   const router = useRouter();
 
@@ -78,7 +88,7 @@ export default function DashboardWargaProjek() {
   };
 
   // ══════════════════════════════════════════════
-  // SUBMIT BAYAR (dengan SPLIT: iuran + donasi)
+  // SUBMIT BAYAR (SPLIT: iuran + donasi)
   // ══════════════════════════════════════════════
   const handleSubmitBayar = async ({ nominal, nominalIuran, nominalDonasi, fileBukti, catatan }) => {
     setSubmitting(true);
@@ -86,7 +96,6 @@ export default function DashboardWargaProjek() {
       const batchId = crypto.randomUUID();
       const uploadedUrls = [];
 
-      // Upload bukti
       for (let i = 0; i < 3; i++) {
         const file = fileBukti[i];
         if (!file) continue;
@@ -96,7 +105,7 @@ export default function DashboardWargaProjek() {
 
       const today = new Date().toISOString().split('T')[0];
 
-      // 1. Insert iuran proyek (kalau ada nominal iuran > 0)
+      // 1. Insert iuran proyek (cicilan)
       if (nominalIuran > 0) {
         const { error: errIuran } = await supabase.from('iuran_proyek').insert([
           {
@@ -114,7 +123,7 @@ export default function DashboardWargaProjek() {
         if (errIuran) throw errIuran;
       }
 
-      // 2. Insert kas_proyek (donasi, kalau ada kelebihan)
+      // 2. Insert kas_proyek (donasi)
       if (nominalDonasi > 0) {
         const { error: errKas } = await supabase.from('kas_proyek').insert([
           {
@@ -148,6 +157,35 @@ export default function DashboardWargaProjek() {
     }
   };
 
+  // ══════════════════════════════════════════════
+  // LIHAT REKAP
+  // ══════════════════════════════════════════════
+  const handleLihatRekap = async (proyek) => {
+    setLoadingRekap(true);
+    try {
+      if (allWargaList.length === 0) {
+        const [resWarga, resIuran] = await Promise.all([
+          supabase.from('warga').select('*').order('no_rumah'),
+          supabase.from('iuran_proyek').select('*').eq('proyek_id', proyek.id),
+        ]);
+        setAllWargaList(resWarga.data || []);
+        setAllIuranList(resIuran.data || []);
+      } else {
+        const { data } = await supabase
+          .from('iuran_proyek')
+          .select('*')
+          .eq('proyek_id', proyek.id);
+        setAllIuranList(data || []);
+      }
+      setRekapProyek(proyek);
+      setShowRekap(true);
+    } catch (err) {
+      alert('Gagal memuat rekap: ' + err.message);
+    } finally {
+      setLoadingRekap(false);
+    }
+  };
+
   if (!warga) return null;
 
   // Filter proyek: aktif dulu
@@ -157,9 +195,7 @@ export default function DashboardWargaProjek() {
     return 0;
   });
 
-  // ══════════════════════════════════════════════
-  // GABUNG RIWAYAT: iuran + donasi
-  // ══════════════════════════════════════════════
+  // Gabung riwayat: iuran + donasi
   const riwayatCicilan = iuranProyekList.map((i) => ({
     id: 'i-' + i.id,
     tanggal: i.tanggal_transaksi || i.tanggal,
@@ -178,7 +214,7 @@ export default function DashboardWargaProjek() {
       tipe: 'donasi',
       proyek_id: k.proyek_id,
       nominal: Number(k.nominal),
-      status: 'approved', // donasi selalu approved
+      status: 'approved',
       catatan: k.keterangan,
     }));
 
@@ -216,7 +252,6 @@ export default function DashboardWargaProjek() {
                   const sisa = getSisaWarga(iuranProyekList, warga.id, proyek);
                   const adaPending = pending > 0;
 
-                  // Total donasi warga untuk proyek ini
                   const donasiWarga = kasProyekList
                     .filter(
                       (k) =>
@@ -240,6 +275,7 @@ export default function DashboardWargaProjek() {
                       adaPending={adaPending}
                       donasiWarga={donasiWarga}
                       onBayar={() => handleBayar(proyek)}
+                      onLihatRekap={() => handleLihatRekap(proyek)}
                     />
                   );
                 })}
@@ -283,9 +319,11 @@ export default function DashboardWargaProjek() {
                                 </span>
                               )}
                             </td>
-                            <td className={`p-3 text-right font-mono font-semibold ${
-                              r.tipe === 'donasi' ? 'text-purple-400' : 'text-emerald-400'
-                            }`}>
+                            <td
+                              className={`p-3 text-right font-mono font-semibold ${
+                                r.tipe === 'donasi' ? 'text-purple-400' : 'text-emerald-400'
+                              }`}
+                            >
                               {r.tipe === 'donasi' ? '+' : ''} {formatRupiahProyek(r.nominal)}
                             </td>
                             <td className="p-3">
@@ -326,6 +364,15 @@ export default function DashboardWargaProjek() {
           submitting={submitting}
         />
       )}
+
+      {/* Modal Rekap */}
+      <ModalRekapProjek
+        show={showRekap}
+        onClose={() => setShowRekap(false)}
+        proyek={rekapProyek}
+        wargaList={allWargaList}
+        iuranProyekList={allIuranList}
+      />
     </>
   );
 }
