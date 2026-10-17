@@ -137,7 +137,6 @@ export default function TabTunai({
               <div className="text-[10px] text-slate-500 uppercase">
                 Total Tagihan<br/><span className="text-[8px]">(s.d Bulan Ini)</span>
               </div>
-              {/* ANGKA DI BAWAH HANYA SAMPAI BULAN INI */}
               <div className="text-sm font-bold text-amber-400">{formatRupiah(totalTagihanSampaiSekarang)}</div>
             </div>
             <button
@@ -172,13 +171,17 @@ export default function TabTunai({
                       {infoTagihan.map((b) => {
                         const [tahun, bulan] = b.kode.split('-').map(Number);
                         const isCurrentMonth = tahun === currentYear && bulan === currentMonth;
+                        const isPastMonth = tahun < currentYear || (tahun === currentYear && bulan < currentMonth);
+                        
+                        // JIKA SUDAH MASUK BULAN INI ATAU SEBELUMNYA, DAN BELUM LUNAS = TUNGGAKAN
+                        const isTunggakan = (isCurrentMonth || isPastMonth) && b.status !== 'lunas';
 
                         return (
                           <tr 
                             key={b.kode} 
-                            className={isCurrentMonth ? 'bg-slate-600/30 border border-rose-500/50' : ''}
+                            className={isTunggakan ? 'bg-rose-950/20 border-l-4 border-rose-500' : 'hover:bg-slate-800/40'}
                           >
-                            <td className={`p-2 ${isCurrentMonth ? 'text-white font-bold' : 'text-slate-300'}`}>
+                            <td className={`p-2 ${isTunggakan ? 'text-white font-bold' : 'text-slate-300'}`}>
                               {b.nama} {isCurrentMonth && <span className="text-[9px] text-rose-400 font-normal ml-1">(Bulan Ini)</span>}
                             </td>
                             <td className="p-2 text-right">
@@ -188,12 +191,16 @@ export default function TabTunai({
                                 </span>
                               )}
                               {b.status === 'kurang' && (
-                                <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded">
-                                  🟡 Kurang {formatRupiah(b.kekurangan)}
+                                <span className={`text-[10px] px-2 py-0.5 rounded border ${
+                                  isTunggakan ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                }`}>
+                                  {isTunggakan ? '🔴' : '🟡'} Kurang {formatRupiah(b.kekurangan)}
                                 </span>
                               )}
                               {b.status === 'belum' && (
-                                <span className={`text-[10px] ${isCurrentMonth ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' : 'bg-slate-800 text-slate-400 border-slate-700'} border px-2 py-0.5 rounded`}>
+                                <span className={`text-[10px] px-2 py-0.5 rounded border ${
+                                  isTunggakan ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' : 'bg-slate-800 text-slate-400 border-slate-700'
+                                }`}>
                                   ⚫ Belum
                                 </span>
                               )}
@@ -203,7 +210,7 @@ export default function TabTunai({
                                 </span>
                               )}
                             </td>
-                            <td className="p-2 text-right font-mono text-slate-400 text-[10px]">
+                            <td className={`p-2 text-right font-mono text-[10px] ${isTunggakan ? 'text-rose-300 font-bold' : 'text-slate-400'}`}>
                               {b.kekurangan > 0 ? formatRupiah(b.kekurangan) : '-'}
                             </td>
                           </tr>
