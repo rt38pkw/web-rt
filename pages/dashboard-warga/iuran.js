@@ -101,20 +101,29 @@ export default function DashboardWargaIuran() {
     }
   };
 
+  // ═══════════════════════════════════════════════════════════
+  // FUNGSI REKAP DENGAN ALERT DEBUG
+  // ═══════════════════════════════════════════════════════════
   const loadRekap = async () => {
-    if (allWargaList.length > 0) {
-      setShowRekapModal(true);
-      return;
-    }
+    alert("TES 1: Tombol diklik, mulai ambil data...");
     setLoadingRekap(true);
     try {
-      const [wargaData, iuranData] = await Promise.all([fetchAllWarga(), fetchAllIuran()]);
+      alert("TES 2: Menghubungi database Supabase...");
+      const [wargaData, iuranData] = await Promise.all([
+        fetchAllWarga(),
+        fetchAllIuran(),
+      ]);
+      
+      alert("TES 3: Data berhasil diambil! Warga: " + wargaData.length + ", Iuran: " + iuranData.length);
+      
       setAllWargaList(wargaData);
       setAllIuranList(iuranData);
+      
+      alert("TES 4: Membuka modal rekap...");
       setShowRekapModal(true);
     } catch (err) {
-      console.error('Gagal memuat rekap:', err);
-      alert('Gagal memuat rekap. Cek koneksi internet.');
+      alert("ERROR ASLI: " + err.message);
+      console.error(err);
     } finally {
       setLoadingRekap(false);
     }
