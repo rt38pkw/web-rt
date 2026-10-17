@@ -5,7 +5,6 @@ import { useProyekData, getPendingProyekCount, invalidateProyekCache } from '../
 import { formatRupiahProyek, formatTanggalProyek, isProyekTelat } from '../../lib/proyek/constants';
 import { getProgressProyek } from '../../lib/proyek/calculations';
 import { canDeleteProyek } from '../../lib/proyek/kas';
-import { insertKasProyekBulk } from '../../lib/proyek/kas';
 
 export default function PageProyekKelola() {
   const { user, warga, proyekList, iuranProyekList, kasProyekList, loading, refetch } = useProyekData();
@@ -13,7 +12,6 @@ export default function PageProyekKelola() {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
 
-  // Form state
   const [nama, setNama] = useState('');
   const [deskripsi, setDeskripsi] = useState('');
   const [nominal, setNominal] = useState('');
@@ -110,52 +108,19 @@ export default function PageProyekKelola() {
     }
   };
 
-  // ═══ BATALKAN PROYEK (Baru) ═══
+  // ═══ BATALKAN PROYEK (SIMPEL) ═══
   const handleBatalkan = async (proyek) => {
-    const konfirmasi = confirm(
-      `⚠️ BATALKAN PROYEK\n\n` +
-      `Proyek "${proyek.nama}" akan dihentikan.\n\n` +
-      `Semua iuran yang sudah masuk (approved) akan diubah menjadi DONASI PROYEK.\n` +
-      `Warga tidak bisa lagi membayar cicilan untuk proyek ini.\n\n` +
-      `Anda bisa melakukan refund manual ke warga melalui menu "Kas Proyek".\n\n` +
-      `Lanjutkan membatalkan?`
-    );
-    if (!konfirmasi) return;
+    if (!confirm(`Batalkan proyek "${proyek.nama}"?\n\nWarga tidak bisa lagi bayar. Anda bisa me-refund uang mereka di menu Kas Proyek.`)) return;
 
     try {
-      // 1. Hitung total iuran per warga untuk dikonversi ke donasi
-      const totalIuranPerWarga = {};
-      iuranProyekList
-        .filter(i => i.proyek_id === proyek.id && i.status === 'approved')
-        .forEach(i => {
-          if (!totalIuranPerWarga[i.warga_id]) totalIuranPerWarga[i.warga_id] = 0;
-          totalIuranPerWarga[i.warga_id] += Number(i.jumlah || 0);
-        });
-
-      // 2. Siapkan record baru untuk kas_proyek (donasi)
-      const donasiRecords = Object.keys(totalIuranPerWarga).map(wargaId => ({
-        proyek_id: proyek.id,
-        warga_id: wargaId,
-        tipe: 'donasi',
-        tanggal: new Date().toISOString().split('T')[0],
-        nominal: totalIuranPerWarga[wargaId],
-        keterangan: `Konversi iuran ke donasi (proyek dibatalkan)`,
-        created_by: user?.id,
-      }));
-
-      // 3. Insert donasi (kalau ada)
-      if (donasiRecords.length > 0) {
-        await insertKasProyekBulk(donasiRecords);
-      }
-
-      // 4. Update status proyek jadi batal
       const { error } = await supabase
         .from('proyek')
         .update({ status: 'batal' })
         .eq('id', proyek.id);
+      
       if (error) throw error;
 
-      alert('✅ Proyek dibatalkan. Iuran warga sudah dipindahkan ke Donasi Proyek.');
+      alert('✅ Proyek dibatalkan. Silakan refund warga di menu Kas Proyek.');
       invalidateProyekCache();
       refetch();
     } catch (err) {
@@ -183,6 +148,23 @@ export default function PageProyekKelola() {
     }
   };
 
+  // ═══ BUKA LAGI (dari selesai ke aktif) ═══
+  const handleUbahStatus = async (proyek, statusBaru) => {
+    if (!confirm(`Ubah status proyek "${proyek.nama}" menjadi "${statusBaru}"?`)) return;
+    try {
+      const { error } = await supabase
+        .from('proyek')
+        .update({ status: statusBaru })
+        .eq('id', proyek.id);
+      if (error) throw error;
+      alert('✅ Status proyek diubah!');
+      invalidateProyekCache();
+      refetch();
+    } catch (err) {
+      alert('Gagal: ' + err.message);
+    }
+  };
+
   if (loading) {
     return (
       <Layout user={user}>
@@ -196,29 +178,21 @@ export default function PageProyekKelola() {
   return (
     <Layout user={user} pendingCount={pendingCount}>
       <div className="space-y-4">
-        {/* Header + Tombol Tambah */}
         <div className="flex justify-between items-center flex-wrap gap-3">
           <div>
             <h2 className="text-sm font-bold text-white">➕ Kelola Proyek</h2>
             <p className="text-[11px] text-slate-400">Buat, edit, batalkan, atau hapus proyek</p>
           </div>
           <button
-            onClick={() => {
-              resetForm();
-              setShowForm(!showForm);
-            }}
+            onClick={() => { resetForm(); setShowForm(!showForm); }}
             className="text-xs bg-amber-600 hover:bg-amber-500 text-white font-semibold px-4 py-2 rounded-lg"
           >
             {showForm ? '✕ Tutup Form' : '+ Buat Proyek Baru'}
           </button>
         </div>
 
-        {/* Form */}
         {showForm && (
-          <form
-            onSubmit={handleSubmit}
-            className="bg-slate-900 border border-amber-500/30 rounded-2xl p-5 space-y-3"
-          >
+          <form onSubmit={handleSubmit} className="bg-slate-900 border border-amber-500/30 rounded-2xl p-5 space-y-3">
             <h3 className="text-sm font-bold text-white mb-2">
               {editId ? '✏️ Edit Proyek' : '📝 Buat Proyek Baru'}
             </h3>
@@ -228,23 +202,16 @@ export default function PageProyekKelola() {
                 Nama Proyek <span className="text-rose-400">*</span>
               </label>
               <input
-                type="text"
-                value={nama}
-                onChange={(e) => setNama(e.target.value)}
-                required
+                type="text" value={nama} onChange={(e) => setNama(e.target.value)} required
                 placeholder="Contoh: Pengadaan CCTV"
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
               />
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-                Deskripsi
-              </label>
+              <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Deskripsi</label>
               <textarea
-                value={deskripsi}
-                onChange={(e) => setDeskripsi(e.target.value)}
-                rows={2}
+                value={deskripsi} onChange={(e) => setDeskripsi(e.target.value)} rows={2}
                 placeholder="Deskripsi singkat proyek (opsional)"
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white resize-none"
               />
@@ -256,10 +223,7 @@ export default function PageProyekKelola() {
                   Nominal per Warga (Rp) <span className="text-rose-400">*</span>
                 </label>
                 <input
-                  type="number"
-                  value={nominal}
-                  onChange={(e) => setNominal(e.target.value)}
-                  required
+                  type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} required
                   placeholder="80000"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
                 />
@@ -269,10 +233,7 @@ export default function PageProyekKelola() {
                   Deadline <span className="text-rose-400">*</span>
                 </label>
                 <input
-                  type="date"
-                  value={deadline}
-                  onChange={(e) => setDeadline(e.target.value)}
-                  required
+                  type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} required
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
                 />
               </div>
@@ -281,16 +242,12 @@ export default function PageProyekKelola() {
             <div className="flex gap-2 pt-2">
               {editId && (
                 <button
-                  type="button"
-                  onClick={() => { resetForm(); setShowForm(false); }}
+                  type="button" onClick={() => { resetForm(); setShowForm(false); }}
                   className="w-1/3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs"
-                >
-                  Batal
-                </button>
+                >Batal</button>
               )}
               <button
-                type="submit"
-                disabled={submitting}
+                type="submit" disabled={submitting}
                 className={`${editId ? 'w-2/3' : 'w-full'} bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white font-semibold py-2.5 rounded-xl text-xs`}
               >
                 {submitting ? 'Menyimpan...' : editId ? '💾 Update Proyek' : '💾 Buat Proyek'}
@@ -299,7 +256,6 @@ export default function PageProyekKelola() {
           </form>
         )}
 
-        {/* List Proyek */}
         {proyekList.length === 0 ? (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
             <div className="text-4xl mb-2">🏗️</div>
@@ -314,7 +270,6 @@ export default function PageProyekKelola() {
 
               return (
                 <div key={proyek.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-                  {/* Header */}
                   <div className="flex justify-between items-start gap-2 flex-wrap">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -345,7 +300,6 @@ export default function PageProyekKelola() {
                     </div>
                   </div>
 
-                  {/* Progress */}
                   <div className="bg-slate-950 rounded-xl p-3">
                     <div className="flex justify-between text-[10px] text-slate-400 mb-1.5">
                       <span>Progress: {progress.jumlahLunas}/{progress.jumlahWarga} lunas</span>
@@ -353,46 +307,33 @@ export default function PageProyekKelola() {
                     </div>
                     <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
                       <div
-                        className={`h-full transition-all ${
-                          progress.persen === 100
-                            ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
-                            : 'bg-gradient-to-r from-amber-500 to-amber-400'
-                        }`}
+                        className={`h-full transition-all ${progress.persen === 100 ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' : 'bg-gradient-to-r from-amber-500 to-amber-400'}`}
                         style={{ width: `${progress.persen}%` }}
                       />
                     </div>
                   </div>
 
-                  {/* Aksi */}
                   <div className="flex gap-2 flex-wrap">
                     <button
                       onClick={() => handleEdit(proyek)}
                       className="text-[11px] bg-blue-600 hover:bg-blue-500 text-white font-semibold px-3 py-1.5 rounded-lg"
-                    >
-                      ✏️ Edit
-                    </button>
+                    >✏️ Edit</button>
                     {proyek.status === 'aktif' && (
                       <button
                         onClick={() => handleBatalkan(proyek)}
                         className="text-[11px] bg-orange-600 hover:bg-orange-500 text-white font-semibold px-3 py-1.5 rounded-lg"
-                      >
-                        🚫 Batalkan
-                      </button>
+                      >🚫 Batalkan</button>
                     )}
                     {proyek.status === 'selesai' && (
                       <button
                         onClick={() => handleUbahStatus(proyek, 'aktif')}
                         className="text-[11px] bg-amber-600 hover:bg-amber-500 text-white font-semibold px-3 py-1.5 rounded-lg"
-                      >
-                        ↻ Buka Lagi
-                      </button>
+                      >↻ Buka Lagi</button>
                     )}
                     <button
                       onClick={() => handleHapus(proyek)}
                       className="text-[11px] bg-rose-600 hover:bg-rose-500 text-white font-semibold px-3 py-1.5 rounded-lg"
-                    >
-                      🗑️ Hapus
-                    </button>
+                    >🗑️ Hapus</button>
                   </div>
                 </div>
               );
