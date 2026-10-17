@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export default function ModalEditTunai({ batch, warga, tarifList, onClose, onSave }) {
+export default function ModalEditTunai({ batch, warga, onClose, onSave }) {
   const [nominal, setNominal] = useState('');
   const [catatan, setCatatan] = useState('');
   const [tanggal, setTanggal] = useState('');
@@ -43,7 +43,6 @@ export default function ModalEditTunai({ batch, warga, tarifList, onClose, onSav
           <div>
             <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Total Diterima (Rp)</label>
             <input type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-mono" />
-            <p className="text-[10px] text-slate-500 mt-1">*Sistem akan menghitung ulang bulan mana saja yang lunas & sisa depositnya.</p>
           </div>
           <div>
             <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Tanggal Bayar</label>
