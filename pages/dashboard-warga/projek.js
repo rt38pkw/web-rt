@@ -21,10 +21,12 @@ export default function DashboardWargaProjek() {
   const [kasProyekList, setKasProyekList] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Modal bayar
   const [showModalBayar, setShowModalBayar] = useState(false);
   const [proyekDipilih, setProyekDipilih] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Modal rekap
   const [showRekap, setShowRekap] = useState(false);
   const [rekapProyek, setRekapProyek] = useState(null);
   const [allWargaList, setAllWargaList] = useState([]);
@@ -65,8 +67,10 @@ export default function DashboardWargaProjek() {
           .eq('warga_id', wargaId)
           .order('tanggal', { ascending: false }),
       ]);
+      
       // Filter proyek yang valid (punya id & nominal)
       const proyekValid = (resProyek.data || []).filter(p => p && p.id && p.nominal_per_warga);
+      
       setProyekList(proyekValid);
       setIuranProyekList(resIuran.data || []);
       setKasProyekList(resKas.data || []);
@@ -237,8 +241,6 @@ export default function DashboardWargaProjek() {
             ) : (
               <div className="space-y-4">
                 {proyekTampil.map((proyek) => {
-                  if (!proyek.nominal_per_warga) return null;
-
                   const terbayar = getTotalTerbayar(iuranProyekList, warga.id, proyek.id);
                   const pending = getTotalPending(iuranProyekList, warga.id, proyek.id);
                   const sisa = getSisaWarga(iuranProyekList, warga.id, proyek);
@@ -331,7 +333,8 @@ export default function DashboardWargaProjek() {
         )}
       </Layout>
 
-      {showModalBayar && proyekDipilih && proyekDipilih.id && (
+      {/* ═══ MODAL BAYAR ═══ */}
+      {showModalBayar && proyekDipilih && (
         <ModalBayarProjek
           show={showModalBayar}
           onClose={() => {
@@ -346,7 +349,8 @@ export default function DashboardWargaProjek() {
         />
       )}
 
-      {showRekap && rekapProyek && rekapProyek.id && (
+      {/* ═══ MODAL REKAP ═══ */}
+      {showRekap && rekapProyek && (
         <ModalRekapProjek
           show={showRekap}
           onClose={() => setShowRekap(false)}
