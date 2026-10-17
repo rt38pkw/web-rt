@@ -6,7 +6,7 @@ import ModalEditTunai from '../../components/keuangan/ModalEditTunai';
 import ModalKonfirmasiHapus from '../../components/keuangan/ModalKonfirmasiHapus';
 import { formatRupiah } from '../../lib/keuangan/helpers';
 import { distribusikanTunai } from '../../lib/keuangan/tunai';
-import { getPeriodeBulan } from '../../lib/keuangan/constants'; 
+import { getPeriodeBulan, TAHUN_TERSEDIA } from '../../lib/keuangan/constants'; 
 import {
   useKeuanganData,
   getPendingBatches,
@@ -32,10 +32,12 @@ export default function PageTunai() {
   const wargaList = Array.isArray(warga) ? warga : [];
   const depositList = Array.isArray(deposit) ? deposit : [];
 
-  // Menggunakan 1 tahun (2026) saja seperti tampilan awal
-  const bulanList = useMemo(() => getPeriodeBulan(2026), []);
+  // GENERATE BULAN DINAMIS (2026, 2027, 2028)
+  const bulanList = useMemo(() => {
+    return TAHUN_TERSEDIA.flatMap(tahun => getPeriodeBulan(tahun));
+  }, []);
 
-  // RIWAYAT TUNAI
+  // RIWAYAT TUNAI (Gabungkan data Iuran + Deposit)
   const riwayatTunai = useMemo(() => {
     const tunaiRecords = iuranList.filter((i) => i.metode === 'tunai');
     const grouped = {};
@@ -83,7 +85,7 @@ export default function PageTunai() {
     const tarif = w?.kategori === 'Usaha' ? 30000 : 15000;
     const iuranWarga = iuranList.filter((i) => i.warga_id === tunaiWargaId);
 
-    const { hasil, totalPakai, sisaUang } = distribusikanTunai(nominal, bulanList, iuranWarga, tarif);
+    const { hasil, sisaUang } = distribusikanTunai(nominal, bulanList, iuranWarga, tarif);
 
     if (hasil.length === 0) {
       alert('Semua bulan sudah lunas. Tidak ada yang bisa dibayar.');
@@ -196,25 +198,54 @@ export default function PageTunai() {
   return (
     <KeuanganLayout user={user} pendingCount={getPendingBatches(iuranList).length}>
       <TabTunai
-        warga={wargaList} tarifList={tarifList} iuran={iuranList} tunaiWargaId={tunaiWargaId}
-        setTunaiWargaId={setTunaiWargaId} tunaiNominal={tunaiNominal} setTunaiNominal={setTunaiNominal}
-        tunaiTanggal={tunaiTanggal} setTunaiTanggal={setTunaiTanggal} tunaiCatatan={tunaiCatatan}
-        setTunaiCatatan={setTunaiCatatan} tunaiSubmitting={tunaiSubmitting} handleSubmitTunai={handleSubmitTunai}
-        riwayatTunai={riwayatTunai} handleEditTunai={handleEditTunai} handleHapusTunai={handleHapusTunai}
+        warga={wargaList} 
+        iuran={iuranList} 
         bulanList={bulanList}
+        tunaiWargaId={tunaiWargaId}
+        setTunaiWargaId={setTunaiWargaId} 
+        tunaiNominal={tunaiNominal} 
+        setTunaiNominal={setTunaiNominal}
+        tunaiTanggal={tunaiTanggal} 
+        setTunaiTanggal={setTunaiTanggal} 
+        tunaiCatatan={tunaiCatatan}
+        setTunaiCatatan={setTunaiCatatan} 
+        tunaiSubmitting={tunaiSubmitting} 
+        handleSubmitTunai={handleSubmitTunai}
+        riwayatTunai={riwayatTunai} 
+        handleEditTunai={handleEditTunai} 
+        handleHapusTunai={handleHapusTunai}
       />
 
       {modalEditTunai && (
-        <ModalEditTunai batch={modalEditTunai} warga={wargaList.find((x) => x.id === modalEditTunai.items[0]?.warga_id)}
-          tarifList={tarifList} onClose={() => setModalEditTunai(null)} onSave={handleSaveEditTunai}
+        <ModalEditTunai 
+          batch={modalEditTunai} 
+          warga={wargaList.find((x) => x.id === modalEditTunai.items[0]?.warga_id)}
+          tarifList={tarifList} 
+          onClose={() => setModalEditTunai(null)} 
+          onSave={handleSaveEditTunai}
         />
       )}
 
       <ModalKonfirmasiHapus
-        open={!!modalHapusTunai} onClose={() => setModalHapusTunai(null)} onConfirm={confirmHapusTunai}
-        submitting={hapusSubmitting} title="Hapus Iuran Tunai"
-        data={modalHapusTunai ? { Warga: `${wargaModalHapus?.no_rumah} - ${wargaModalHapus?.nama_lengkap}`, Bulan: `${modalHapusTunai.items.length} bulan`, Total: formatRupiah(totalHapus) } : {}}
-        warning={<><span className="text-rose-400 font-bold">⚠️ Dampak:</span><div className="mt-1 text-[10px]">• Saldo kas <strong>turun</strong> {formatRupiah(totalHapus)}<br />• <strong>Deposit terkait juga akan dihapus</strong></div></>}
+        open={!!modalHapusTunai} 
+        onClose={() => setModalHapusTunai(null)} 
+        onConfirm={confirmHapusTunai}
+        submitting={hapusSubmitting} 
+        title="Hapus Iuran Tunai"
+        data={modalHapusTunai ? { 
+          Warga: `${wargaModalHapus?.no_rumah} - ${wargaModalHapus?.nama_lengkap}`, 
+          Bulan: `${modalHapusTunai.items.length} bulan`, 
+          Total: formatRupiah(totalHapus) 
+        } : {}}
+        warning={
+          <>
+            <span className="text-rose-400 font-bold">⚠️ Dampak:</span>
+            <div className="mt-1 text-[10px]">
+              • Saldo kas <strong>turun</strong> {formatRupiah(totalHapus)}<br />
+              • <strong>Deposit terkait juga akan dihapus</strong>
+            </div>
+          </>
+        }
       />
     </KeuanganLayout>
   );
