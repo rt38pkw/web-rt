@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import Layout from '../../components/proyek/Layout';
+import ModalEditTunai from '../../components/proyek/ModalEditTunai';
+import ModalKonfirmasiHapus from '../../components/keuangan/ModalKonfirmasiHapus';
 import { useProyekData, getPendingProyekCount, invalidateProyekCache } from '../../lib/proyek/hooks';
 import { formatRupiahProyek, formatTanggalProyek } from '../../lib/proyek/constants';
 import { getTotalTerbayar, getSisaWarga } from '../../lib/proyek/calculations';
@@ -14,6 +16,11 @@ export default function PageProyekTunai() {
   const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
   const [catatan, setCatatan] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Edit & Hapus
+  const [modalEdit, setModalEdit] = useState(null);
+  const [modalHapus, setModalHapus] = useState(null);
+  const [hapusSubmitting, setHapusSubmitting] = useState(false);
 
   if (typeof window === 'undefined') return null;
 
@@ -31,6 +38,7 @@ export default function PageProyekTunai() {
   const terlaluBesar = nominalNum > sisa;
   const terlaluKecil = nominalNum <= 0;
 
+  // ═══ INPUT BARU ═══
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -87,6 +95,50 @@ export default function PageProyekTunai() {
     }
   };
 
+  // ═══ EDIT ═══
+  const handleSaveEdit = async ({ id, jumlah, tanggal, catatan }) => {
+    try {
+      const { error } = await supabase
+        .from('iuran_proyek')
+        .update({ jumlah, tanggal, catatan, tanggal_transaksi: tanggal })
+        .eq('id', id);
+      if (error) throw error;
+
+      alert('✅ Cicilan berhasil diupdate!');
+      setModalEdit(null);
+      invalidateProyekCache();
+      refetch();
+    } catch (err) {
+      alert('Gagal: ' + err.message);
+    }
+  };
+
+  // ═══ HAPUS ═══
+  const handleHapusClick = (item) => {
+    setModalHapus(item);
+  };
+
+  const confirmHapus = async () => {
+    if (!modalHapus) return;
+    setHapusSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('iuran_proyek')
+        .delete()
+        .eq('id', modalHapus.id);
+      if (error) throw error;
+
+      alert('✅ Cicilan dihapus.');
+      setModalHapus(null);
+      invalidateProyekCache();
+      refetch();
+    } catch (err) {
+      alert('Gagal: ' + err.message);
+    } finally {
+      setHapusSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <Layout user={user}>
@@ -97,15 +149,19 @@ export default function PageProyekTunai() {
 
   const pendingCount = getPendingProyekCount(iuranProyekList);
 
-  // Riwayat tunai (metode=tunai, approved)
+  // Riwayat tunai
   const riwayatTunai = iuranProyekList
     .filter((i) => i.metode === 'tunai' && i.status === 'approved')
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
+  // Data untuk modal hapus
+  const wargaHapus = modalHapus ? warga.find((w) => w.id === modalHapus.warga_id) : null;
+  const proyekHapus = modalHapus ? proyekList.find((p) => p.id === modalHapus.proyek_id) : null;
+
   return (
     <Layout user={user} pendingCount={pendingCount}>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Form */}
+        {/* Form Input */}
         <form
           onSubmit={handleSubmit}
           className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 h-fit"
@@ -224,10 +280,13 @@ export default function PageProyekTunai() {
           </button>
         </form>
 
-        {/* Riwayat Tunai */}
+        {/* Riwayat Tunai + Aksi */}
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
           <div className="p-4 border-b border-slate-800">
             <h3 className="text-sm font-bold text-white">📋 Riwayat Tunai ({riwayatTunai.length})</h3>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              Edit / hapus akan otomatis update progress proyek & tunggakan
+            </p>
           </div>
           <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
             <table className="w-full text-left text-xs">
@@ -237,12 +296,13 @@ export default function PageProyekTunai() {
                   <th className="p-3">Warga</th>
                   <th className="p-3">Proyek</th>
                   <th className="p-3 text-right">Nominal</th>
+                  <th className="p-3 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {riwayatTunai.length === 0 ? (
                   <tr>
-                    <td colSpan="4" className="p-6 text-center text-slate-500">
+                    <td colSpan="5" className="p-6 text-center text-slate-500">
                       Belum ada cicilan tunai.
                     </td>
                   </tr>
@@ -263,6 +323,24 @@ export default function PageProyekTunai() {
                         <td className="p-3 text-right font-mono font-bold text-emerald-400">
                           {formatRupiahProyek(item.jumlah)}
                         </td>
+                        <td className="p-3 text-right">
+                          <div className="flex gap-1 justify-end">
+                            <button
+                              onClick={() => setModalEdit(item)}
+                              title="Edit"
+                              className="text-blue-400 hover:text-blue-300 text-[10px] font-semibold px-1"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={() => handleHapusClick(item)}
+                              title="Hapus"
+                              className="text-rose-400 hover:text-rose-300 text-[10px] font-semibold px-1"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })
@@ -272,6 +350,45 @@ export default function PageProyekTunai() {
           </div>
         </div>
       </div>
+
+      {/* Modal Edit */}
+      {modalEdit && (
+        <ModalEditTunai
+          data={modalEdit}
+          warga={warga.find((w) => w.id === modalEdit.warga_id)}
+          proyek={proyekList.find((p) => p.id === modalEdit.proyek_id)}
+          onClose={() => setModalEdit(null)}
+          onSave={handleSaveEdit}
+        />
+      )}
+
+      {/* Modal Hapus */}
+      <ModalKonfirmasiHapus
+        open={!!modalHapus}
+        onClose={() => setModalHapus(null)}
+        onConfirm={confirmHapus}
+        submitting={hapusSubmitting}
+        title="Hapus Cicilan Tunai"
+        data={
+          modalHapus
+            ? {
+                Warga: `${wargaHapus?.no_rumah} - ${wargaHapus?.nama_lengkap}`,
+                Proyek: proyekHapus?.nama,
+                Nominal: formatRupiahProyek(modalHapus.jumlah),
+              }
+            : {}
+        }
+        warning={
+          <>
+            ⚠️ <strong>Dampak:</strong>
+            <div className="mt-1 text-[10px]">
+              • Progress proyek akan <strong>turun</strong><br />
+              • Sisa tunggakan warga akan <strong>naik</strong><br />
+              • Riwayat warga akan update otomatis
+            </div>
+          </>
+        }
+      />
     </Layout>
   );
 }
