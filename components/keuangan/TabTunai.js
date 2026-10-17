@@ -25,9 +25,9 @@ export default function TabTunai({
   const iuranWarga = iuran.filter((i) => i.warga_id === tunaiWargaId);
 
   // LOGIKA INFO TAGIHAN & PREVIEW
-  const { list: infoTagihan, totalTagihan: totalTagihanFull } = w
+  const { list: infoTagihan } = w
     ? getInfoTagihan(bulanList, iuranWarga, tarif)
-    : { list: [], totalTagihan: 0 };
+    : { list: [] };
 
   const nominalNum = Number(tunaiNominal) || 0;
   
@@ -37,16 +37,18 @@ export default function TabTunai({
 
   const bisaSimpan = !tunaiSubmitting && tunaiWargaId && nominalNum > 0;
 
-  // ═══ FILTER TOTAL TAGIHAN SAMPAI BULAN INI ═══
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1; // 1-12
+  // BULAN BERJALAN
+  const today = new Date();
+  const currentMonth = today.getMonth() + 1; // 1-12
+  const currentYear = today.getFullYear();
 
+  // HITUNG TOTAL TAGIHAN HANYA SAMPAI BULAN INI
   const totalTagihanSampaiSekarang = infoTagihan
     .filter((b) => {
       const [tahun, bulan] = b.kode.split('-').map(Number);
-      if (tahun < currentYear) return true; // Tahun lalu pasti tunggakan
-      if (tahun > currentYear) return false; // Tahun depan belum jadi tunggakan
-      return bulan <= currentMonth; // Tahun ini, potong sampai bulan berjalan
+      if (tahun < currentYear) return true;
+      if (tahun > currentYear) return false;
+      return bulan <= currentMonth;
     })
     .reduce((sum, b) => sum + (b.kekurangan || 0), 0);
 
@@ -132,8 +134,10 @@ export default function TabTunai({
 
           <div className="flex justify-between items-center pt-3 border-t border-slate-800 mt-2">
             <div>
-              <div className="text-[10px] text-slate-500 uppercase">Total Tagihan<br/><span className="text-[8px]">(Sampai bulan ini)</span></div>
-              {/* MENAMPILKAN TAGIHAN SAMPAI BULAN INI SAJA */}
+              <div className="text-[10px] text-slate-500 uppercase">
+                Total Tagihan<br/><span className="text-[8px]">(s.d Bulan Ini)</span>
+              </div>
+              {/* ANGKA DI BAWAH HANYA SAMPAI BULAN INI */}
               <div className="text-sm font-bold text-amber-400">{formatRupiah(totalTagihanSampaiSekarang)}</div>
             </div>
             <button
@@ -159,42 +163,52 @@ export default function TabTunai({
                 <div className="p-3 border-b border-slate-800 flex justify-between items-center">
                   <h3 className="text-xs font-bold text-white">📊 Info Tagihan</h3>
                   <span className="text-[10px] text-amber-400 font-bold">
-                    Total Tunggakan: {formatRupiah(totalTagihanSampaiSekarang)}
+                    Total s.d Bulan Ini: {formatRupiah(totalTagihanSampaiSekarang)}
                   </span>
                 </div>
-                <div className="overflow-x-auto max-h-[200px] overflow-y-auto">
+                <div className="overflow-x-auto max-h-[250px] overflow-y-auto">
                   <table className="w-full text-left text-xs">
                     <tbody className="divide-y divide-slate-800/60">
-                      {infoTagihan.map((b) => (
-                        <tr key={b.kode}>
-                          <td className="p-2 text-slate-300">{b.nama}</td>
-                          <td className="p-2 text-right">
-                            {b.status === 'lunas' && (
-                              <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">
-                                ✓ Lunas
-                              </span>
-                            )}
-                            {b.status === 'kurang' && (
-                              <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded">
-                                🟡 Kurang {formatRupiah(b.kekurangan)}
-                              </span>
-                            )}
-                            {b.status === 'belum' && (
-                              <span className="text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded">
-                                ⚫ Belum
-                              </span>
-                            )}
-                            {b.status === 'pending' && (
-                              <span className="text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded">
-                                ⏳ Pending
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-2 text-right font-mono text-slate-400 text-[10px]">
-                            {b.kekurangan > 0 ? formatRupiah(b.kekurangan) : '-'}
-                          </td>
-                        </tr>
-                      ))}
+                      {infoTagihan.map((b) => {
+                        const [tahun, bulan] = b.kode.split('-').map(Number);
+                        const isCurrentMonth = tahun === currentYear && bulan === currentMonth;
+
+                        return (
+                          <tr 
+                            key={b.kode} 
+                            className={isCurrentMonth ? 'bg-slate-600/30 border border-rose-500/50' : ''}
+                          >
+                            <td className={`p-2 ${isCurrentMonth ? 'text-white font-bold' : 'text-slate-300'}`}>
+                              {b.nama} {isCurrentMonth && <span className="text-[9px] text-rose-400 font-normal ml-1">(Bulan Ini)</span>}
+                            </td>
+                            <td className="p-2 text-right">
+                              {b.status === 'lunas' && (
+                                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">
+                                  ✓ Lunas
+                                </span>
+                              )}
+                              {b.status === 'kurang' && (
+                                <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded">
+                                  🟡 Kurang {formatRupiah(b.kekurangan)}
+                                </span>
+                              )}
+                              {b.status === 'belum' && (
+                                <span className={`text-[10px] ${isCurrentMonth ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' : 'bg-slate-800 text-slate-400 border-slate-700'} border px-2 py-0.5 rounded`}>
+                                  ⚫ Belum
+                                </span>
+                              )}
+                              {b.status === 'pending' && (
+                                <span className="text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded">
+                                  ⏳ Pending
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-2 text-right font-mono text-slate-400 text-[10px]">
+                              {b.kekurangan > 0 ? formatRupiah(b.kekurangan) : '-'}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -206,13 +220,13 @@ export default function TabTunai({
                   <div className="p-3 border-b border-slate-800">
                     <h3 className="text-xs font-bold text-white">🔄 Preview Distribusi</h3>
                     <p className="text-[10px] text-slate-500 mt-0.5">
-                      Sistem otomatis alokasikan uang ke bulan paling awal
+                      Sistem otomatis alokasikan uang ke bulan paling awal (April - Desember)
                     </p>
                   </div>
                   <div className="overflow-x-auto max-h-[240px] overflow-y-auto">
                     {previewDistribusi.length === 0 ? (
                       <div className="p-4 text-center text-xs text-slate-500">
-                        Semua bulan sudah lunas. Kelebihan: {formatRupiah(nominalNum)}
+                        Semua bulan (April - Desember) sudah lunas. Kelebihan: {formatRupiah(nominalNum)}
                       </div>
                     ) : (
                       <table className="w-full text-left text-xs">
