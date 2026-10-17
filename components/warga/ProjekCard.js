@@ -10,7 +10,7 @@ export default function ProjekCard({
   onBayar,
   onLihatRekap,
 }) {
-  // ═══ GUARD UTAMA: Jangan render kalau data proyek kosong ═══
+  // ═══ GUARD UTAMA ═══
   if (!proyek || !proyek.id) return null;
 
   const target = Number(proyek.nominal_per_warga || 0);
