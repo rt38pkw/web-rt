@@ -1,12 +1,11 @@
 import { formatRupiahProyek, formatTanggalProyek, hitungSisaHari, isProyekTelat } from '../../lib/proyek/constants';
 
-export default function ProjekCard({ proyek, terbayar, sisa, statusWarga, adaPending, onBayar }) {
+export default function ProjekCard({ proyek, terbayar, sisa, statusWarga, adaPending, donasiWarga = 0, onBayar }) {
   const target = Number(proyek.nominal_per_warga);
   const persen = target > 0 ? Math.min(100, Math.round((terbayar / target) * 100)) : 0;
   const sisaHari = hitungSisaHari(proyek.deadline);
   const telat = isProyekTelat(proyek);
 
-  // Status badge
   let badgeLabel = '';
   let badgeClass = '';
   if (statusWarga === 'lunas') {
@@ -30,14 +29,13 @@ export default function ProjekCard({ proyek, terbayar, sisa, statusWarga, adaPen
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4">
-      {/* Header */}
       <div className="flex justify-between items-start gap-2 flex-wrap">
         <div className="min-w-0 flex-1">
           <h3 className="text-base font-bold text-white">🏗️ {proyek.nama}</h3>
           {proyek.deskripsi && (
             <p className="text-[11px] text-slate-400 mt-0.5">{proyek.deskripsi}</p>
           )}
-          <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
+          <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500 flex-wrap">
             <span>Target: <strong className="text-slate-300">{formatRupiahProyek(target)}</strong></span>
             <span>•</span>
             <span className={telat ? 'text-rose-400' : ''}>
@@ -51,7 +49,6 @@ export default function ProjekCard({ proyek, terbayar, sisa, statusWarga, adaPen
         </span>
       </div>
 
-      {/* Progress Bar */}
       <div>
         <div className="flex justify-between text-xs mb-1.5">
           <span className="text-slate-400">Progress</span>
@@ -75,13 +72,20 @@ export default function ProjekCard({ proyek, terbayar, sisa, statusWarga, adaPen
         </div>
       </div>
 
-      {/* Tombol Bayar */}
+      {/* Info Donasi */}
+      {donasiWarga > 0 && (
+        <div className="bg-purple-950/30 border border-purple-500/30 rounded-xl p-2.5 text-[11px] flex justify-between items-center">
+          <span className="text-purple-300">💚 Donasi Anda untuk proyek ini:</span>
+          <strong className="text-purple-400">{formatRupiahProyek(donasiWarga)}</strong>
+        </div>
+      )}
+
       {bisaBayar && (
         <button
           onClick={onBayar}
           className="w-full bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold py-3 rounded-xl transition shadow-lg shadow-amber-600/20"
         >
-          💰 Bayar Cicilan
+          💰 Bayar Cicilan (bisa lebih → jadi donasi)
         </button>
       )}
 
