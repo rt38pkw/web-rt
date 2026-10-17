@@ -10,8 +10,8 @@ export default function ProjekCard({
   onBayar,
   onLihatRekap,
 }) {
-  // ═══ GUARD ═══
-  if (!proyek) return null;
+  // ═══ GUARD UTAMA: Jangan render kalau data proyek kosong ═══
+  if (!proyek || !proyek.id) return null;
 
   const target = Number(proyek.nominal_per_warga || 0);
   const persen = target > 0 ? Math.min(100, Math.round((terbayar / target) * 100)) : 0;
