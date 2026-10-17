@@ -6,7 +6,7 @@ import ModalEditTunai from '../../components/keuangan/ModalEditTunai';
 import ModalKonfirmasiHapus from '../../components/keuangan/ModalKonfirmasiHapus';
 import { formatRupiah } from '../../lib/keuangan/helpers';
 import { distribusikanTunai } from '../../lib/keuangan/tunai';
-import { getPeriodeBulan, TAHUN_TERSEDIA } from '../../lib/keuangan/constants'; 
+import { getPeriodeBulan } from '../../lib/keuangan/constants'; 
 import {
   useKeuanganData,
   getPendingBatches,
@@ -32,10 +32,8 @@ export default function PageTunai() {
   const wargaList = Array.isArray(warga) ? warga : [];
   const depositList = Array.isArray(deposit) ? deposit : [];
 
-  // GENERATE BULAN DINAMIS
-  const bulanList = useMemo(() => {
-    return TAHUN_TERSEDIA.flatMap(tahun => getPeriodeBulan(tahun));
-  }, []);
+  // Menggunakan 1 tahun (2026) saja seperti tampilan awal
+  const bulanList = useMemo(() => getPeriodeBulan(2026), []);
 
   // RIWAYAT TUNAI
   const riwayatTunai = useMemo(() => {
