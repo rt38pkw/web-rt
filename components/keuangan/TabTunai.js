@@ -15,14 +15,6 @@ export default function TabTunai({
   const iuranWargaTerpilih = iuran.filter(i => i.warga_id === tunaiWargaId && i.status === 'approved');
   const tarifBulanan = selectedWarga?.kategori === 'Usaha' ? 30000 : 15000;
 
-  // Kelompokkan bulan berdasarkan tahun (2026, 2027, 2028)
-  const groupedByYear = bulanList.reduce((acc, curr) => {
-    const tahun = curr.kode.split('-')[0];
-    if (!acc[tahun]) acc[tahun] = [];
-    acc[tahun].push(curr);
-    return acc;
-  }, {});
-
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -69,7 +61,7 @@ export default function TabTunai({
           </form>
         </div>
 
-        {/* PANEL KANAN: RINCIAN BULAN */}
+        {/* PANEL KANAN: RINCIAN BULAN (TAMPILAN AWAL) */}
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5 min-h-[300px] flex flex-col">
           {!selectedWarga ? (
             <div className="m-auto text-center space-y-2">
@@ -83,30 +75,22 @@ export default function TabTunai({
                 <div className="text-xs text-slate-400">Kategori: {selectedWarga.kategori || 'Biasa'} (Tarif: {formatRupiah(tarifBulanan)}/bulan)</div>
               </div>
               
-              {/* Grid Bulan per Tahun */}
-              <div className="overflow-y-auto max-h-[400px] pr-2 space-y-4">
-                {Object.entries(groupedByYear).map(([tahun, bulanTahunIni]) => (
-                  <div key={tahun}>
-                    <h4 className="text-xs font-bold text-slate-300 mb-2 sticky top-0 bg-slate-900 py-1">Tahun {tahun}</h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                      {bulanTahunIni.map((bulan) => {
-                        const bayar = iuranWargaTerpilih.find(i => i.bulan_tahun === bulan.kode);
-                        const isLunas = !!bayar;
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 overflow-y-auto max-h-[400px] pr-1">
+                {bulanList.map((bulan) => {
+                  const bayar = iuranWargaTerpilih.find(i => i.bulan_tahun === bulan.kode);
+                  const isLunas = !!bayar;
 
-                        return (
-                          <div key={bulan.kode} 
-                            className={`p-2 rounded-xl border text-center flex flex-col items-center justify-center gap-1 ${
-                              isLunas ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                                      : 'bg-slate-950 border-slate-800 text-slate-500'
-                            }`}>
-                            <span className="text-[11px] font-bold">{bulan.nama}</span>
-                            <span className="text-[9px]">{isLunas ? '✓ Lunas' : 'Belum'}</span>
-                          </div>
-                        );
-                      })}
+                  return (
+                    <div key={bulan.kode} 
+                      className={`p-2 rounded-xl border text-center flex flex-col items-center justify-center gap-1 ${
+                        isLunas ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                                : 'bg-slate-950 border-slate-800 text-slate-500'
+                      }`}>
+                      <span className="text-[11px] font-bold">{bulan.nama}</span>
+                      <span className="text-[9px]">{isLunas ? '✓ Lunas' : 'Belum'}</span>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
