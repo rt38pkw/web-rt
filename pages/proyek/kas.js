@@ -19,15 +19,12 @@ export default function PageProyekKas() {
   const [submitting, setSubmitting] = useState(false);
   
   const [showRefundList, setShowRefundList] = useState(false);
-
   const [showHapus, setShowHapus] = useState(false);
   const [hapusData, setHapusData] = useState(null);
 
   if (typeof window === 'undefined') return null;
 
   const proyekAktif = proyekList.find(p => p.id === proyekTerpilihId) || proyekList[0];
-  
-  // HANYA muncul jika statusnya 'batal'
   const isProyekBatal = proyekAktif?.status === 'batal';
 
   if (loading) {
@@ -71,7 +68,6 @@ export default function PageProyekKas() {
 
   // ═══ HANDLER REFUND (LIST) ═══
   const handleProcessRefundList = async (wargaTerpilih, tanggal) => {
-    // 🛡️ VALIDASI GANDA: Pastikan proyek memang batal sebelum memproses
     if (proyekAktif?.status !== 'batal') {
       alert('❌ Gagal: Refund hanya bisa diproses untuk proyek yang dibatalkan!');
       return;
@@ -127,8 +123,32 @@ export default function PageProyekKas() {
     ? getRingkasanKasProyek(iuranProyekList, kasProyekList, proyekAktif.id)
     : { totalIuran: 0, totalDonasi: 0, totalPengeluaran: 0, totalRefund: 0, saldo: 0 };
 
+  // ═══ PENGGABUNGAN RIWAYAT (MUTASI REKENING) ═══
+  const riwayatIuran = iuranProyekList
+    .filter(i => i.proyek_id === proyekAktif?.id && i.status === 'approved')
+    .map(i => ({
+      id: i.id,
+      tanggal: i.tanggal || i.tanggal_transaksi || i.created_at,
+      tipe: 'iuran',
+      warga_id: i.warga_id,
+      keterangan: i.catatan ? i.catatan : `Setoran ${i.metode || 'iuran'} (Batch ${i.batch_id?.slice(0, 8) || '-'})`,
+      nominal: i.jumlah,
+      isIuran: true
+    }));
+
   const riwayatKas = kasProyekList
     .filter(k => k.proyek_id === proyekAktif?.id)
+    .map(k => ({
+      id: k.id,
+      tanggal: k.tanggal || k.created_at,
+      tipe: k.tipe,
+      warga_id: k.warga_id,
+      keterangan: k.keterangan,
+      nominal: k.nominal,
+      isIuran: false
+    }));
+
+  const riwayatGabungan = [...riwayatIuran, ...riwayatKas]
     .sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
 
   return (
@@ -159,7 +179,6 @@ export default function PageProyekKas() {
               className="flex-1 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-[11px] font-semibold px-4 py-2 rounded-lg"
             >💸 Catat Pengeluaran</button>
             
-            {/* TOMBOL REFUND: Hanya dirender kalau statusnya 'batal' */}
             {isProyekBatal && (
               <button
                 onClick={() => setShowRefundList(true)}
@@ -198,12 +217,13 @@ export default function PageProyekKas() {
         )}
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-          <div className="p-4 border-b border-slate-800">
-            <h3 className="text-sm font-bold text-white">📜 Riwayat Transaksi Kas Proyek</h3>
+          <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+            <h3 className="text-sm font-bold text-white">📜 Riwayat Mutasi Kas Proyek</h3>
+            <span className="text-[10px] text-slate-400 bg-slate-950 px-2 py-1 rounded border border-slate-800">Termasuk Iuran Warga</span>
           </div>
           <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] sticky top-0">
+              <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] sticky top-0 z-10">
                 <tr>
                   <th className="p-3">Tanggal</th>
                   <th className="p-3">Tipe</th>
@@ -214,45 +234,73 @@ export default function PageProyekKas() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {riwayatKas.length === 0 ? (
+                {riwayatGabungan.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="p-6 text-center text-slate-500">Belum ada transaksi pengeluaran/refund.</td>
+                    <td colSpan="6" className="p-6 text-center text-slate-500">Belum ada transaksi sama sekali.</td>
                   </tr>
                 ) : (
-                  riwayatKas.map((k) => {
+                  riwayatGabungan.map((k) => {
                     const w = warga.find(x => x.id === k.warga_id);
+                    
+                    const isIuran = k.tipe === 'iuran';
                     const isPengeluaran = k.tipe === 'pengeluaran';
                     const isDonasi = k.tipe === 'donasi';
+                    const isRefund = k.tipe === 'refund';
                     
+                    const isMasuk = isIuran || isDonasi;
+                    
+                    let badgeClass = 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+                    let badgeText = '❓ Lainnya';
+                    let textNominal = 'text-slate-400';
+
+                    if (isIuran) {
+                      badgeClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                      badgeText = '💵 Iuran';
+                      textNominal = 'text-emerald-400';
+                    } else if (isDonasi) {
+                      badgeClass = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+                      badgeText = '💚 Donasi';
+                      textNominal = 'text-purple-400';
+                    } else if (isPengeluaran) {
+                      badgeClass = 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+                      badgeText = '💸 Pengeluaran';
+                      textNominal = 'text-rose-400';
+                    } else if (isRefund) {
+                      badgeClass = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                      badgeText = '↩️ Refund';
+                      textNominal = 'text-amber-400';
+                    }
+
                     return (
                       <tr key={k.id} className="hover:bg-slate-800/40">
                         <td className="p-3 text-slate-400 whitespace-nowrap text-[10px]">{formatTanggalProyek(k.tanggal)}</td>
                         <td className="p-3">
-                          <span className={`text-[10px] px-2 py-0.5 rounded border ${
-                            isPengeluaran ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' 
-                            : isDonasi ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' 
-                            : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                          }`}>
-                            {isPengeluaran ? '💸 Pengeluaran' : isDonasi ? '💚 Donasi' : '↩️ Refund'}
+                          <span className={`text-[10px] px-2 py-0.5 rounded border ${badgeClass}`}>
+                            {badgeText}
                           </span>
                         </td>
                         <td className="p-3 text-slate-300">{w ? `${w.no_rumah} - ${w.nama_lengkap}` : '-'}</td>
                         <td className="p-3 text-slate-400 text-[11px]">{k.keterangan || '-'}</td>
-                        <td className={`p-3 text-right font-mono font-bold ${
-                          isPengeluaran ? 'text-rose-400' : isDonasi ? 'text-purple-400' : 'text-amber-400'
-                        }`}>
-                          {isDonasi ? '+ ' : '- '}{formatRupiahProyek(k.nominal)}
+                        <td className={`p-3 text-right font-mono font-bold ${textNominal}`}>
+                          {isMasuk ? '+ ' : '- '}{formatRupiahProyek(k.nominal)}
                         </td>
                         <td className="p-3 text-right">
                           <div className="flex gap-1 justify-end">
-                            <button
-                              onClick={() => { setEditData(k); setModalMode('edit'); setShowModal(true); }}
-                              className="text-blue-400 hover:text-blue-300 text-[10px] font-semibold px-1"
-                            >✏️</button>
-                            <button
-                              onClick={() => handleHapusClick(k)}
-                              className="text-rose-400 hover:text-rose-300 text-[10px] font-semibold px-1"
-                            >🗑️</button>
+                            {/* Iuran dikelola di halaman Tunai, jadi tombol aksi hanya muncul untuk data Kas */}
+                            {!isIuran ? (
+                              <>
+                                <button
+                                  onClick={() => { setEditData(k); setModalMode('edit'); setShowModal(true); }}
+                                  className="text-blue-400 hover:text-blue-300 text-[10px] font-semibold px-1"
+                                >✏️</button>
+                                <button
+                                  onClick={() => handleHapusClick(k)}
+                                  className="text-rose-400 hover:text-rose-300 text-[10px] font-semibold px-1"
+                                >🗑️</button>
+                              </>
+                            ) : (
+                              <span className="text-[9px] text-slate-500 italic px-1">di menu Tunai</span>
+                            )}
                           </div>
                         </td>
                       </tr>
