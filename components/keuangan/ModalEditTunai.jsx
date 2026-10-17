@@ -9,9 +9,8 @@ export default function ModalEditTunai({ batch, warga, tarifList, onClose, onSav
 
   useEffect(() => {
     if (batch) {
-      // Hitung total nominal lama (Iuran + Deposit) sebagai default
-      const totalIuran = batch.items.reduce((s, i) => s + Number(i.jumlah || 0), 0);
-      setNominal(String(totalIuran)); // Anggap default-nya iuran saja (deposit akan dihitung ulang)
+      // Ambil totalNominal (Iuran + Deposit) yang sudah dihitung dari parent
+      setNominal(String(batch.totalNominal || 0));
       setCatatan(batch.items[0]?.catatan || '');
       setTanggal(batch.items[0]?.tanggal_transaksi || new Date().toISOString().split('T')[0]);
     }
