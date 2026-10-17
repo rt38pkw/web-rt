@@ -190,20 +190,28 @@ export default function PageProyekKas() {
                 ) : (
                   riwayatKas.map((k) => {
                     const w = warga.find(x => x.id === k.warga_id);
+                    // ═══ LOGIKA TIPE & WARNA DIPERBAIKI ═══
+                    const isPengeluaran = k.tipe === 'pengeluaran';
+                    const isDonasi = k.tipe === 'donasi';
+                    
                     return (
                       <tr key={k.id} className="hover:bg-slate-800/40">
                         <td className="p-3 text-slate-400 whitespace-nowrap text-[10px]">{formatTanggalProyek(k.tanggal)}</td>
                         <td className="p-3">
                           <span className={`text-[10px] px-2 py-0.5 rounded border ${
-                            k.tipe === 'pengeluaran' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                            isPengeluaran ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' 
+                            : isDonasi ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' 
+                            : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                           }`}>
-                            {k.tipe === 'pengeluaran' ? '💸 Pengeluaran' : '↩️ Refund'}
+                            {isPengeluaran ? '💸 Pengeluaran' : isDonasi ? '💚 Donasi' : '↩️ Refund'}
                           </span>
                         </td>
                         <td className="p-3 text-slate-300">{w ? `${w.no_rumah} - ${w.nama_lengkap}` : '-'}</td>
                         <td className="p-3 text-slate-400 text-[11px]">{k.keterangan || '-'}</td>
-                        <td className={`p-3 text-right font-mono font-bold ${k.tipe === 'pengeluaran' ? 'text-rose-400' : 'text-amber-400'}`}>
-                          - {formatRupiahProyek(k.nominal)}
+                        <td className={`p-3 text-right font-mono font-bold ${
+                          isPengeluaran ? 'text-rose-400' : isDonasi ? 'text-purple-400' : 'text-amber-400'
+                        }`}>
+                          {isDonasi ? '+ ' : '- '}{formatRupiahProyek(k.nominal)}
                         </td>
                         <td className="p-3 text-right">
                           <div className="flex gap-1 justify-end">
@@ -247,7 +255,7 @@ export default function PageProyekKas() {
         submitting={submitting}
         title="Hapus Transaksi Kas"
         data={hapusData ? {
-          Tipe: hapusData.tipe === 'pengeluaran' ? 'Pengeluaran' : 'Refund',
+          Tipe: hapusData.tipe === 'pengeluaran' ? 'Pengeluaran' : hapusData.tipe === 'donasi' ? 'Donasi' : 'Refund',
           Nominal: formatRupiahProyek(hapusData.nominal),
           Keterangan: hapusData.keterangan || '-'
         } : {}}
@@ -255,7 +263,7 @@ export default function PageProyekKas() {
           <>
             ⚠️ <strong>Dampak:</strong>
             <div className="mt-1 text-[10px]">
-              Saldo Kas Proyek akan <strong>naik kembali</strong> sebesar {formatRupiahProyek(hapusData?.nominal || 0)}.
+              Saldo Kas Proyek akan <strong>{hapusData?.tipe === 'donasi' ? 'turun' : 'naik kembali'}</strong> sebesar {formatRupiahProyek(hapusData?.nominal || 0)}.
             </div>
           </>
         }
