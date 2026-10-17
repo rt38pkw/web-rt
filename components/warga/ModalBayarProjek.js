@@ -31,8 +31,11 @@ export default function ModalBayarProjek({
 
   const nominalNum = Number(nominal) || 0;
   const kelebihan = nominalNum - sisaWarga;
-  const terlaluBesar = kelebihan > 0;
   const terlaluKecil = nominalNum <= 0;
+
+  // Split: berapa masuk iuran, berapa jadi donasi
+  const masukIuran = Math.min(nominalNum, sisaWarga);
+  const masukDonasi = Math.max(0, kelebihan);
 
   const handleFileChange = (slotIndex, e) => {
     const file = e.target.files?.[0];
@@ -73,16 +76,18 @@ export default function ModalBayarProjek({
       setError('Nominal harus lebih dari 0');
       return;
     }
-    if (terlaluBesar) {
-      setError(`Kelebihan ${formatRupiahProyek(kelebihan)}. Maksimal: ${formatRupiahProyek(sisaWarga)}`);
-      return;
-    }
     if (!fileBukti[0]) {
       setError('Upload minimal 1 bukti pembayaran (slot 1)');
       return;
     }
 
-    await onSubmit({ nominal: nominalNum, fileBukti, catatan });
+    await onSubmit({
+      nominal: nominalNum,
+      nominalIuran: masukIuran,
+      nominalDonasi: masukDonasi,
+      fileBukti,
+      catatan,
+    });
   };
 
   return (
@@ -134,29 +139,22 @@ export default function ModalBayarProjek({
         {/* Nominal */}
         <div>
           <label className="text-xs font-semibold text-slate-300 block mb-2">
-            Nominal Cicilan <span className="text-slate-500">(bebas, maks sisa)</span>
+            Nominal Bayar <span className="text-slate-500">(bebas)</span>
           </label>
           <input
             type="number"
             value={nominal}
             onChange={(e) => setNominal(e.target.value)}
             placeholder="0"
-            className={`w-full bg-slate-950 border rounded-xl px-3 py-2.5 text-sm text-white font-mono ${
-              terlaluBesar ? 'border-rose-500 focus:border-rose-500' : 'border-slate-800 focus:border-blue-500/50'
-            } focus:outline-none`}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white font-mono focus:border-blue-500/50 focus:outline-none"
           />
-          {terlaluBesar && (
-            <p className="text-[10px] text-rose-400 mt-1">
-              ⚠️ Kelebihan {formatRupiahProyek(kelebihan)}. Maksimal {formatRupiahProyek(sisaWarga)}.
-            </p>
-          )}
           <div className="flex gap-1.5 mt-2 flex-wrap">
             <button
               type="button"
               onClick={() => setNominal(String(sisaWarga))}
               className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded"
             >
-              Lunas sisa ({formatRupiahProyek(sisaWarga)})
+              Pas Sisa ({formatRupiahProyek(sisaWarga)})
             </button>
             <button
               type="button"
@@ -167,6 +165,24 @@ export default function ModalBayarProjek({
             </button>
           </div>
         </div>
+
+        {/* ═══ PREVIEW SPLIT (Kalau ada kelebihan) ═══ */}
+        {nominalNum > 0 && masukDonasi > 0 && (
+          <div className="bg-purple-950/30 border border-purple-500/30 rounded-xl p-3 space-y-2">
+            <div className="text-[11px] font-semibold text-purple-300">📊 Rincian:</div>
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-400">→ Cicilan Iuran</span>
+              <strong className="text-emerald-400">{formatRupiahProyek(masukIuran)}</strong>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-400">→ Donasi (kelebihan)</span>
+              <strong className="text-purple-400">+ {formatRupiahProyek(masukDonasi)}</strong>
+            </div>
+            <p className="text-[9px] text-purple-300/70 leading-relaxed border-t border-purple-500/20 pt-1.5">
+              💡 Kelebihan otomatis tercatat sebagai <strong>donasi proyek</strong>. Uang ini tidak dikembalikan kecuali ada kebijakan refund dari pengelola.
+            </p>
+          </div>
+        )}
 
         {/* Upload 3 slot */}
         <div>
@@ -258,7 +274,7 @@ export default function ModalBayarProjek({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={submitting || terlaluBesar || terlaluKecil || !fileBukti[0]}
+            disabled={submitting || terlaluKecil || !fileBukti[0]}
             className="w-2/3 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-xs"
           >
             {submitting ? 'Mengirim...' : `Kirim Pengajuan ${formatRupiahProyek(nominalNum)}`}
