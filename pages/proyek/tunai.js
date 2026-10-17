@@ -309,14 +309,15 @@ export default function PageProyekTunai() {
                   <th className="p-3">Tanggal</th>
                   <th className="p-3">Warga</th>
                   <th className="p-3">Proyek</th>
-                  <th className="p-3 text-right">Nominal</th>
+                  <th className="p-3 text-right">Iuran</th>
+                  <th className="p-3 text-right">Donasi</th>
                   <th className="p-3 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {riwayatTunai.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="p-6 text-center text-slate-500">
+                    <td colSpan="6" className="p-6 text-center text-slate-500">
                       Belum ada cicilan tunai.
                     </td>
                   </tr>
@@ -324,6 +325,13 @@ export default function PageProyekTunai() {
                   riwayatTunai.map((item) => {
                     const w = warga.find((x) => x.id === item.warga_id);
                     const p = proyekList.find((x) => x.id === item.proyek_id);
+                    
+                    // Mencari data donasi berdasarkan batch_id yang sama
+                    const donasiTerkait = kasProyekList.find(
+                      (k) => k.tipe === 'donasi' && k.keterangan?.includes(item.batch_id?.slice(0, 8))
+                    );
+                    const nominalDonasi = donasiTerkait ? donasiTerkait.nominal : 0;
+
                     return (
                       <tr key={item.id} className="hover:bg-slate-800/40">
                         <td className="p-3 text-slate-400 whitespace-nowrap text-[10px]">
@@ -336,6 +344,9 @@ export default function PageProyekTunai() {
                         <td className="p-3 text-slate-300 text-[11px]">{p?.nama || '-'}</td>
                         <td className="p-3 text-right font-mono font-bold text-emerald-400">
                           {formatRupiahProyek(item.jumlah)}
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold text-purple-400">
+                          {nominalDonasi > 0 ? `+ ${formatRupiahProyek(nominalDonasi)}` : '-'}
                         </td>
                         <td className="p-3 text-right">
                           <div className="flex gap-1 justify-end">
