@@ -13,11 +13,14 @@ import {
 } from '../../lib/keuangan/hooks';
 
 export default function PageTunai() {
+  // ⚠️ PENTING: Pastikan hook useKeuanganData mengembalikan data 'deposit'
+  // Jika namanya 'depositWarga', sesuaikan namanya di bawah ini.
   const {
     user,
     iuran = [],
     warga = [],
     tarifList = [],
+    deposit = [], 
     loading,
     refetch,
   } = useKeuanganData();
@@ -34,22 +37,33 @@ export default function PageTunai() {
 
   const iuranList = Array.isArray(iuran) ? iuran : [];
   const wargaList = Array.isArray(warga) ? warga : [];
+  const depositList = Array.isArray(deposit) ? deposit : []; // Fallback jika kosong
 
   // ═══ RIWAYAT TUNAI ═══
   const riwayatTunai = useMemo(() => {
     const tunaiRecords = iuranList.filter((i) => i.metode === 'tunai');
     const grouped = {};
+    
     tunaiRecords.forEach((i) => {
       const key = i.batch_id || i.id;
-      if (!grouped[key]) grouped[key] = { batchId: key, items: [] };
+      if (!grouped[key]) {
+        // Cari apakah ada deposit untuk batch ini
+        const dep = depositList.find(d => d.keterangan?.includes(key.slice(0, 8)));
+        grouped[key] = { 
+          batchId: key, 
+          items: [],
+          totalDeposit: dep ? dep.jumlah : 0 
+        };
+      }
       grouped[key].items.push(i);
     });
+    
     return Object.values(grouped).sort((a, b) => {
       const ta = a.items[0]?.tanggal_transaksi || '';
       const tb = b.items[0]?.tanggal_transaksi || '';
       return tb.localeCompare(ta);
     });
-  }, [iuranList]);
+  }, [iuranList, depositList]);
 
   if (typeof window === 'undefined') return null;
 
@@ -123,9 +137,13 @@ export default function PageTunai() {
     }
   }
 
-  // ═══ EDIT TUNAI (LOGIKA BARU: DISTRIBUSI ULANG) ═══
+  // ═══ EDIT TUNAI ═══
   function handleEditTunai(batch) {
-    setModalEditTunai(batch);
+    // Hitung total Iuran + Total Deposit untuk dilempar ke Modal
+    const totalIuran = batch.items.reduce((s, i) => s + Number(i.jumlah || 0), 0);
+    const totalNominal = totalIuran + (batch.totalDeposit || 0);
+    
+    setModalEditTunai({ ...batch, totalNominal });
   }
 
   async function handleSaveEditTunai({ batchId, nominalTotal, catatan, tanggal }) {
