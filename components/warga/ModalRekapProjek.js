@@ -2,11 +2,12 @@ import { formatRupiahProyek } from '../../lib/proyek/constants';
 import { getTotalTerbayar } from '../../lib/proyek/calculations';
 
 export default function ModalRekapProjek({ show, onClose, proyek, wargaList, iuranProyekList }) {
+  // ═══ GUARD: Kalau proyek belum ada, jangan render ═══
   if (!show || !proyek) return null;
 
   const wargaSafe = Array.isArray(wargaList) ? wargaList : [];
   const iuranSafe = Array.isArray(iuranProyekList) ? iuranProyekList : [];
-  const target = Number(proyek.nominal_per_warga);
+  const target = Number(proyek.nominal_per_warga || 0);
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
@@ -42,6 +43,7 @@ export default function ModalRekapProjek({ show, onClose, proyek, wargaList, iur
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {wargaSafe.map((w) => {
+                // Safe call — getTotalTerbayar juga sudah di-guard di dalamnya
                 const terbayar = getTotalTerbayar(iuranSafe, w.id, proyek.id);
                 const lunas = terbayar >= target;
                 const kurang = target - terbayar;
