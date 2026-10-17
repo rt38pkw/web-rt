@@ -1,7 +1,19 @@
 import { formatRupiahProyek, formatTanggalProyek, hitungSisaHari, isProyekTelat } from '../../lib/proyek/constants';
 
-export default function ProjekCard({ proyek, terbayar, sisa, statusWarga, adaPending, donasiWarga = 0, onBayar }) {
-  const target = Number(proyek.nominal_per_warga);
+export default function ProjekCard({ 
+  proyek, 
+  terbayar = 0, 
+  sisa = 0, 
+  statusWarga, 
+  adaPending = false, 
+  donasiWarga = 0, 
+  onBayar,
+  onLihatRekap,
+}) {
+  // ═══ GUARD ═══
+  if (!proyek) return null;
+
+  const target = Number(proyek.nominal_per_warga || 0);
   const persen = target > 0 ? Math.min(100, Math.round((terbayar / target) * 100)) : 0;
   const sisaHari = hitungSisaHari(proyek.deadline);
   const telat = isProyekTelat(proyek);
@@ -72,7 +84,6 @@ export default function ProjekCard({ proyek, terbayar, sisa, statusWarga, adaPen
         </div>
       </div>
 
-      {/* Info Donasi */}
       {donasiWarga > 0 && (
         <div className="bg-purple-950/30 border border-purple-500/30 rounded-xl p-2.5 text-[11px] flex justify-between items-center">
           <span className="text-purple-300">💚 Donasi Anda untuk proyek ini:</span>
@@ -106,6 +117,13 @@ export default function ProjekCard({ proyek, terbayar, sisa, statusWarga, adaPen
           Proyek sudah selesai.
         </div>
       )}
+
+      <button
+        onClick={onLihatRekap}
+        className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold py-2 rounded-xl border border-slate-700 transition"
+      >
+        📋 Lihat Rekap Warga
+      </button>
     </div>
   );
 }
