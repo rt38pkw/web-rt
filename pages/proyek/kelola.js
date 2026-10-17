@@ -4,9 +4,11 @@ import Layout from '../../components/proyek/Layout';
 import { useProyekData, getPendingProyekCount, invalidateProyekCache } from '../../lib/proyek/hooks';
 import { formatRupiahProyek, formatTanggalProyek, isProyekTelat } from '../../lib/proyek/constants';
 import { getProgressProyek } from '../../lib/proyek/calculations';
+import { canDeleteProyek } from '../../lib/proyek/kas';
+import { insertKasProyekBulk } from '../../lib/proyek/kas';
 
 export default function PageProyekKelola() {
-  const { user, warga, proyekList, iuranProyekList, loading, refetch } = useProyekData();
+  const { user, warga, proyekList, iuranProyekList, kasProyekList, loading, refetch } = useProyekData();
 
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -49,10 +51,28 @@ export default function PageProyekKelola() {
       return;
     }
 
+    // WARNING kalau edit & ada transaksi (karena nominal berubah)
+    if (editId) {
+      const proyekLama = proyekList.find(p => p.id === editId);
+      const transaksiAda = iuranProyekList.some(i => i.proyek_id === editId && i.status === 'approved');
+
+      if (proyekLama && Number(nominal) !== Number(proyekLama.nominal_per_warga) && transaksiAda) {
+        const ok = confirm(
+          `⚠️ PERINGATAN PERUBAHAN NOMINAL!\n\n` +
+          `Nominal proyek akan diubah dari ${formatRupiahProyek(proyekLama.nominal_per_warga)} ` +
+          `menjadi ${formatRupiahProyek(nominal)}.\n\n` +
+          `Proyek ini sudah memiliki transaksi cicilan. Mengubah nominal akan:\n` +
+          `• Menghitung ulang status Lunas/Kurang semua warga\n` +
+          `• Beberapa warga yang tadinya Lunas bisa berubah menjadi Kurang\n\n` +
+          `Pastikan Anda sudah menginfokan hal ini ke warga. Lanjutkan?`
+        );
+        if (!ok) return;
+      }
+    }
+
     setSubmitting(true);
     try {
       if (editId) {
-        // Update
         const { error } = await supabase
           .from('proyek')
           .update({
@@ -65,7 +85,6 @@ export default function PageProyekKelola() {
         if (error) throw error;
         alert('✅ Proyek berhasil diupdate!');
       } else {
-        // Insert
         const { error } = await supabase.from('proyek').insert([
           {
             nama: nama.trim(),
@@ -91,34 +110,68 @@ export default function PageProyekKelola() {
     }
   };
 
-  const handleUbahStatus = async (proyek, statusBaru) => {
-    if (!confirm(`Ubah status proyek "${proyek.nama}" jadi "${statusBaru}"?`)) return;
+  // ═══ BATALKAN PROYEK (Baru) ═══
+  const handleBatalkan = async (proyek) => {
+    const konfirmasi = confirm(
+      `⚠️ BATALKAN PROYEK\n\n` +
+      `Proyek "${proyek.nama}" akan dihentikan.\n\n` +
+      `Semua iuran yang sudah masuk (approved) akan diubah menjadi DONASI PROYEK.\n` +
+      `Warga tidak bisa lagi membayar cicilan untuk proyek ini.\n\n` +
+      `Anda bisa melakukan refund manual ke warga melalui menu "Kas Proyek".\n\n` +
+      `Lanjutkan membatalkan?`
+    );
+    if (!konfirmasi) return;
+
     try {
+      // 1. Hitung total iuran per warga untuk dikonversi ke donasi
+      const totalIuranPerWarga = {};
+      iuranProyekList
+        .filter(i => i.proyek_id === proyek.id && i.status === 'approved')
+        .forEach(i => {
+          if (!totalIuranPerWarga[i.warga_id]) totalIuranPerWarga[i.warga_id] = 0;
+          totalIuranPerWarga[i.warga_id] += Number(i.jumlah || 0);
+        });
+
+      // 2. Siapkan record baru untuk kas_proyek (donasi)
+      const donasiRecords = Object.keys(totalIuranPerWarga).map(wargaId => ({
+        proyek_id: proyek.id,
+        warga_id: wargaId,
+        tipe: 'donasi',
+        tanggal: new Date().toISOString().split('T')[0],
+        nominal: totalIuranPerWarga[wargaId],
+        keterangan: `Konversi iuran ke donasi (proyek dibatalkan)`,
+        created_by: user?.id,
+      }));
+
+      // 3. Insert donasi (kalau ada)
+      if (donasiRecords.length > 0) {
+        await insertKasProyekBulk(donasiRecords);
+      }
+
+      // 4. Update status proyek jadi batal
       const { error } = await supabase
         .from('proyek')
-        .update({ status: statusBaru })
+        .update({ status: 'batal' })
         .eq('id', proyek.id);
       if (error) throw error;
-      alert('✅ Status proyek diubah!');
+
+      alert('✅ Proyek dibatalkan. Iuran warga sudah dipindahkan ke Donasi Proyek.');
       invalidateProyekCache();
       refetch();
     } catch (err) {
-      alert('Gagal: ' + err.message);
+      alert('Gagal membatalkan: ' + err.message);
     }
   };
 
+  // ═══ HAPUS PROYEK (Hanya kalau kosong) ═══
   const handleHapus = async (proyek) => {
-    // Cek apakah sudah ada transaksi
-    const jumlahTransaksi = iuranProyekList.filter((i) => i.proyek_id === proyek.id).length;
+    const bisaHapus = await canDeleteProyek(proyek.id);
+    if (!bisaHapus) {
+      alert('❌ Proyek ini sudah memiliki transaksi. Gunakan tombol "Batalkan Proyek" jika ingin menghentikan.');
+      return;
+    }
 
-    const msg = jumlahTransaksi > 0
-      ? `⚠️ Proyek "${proyek.nama}" sudah punya ${jumlahTransaksi} transaksi cicilan.\n\n` +
-        `Menghapus proyek akan menghapus SEMUA transaksi cicilan terkait.\n\n` +
-        `Yakin mau hapus?`
-      : `Hapus proyek "${proyek.nama}"?`;
-
-    if (!confirm(msg)) return;
-
+    if (!confirm(`Hapus proyek "${proyek.nama}"? (Proyek ini masih kosong tanpa transaksi)`)) return;
     try {
       const { error } = await supabase.from('proyek').delete().eq('id', proyek.id);
       if (error) throw error;
@@ -147,7 +200,7 @@ export default function PageProyekKelola() {
         <div className="flex justify-between items-center flex-wrap gap-3">
           <div>
             <h2 className="text-sm font-bold text-white">➕ Kelola Proyek</h2>
-            <p className="text-[11px] text-slate-400">Buat proyek baru, edit, atau ubah status</p>
+            <p className="text-[11px] text-slate-400">Buat, edit, batalkan, atau hapus proyek</p>
           </div>
           <button
             onClick={() => {
@@ -276,7 +329,7 @@ export default function PageProyekKelola() {
                           <span className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded">Selesai</span>
                         )}
                         {proyek.status === 'batal' && (
-                          <span className="text-[10px] bg-slate-500/10 text-slate-400 border border-slate-500/20 px-2 py-0.5 rounded">Batal</span>
+                          <span className="text-[10px] bg-slate-500/10 text-slate-400 border border-slate-500/20 px-2 py-0.5 rounded">Dibatalkan</span>
                         )}
                       </div>
                       {proyek.deskripsi && (
@@ -308,10 +361,6 @@ export default function PageProyekKelola() {
                         style={{ width: `${progress.persen}%` }}
                       />
                     </div>
-                    <div className="flex justify-between text-[10px] mt-1.5">
-                      <span className="text-emerald-400">Terbayar: {formatRupiahProyek(progress.totalTerbayar)}</span>
-                      <span className="text-amber-400">Sisa: {formatRupiahProyek(progress.totalSisa)}</span>
-                    </div>
                   </div>
 
                   {/* Aksi */}
@@ -324,10 +373,10 @@ export default function PageProyekKelola() {
                     </button>
                     {proyek.status === 'aktif' && (
                       <button
-                        onClick={() => handleUbahStatus(proyek, 'selesai')}
-                        className="text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded-lg"
+                        onClick={() => handleBatalkan(proyek)}
+                        className="text-[11px] bg-orange-600 hover:bg-orange-500 text-white font-semibold px-3 py-1.5 rounded-lg"
                       >
-                        ✓ Tandai Selesai
+                        🚫 Batalkan
                       </button>
                     )}
                     {proyek.status === 'selesai' && (
