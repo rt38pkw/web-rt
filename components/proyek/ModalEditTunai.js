@@ -19,12 +19,13 @@ export default function ModalEditTunai({ data, warga, proyek, onClose, onSave })
 
   const nominalNum = Number(nominal) || 0;
   const targetPerWarga = Number(proyek?.nominal_per_warga || 0);
-  const terlaluBesar = nominalNum > targetPerWarga;
   const terlaluKecil = nominalNum <= 0;
+  
+  // Validasi terlaluBesar DIHAPUS agar bisa input Total (Iuran + Donasi)
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (terlaluKecil || terlaluBesar) return;
+    if (terlaluKecil) return;
 
     setSubmitting(true);
     try {
@@ -73,22 +74,18 @@ export default function ModalEditTunai({ data, warga, proyek, onClose, onSave })
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">
-              Nominal (Rp)
+              Total Diterima (Rp)
             </label>
             <input
               type="number"
               value={nominal}
               onChange={(e) => setNominal(e.target.value)}
               required
-              className={`w-full bg-slate-950 border rounded-xl px-3 py-2 text-sm text-white font-mono ${
-                terlaluBesar ? 'border-rose-500' : 'border-slate-800'
-              }`}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-mono"
             />
-            {terlaluBesar && (
-              <p className="text-[10px] text-rose-400 mt-1">
-                ⚠️ Tidak boleh lebih dari target per warga ({formatRupiahProyek(targetPerWarga)})
-              </p>
-            )}
+            <p className="text-[10px] text-slate-500 mt-1">
+              *Nominal di atas target akan otomatis dihitung sebagai Donasi.
+            </p>
           </div>
 
           <div>
@@ -127,7 +124,7 @@ export default function ModalEditTunai({ data, warga, proyek, onClose, onSave })
             </button>
             <button
               type="submit"
-              disabled={submitting || terlaluBesar || terlaluKecil}
+              disabled={submitting || terlaluKecil}
               className="w-1/2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-xs"
             >
               {submitting ? 'Menyimpan...' : '💾 Simpan'}
