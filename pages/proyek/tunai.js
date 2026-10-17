@@ -111,15 +111,59 @@ export default function PageProyekTunai() {
     }
   };
 
-  // ═══ EDIT TUNai ═══
+  // ═══ EDIT TUNai (UPDATE IURAN & DONASI) ═══
   const handleSaveEdit = async ({ id, jumlah, tanggal, catatan }) => {
     try {
-      const { error } = await supabase
+      const itemLama = modalEdit;
+      const proyek = proyekList.find((p) => p.id === itemLama.proyek_id);
+      
+      // 1. Hitung sisa SEBELUM transaksi ini diedit
+      const sisaSaatIni = getSisaWarga(iuranProyekList, itemLama.warga_id, proyek);
+      const sisaTanpaIni = sisaSaatIni + itemLama.jumlah;
+
+      // 2. Hitung ulang alokasi (Iuran vs Donasi)
+      const iuranBaru = Math.min(jumlah, sisaTanpaIni);
+      const donasiBaru = Math.max(0, jumlah - sisaTanpaIni);
+
+      // 3. Update tabel iuran_proyek
+      const { error: errIuran } = await supabase
         .from('iuran_proyek')
-        .update({ jumlah, tanggal, catatan, tanggal_transaksi: tanggal })
+        .update({ jumlah: iuranBaru, tanggal, catatan, tanggal_transaksi: tanggal })
         .eq('id', id);
-      if (error) throw error;
-      alert('✅ Cicilan tunai diupdate!');
+      if (errIuran) throw errIuran;
+
+      // 4. Sinkronisasi tabel kas_proyek (Donasi)
+      if (itemLama.batch_id) {
+        const { data: kasLama, error: errCariKas } = await supabase
+          .from('kas_proyek')
+          .select('id')
+          .eq('tipe', 'donasi')
+          .like('keterangan', `%${itemLama.batch_id.slice(0, 8)}%`);
+
+        if (errCariKas) throw errCariKas;
+
+        if (kasLama && kasLama.length > 0) {
+          if (donasiBaru > 0) {
+            // Update nominal donasi jika masih ada kelebihan
+            await supabase.from('kas_proyek').update({ nominal: donasiBaru, tanggal }).eq('id', kasLama[0].id);
+          } else {
+            // Hapus donasi jika diedit jadi pas / kurang
+            await supabase.from('kas_proyek').delete().eq('id', kasLama[0].id);
+          }
+        } else if (donasiBaru > 0) {
+          // Buat donasi baru jika sebelumnya tidak ada, tapi diedit jadi lebih
+          await insertKasProyek({
+            proyek_id: itemLama.proyek_id,
+            warga_id: itemLama.warga_id,
+            tipe: 'donasi',
+            tanggal,
+            nominal: donasiBaru,
+            keterangan: `Donasi dari kelebihan bayar tunai (batch ${itemLama.batch_id.slice(0, 8)})`,
+          });
+        }
+      }
+
+      alert('✅ Transaksi tunai & donasi berhasil disesuaikan!');
       setModalEdit(null);
       invalidateProyekCache();
       refetch();
@@ -128,18 +172,29 @@ export default function PageProyekTunai() {
     }
   };
 
-  // ═══ HAPUS TUNai ═══
+  // ═══ HAPUS TUNai (HAPUS IURAN & DONASI) ═══
   const confirmHapus = async () => {
     if (!modalHapus) return;
     setHapusSubmitting(true);
     try {
-      const { error } = await supabase
+      // 1. Hapus dari iuran_proyek
+      const { error: errIuran } = await supabase
         .from('iuran_proyek')
         .delete()
         .eq('id', modalHapus.id);
-      if (error) throw error;
+      if (errIuran) throw errIuran;
 
-      alert('✅ Cicilan tunai dihapus.');
+      // 2. Hapus donasi terkait di kas_proyek (jika ada batch_id)
+      if (modalHapus.batch_id) {
+        const { error: errKas } = await supabase
+          .from('kas_proyek')
+          .delete()
+          .eq('tipe', 'donasi')
+          .like('keterangan', `%${modalHapus.batch_id.slice(0, 8)}%`);
+        if (errKas) throw errKas;
+      }
+
+      alert('✅ Cicilan tunai & donasi terkait berhasil dihapus.');
       setModalHapus(null);
       invalidateProyekCache();
       refetch();
@@ -326,7 +381,6 @@ export default function PageProyekTunai() {
                     const w = warga.find((x) => x.id === item.warga_id);
                     const p = proyekList.find((x) => x.id === item.proyek_id);
                     
-                    // Mencari data donasi berdasarkan batch_id yang sama
                     const donasiTerkait = kasProyekList.find(
                       (k) => k.tipe === 'donasi' && k.keterangan?.includes(item.batch_id?.slice(0, 8))
                     );
@@ -399,6 +453,7 @@ export default function PageProyekTunai() {
             <div className="mt-1 text-[10px]">
               • Progress proyek akan <strong>turun</strong><br />
               • Sisa tunggakan warga akan <strong>naik</strong><br />
+              • <strong>Donasi terkait juga akan dihapus</strong><br />
               • Riwayat warga akan update otomatis
             </div>
           </>
