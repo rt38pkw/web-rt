@@ -6,6 +6,7 @@ const MENU = [
   { key: 'dashboard', i: '📊', l: 'Dashboard', path: '/proyek/dashboard' },
   { key: 'verifikasi', i: '⏳', l: 'Verifikasi', path: '/proyek/verifikasi' },
   { key: 'tunai', i: '💵', l: 'Tunai', path: '/proyek/tunai' },
+  { key: 'kas', i: '💰', l: 'Kas Proyek', path: '/proyek/kas' }, // <-- MENU BARU
   { key: 'tunggakan', i: '⚠️', l: 'Tunggakan', path: '/proyek/tunggakan' },
   { key: 'kelola', i: '➕', l: 'Kelola', path: '/proyek/kelola' },
 ];
@@ -37,7 +38,6 @@ export default function Layout({ user, pendingCount = 0, children }) {
           <div className="flex items-center gap-2 shrink-0">
             {user && <NotifToggle userId={user.id} userType="pengurus" />}
 
-            {/* ← Admin hanya untuk ketua */}
             {isKetua && (
               <Link
                 href="/admin"
