@@ -4,7 +4,7 @@ import { getInfoTagihan, distribusikanTunai } from '../../lib/keuangan/tunai';
 export default function TabTunai({
   warga = [],
   iuran = [],
-  bulanList = [], // Diambil dari parent
+  bulanList = [],
   tunaiWargaId,
   setTunaiWargaId,
   tunaiNominal,
@@ -24,8 +24,8 @@ export default function TabTunai({
   const tarif = w ? (w.kategori === 'Usaha' ? 30000 : 15000) : 0;
   const iuranWarga = iuran.filter((i) => i.warga_id === tunaiWargaId);
 
-  // LOGIKA INFO TAGIHAN & PREVIEW (Diambil dari kode yang kamu kirim)
-  const { list: infoTagihan, totalTagihan } = w
+  // LOGIKA INFO TAGIHAN & PREVIEW
+  const { list: infoTagihan, totalTagihan: totalTagihanFull } = w
     ? getInfoTagihan(bulanList, iuranWarga, tarif)
     : { list: [], totalTagihan: 0 };
 
@@ -36,6 +36,19 @@ export default function TabTunai({
     : { hasil: [], totalPakai: 0, sisaUang: 0 };
 
   const bisaSimpan = !tunaiSubmitting && tunaiWargaId && nominalNum > 0;
+
+  // ═══ FILTER TOTAL TAGIHAN SAMPAI BULAN INI ═══
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1; // 1-12
+
+  const totalTagihanSampaiSekarang = infoTagihan
+    .filter((b) => {
+      const [tahun, bulan] = b.kode.split('-').map(Number);
+      if (tahun < currentYear) return true; // Tahun lalu pasti tunggakan
+      if (tahun > currentYear) return false; // Tahun depan belum jadi tunggakan
+      return bulan <= currentMonth; // Tahun ini, potong sampai bulan berjalan
+    })
+    .reduce((sum, b) => sum + (b.kekurangan || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -119,8 +132,9 @@ export default function TabTunai({
 
           <div className="flex justify-between items-center pt-3 border-t border-slate-800 mt-2">
             <div>
-              <div className="text-[10px] text-slate-500 uppercase">Total Tagihan</div>
-              <div className="text-sm font-bold text-amber-400">{formatRupiah(totalTagihan)}</div>
+              <div className="text-[10px] text-slate-500 uppercase">Total Tagihan<br/><span className="text-[8px]">(Sampai bulan ini)</span></div>
+              {/* MENAMPILKAN TAGIHAN SAMPAI BULAN INI SAJA */}
+              <div className="text-sm font-bold text-amber-400">{formatRupiah(totalTagihanSampaiSekarang)}</div>
             </div>
             <button
               type="submit"
@@ -145,7 +159,7 @@ export default function TabTunai({
                 <div className="p-3 border-b border-slate-800 flex justify-between items-center">
                   <h3 className="text-xs font-bold text-white">📊 Info Tagihan</h3>
                   <span className="text-[10px] text-amber-400 font-bold">
-                    Total: {formatRupiah(totalTagihan)}
+                    Total Tunggakan: {formatRupiah(totalTagihanSampaiSekarang)}
                   </span>
                 </div>
                 <div className="overflow-x-auto max-h-[200px] overflow-y-auto">
