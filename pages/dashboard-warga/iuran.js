@@ -46,7 +46,7 @@ export default function DashboardWargaIuran() {
   useEffect(() => {
     const savedSession = localStorage.getItem('warga_session');
     if (!savedSession) {
-      router.replace('/');
+      router.push('/');
       return;
     }
     const userData = JSON.parse(savedSession);
@@ -55,18 +55,34 @@ export default function DashboardWargaIuran() {
     loadDeposit(userData.id);
     loadTarif();
     refreshSession(userData.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ═══ REALTIME: Dengerin perubahan dari Admin ═══
+  useEffect(() => {
+    if (!warga?.id) return;
+
+    const channel = supabase
+      .channel('warga-iuran-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran' }, () => {
+        loadIuran(warga.id);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deposit_warga' }, () => {
+        loadDeposit(warga.id);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [warga?.id]);
 
   const refreshSession = async (wargaId) => {
     try {
       const data = await fetchWargaById(wargaId);
       setWarga(data);
-      
-      // ═══ PERBAIKAN: HAPUS PASSWORD SEBELUM DISIMPAN LAGI KE LOCALSTORAGE ═══
+      // Hapus password sebelum disimpan ke lokal
       const { password: _, ...profilAman } = data;
       localStorage.setItem('warga_session', JSON.stringify(profilAman));
-      
     } catch (err) {
       console.error('Gagal refresh session:', err);
     }
@@ -124,11 +140,10 @@ export default function DashboardWargaIuran() {
     }
   };
 
-  // ═══ PERBAIKAN FUNGSI LOGOUT ═══
   const handleLogout = () => {
     if (!confirm('Keluar dari akun warga?')) return;
     localStorage.removeItem('warga_session');
-    router.replace('/'); // Pakai replace agar tidak bisa di-back
+    router.replace('/');
   };
 
   if (!warga) return null;
