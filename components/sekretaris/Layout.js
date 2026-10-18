@@ -14,7 +14,7 @@ export default function Layout({ user, children }) {
 
   const handleLogout = () => {
     if (!confirm('Keluar dari akun pengurus?')) return;
-    sessionStorage.removeItem('pengurusSession');
+    localStorage.removeItem('pengurusSession'); // Ubah ke localStorage
     window.location.replace('/admin');
   };
 
