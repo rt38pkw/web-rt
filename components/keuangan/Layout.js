@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import NotifToggle from '../NotifToggle';
 
-// ═══ MENU UTAMA ═══
 const MENU_MAIN = [
   { key: 'dashboard', i: '📊', l: 'Dashboard', path: '/keuangan/dashboard' },
   { key: 'tarif', i: '💰', l: 'Tarif', path: '/keuangan/tarif' },
@@ -15,7 +14,6 @@ const MENU_MAIN = [
   { key: 'riwayat', i: '📋', l: 'Riwayat', path: '/keuangan/riwayat' },
 ];
 
-// ═══ MENU PROYEK (operator) ═══
 const MENU_PROYEK = [
   { key: 'projek', i: '🏗️', l: 'Projek', path: '/keuangan/projek' },
 ];
@@ -23,20 +21,15 @@ const MENU_PROYEK = [
 export default function Layout({ user, pendingCount = 0, children }) {
   const router = useRouter();
 
-  // ── Cek role ──
   const isOperatorProyek = user?.role === 'bendahara_2';
   const isKetua = user?.role === 'ketua';
 
-  // ── Menu sesuai role ──
   const MENU = isOperatorProyek ? MENU_PROYEK : MENU_MAIN;
-
   const activeKey = MENU.find((m) => router.pathname.startsWith(m.path))?.key;
 
-  // ── Logout ──
   const handleLogout = () => {
     if (!confirm('Keluar dari akun pengurus?')) return;
-    sessionStorage.removeItem('pengurusSession');
-    // DIUBAH MENJADI /admin
+    localStorage.removeItem('pengurusSession'); // Ubah ke localStorage
     window.location.replace('/admin');
   };
 
@@ -56,7 +49,6 @@ export default function Layout({ user, pendingCount = 0, children }) {
           <div className="flex items-center gap-2 shrink-0">
             {user && <NotifToggle userId={user.id} userType="pengurus" />}
 
-            {/* ← Admin hanya untuk ketua */}
             {isKetua && (
               <Link
                 href="/admin"
@@ -66,7 +58,6 @@ export default function Layout({ user, pendingCount = 0, children }) {
               </Link>
             )}
 
-            {/* Keluar untuk semua */}
             <button
               onClick={handleLogout}
               className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-2 rounded-lg border border-rose-500/20 font-medium"
