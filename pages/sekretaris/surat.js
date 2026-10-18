@@ -5,7 +5,8 @@ export default function SekretarisSurat() {
   const [user, setUser] = useState(null);
   
   useEffect(() => {
-    const saved = sessionStorage.getItem('pengurusSession');
+    // UBAH KE LOCALSTORAGE
+    const saved = localStorage.getItem('pengurusSession');
     if (saved) setUser(JSON.parse(saved));
     else window.location.replace('/admin');
   }, []);
