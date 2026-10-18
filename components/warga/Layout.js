@@ -2,11 +2,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import InstallButton from '../InstallButton';
 
+// MENU PENGUMUMAN DAN SURAT SUDAH DIHAPUS
 const MENU = [
   { key: 'iuran', label: 'Status Iuran', icon: '💰', path: '/dashboard-warga/iuran' },
   { key: 'projek', label: 'Projek', icon: '🏗️', path: '/dashboard-warga/projek' },
-  { key: 'pengumuman', label: 'Pengumuman', icon: '📢', path: '/dashboard-warga/pengumuman' },
-  { key: 'surat', label: 'Surat Mandiri', icon: '📄', path: '/dashboard-warga/surat' },
 ];
 
 export default function Layout({ children, warga, onLogout }) {
