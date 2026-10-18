@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import NotifToggle from '../NotifToggle';
-import InstallButton from '../InstallButton';
 
 // ═══ MENU UTAMA ═══
 const MENU_MAIN = [
@@ -54,7 +53,8 @@ export default function Layout({ user, pendingCount = 0, children }) {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {!isOperatorProyek && <InstallButton />}
+            {/* <InstallButton /> DIHAPUS DARI SINI */}
+            
             {user && <NotifToggle userId={user.id} userType="pengurus" />}
 
             {/* ← Admin hanya untuk ketua */}
