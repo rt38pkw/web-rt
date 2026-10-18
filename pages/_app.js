@@ -1,31 +1,30 @@
-import { useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import '../styles/globals.css';
-import InstallPrompt from '../components/InstallPrompt';
 
-function MyApp({ Component, pageProps }) {
+export default function App({ Component, pageProps }) {
   const router = useRouter();
-  const isPengurusPage = router.pathname.startsWith('/admin');
-
-  // Register service worker (PWA)
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker
-          .register('/sw.js')
-          .then((reg) => console.log('✅ Service Worker registered:', reg.scope))
-          .catch((err) => console.log('❌ SW registration failed:', err));
-      });
-    }
-  }, []);
+  
+  // Cek apakah sedang di halaman admin atau warga
+  const isAdmin = router.pathname.startsWith('/admin');
+  const isWarga = router.pathname.startsWith('/dashboard-warga') || router.pathname.startsWith('/warga');
 
   return (
     <>
+      <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        
+        {/* Pilih manifest yang sesuai */}
+        {isAdmin ? (
+          <link rel="manifest" href="/manifest-admin.json" />
+        ) : isWarga ? (
+          <link rel="manifest" href="/manifest-warga.json" />
+        ) : (
+          <link rel="manifest" href="/manifest.json" />
+        )}
+      </Head>
+      
       <Component {...pageProps} />
-      {!isPengurusPage && <InstallPrompt />}
     </>
   );
 }
-
-export default MyApp;
