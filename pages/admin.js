@@ -27,7 +27,8 @@ export default function AdminDashboard() {
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
-    const savedUser = sessionStorage.getItem('pengurusSession');
+    // CEK SAVE LOGIN (LOCALSTORAGE)
+    const savedUser = localStorage.getItem('pengurusSession');
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser);
 
@@ -67,8 +68,10 @@ export default function AdminDashboard() {
       return;
     }
 
-    setUser(data);
-    sessionStorage.setItem('pengurusSession', JSON.stringify(data));
+    // SIMPAN DATA TANPA PASSWORD (AMAN)
+    const { password: _, ...profilAman } = data;
+    setUser(profilAman);
+    localStorage.setItem('pengurusSession', JSON.stringify(profilAman));
 
     if (data.role === 'bendahara') {
       window.location.replace('/keuangan/dashboard');
@@ -88,7 +91,7 @@ export default function AdminDashboard() {
 
   const handleLogout = () => {
     if (!confirm('Keluar dari akun pengurus?')) return;
-    sessionStorage.removeItem('pengurusSession');
+    localStorage.removeItem('pengurusSession'); // Hapus dari localStorage
     window.location.replace('/admin');
   };
 
@@ -152,9 +155,14 @@ export default function AdminDashboard() {
       alert(`Gagal memperbarui profil: ${error.message}`);
     } else {
       alert('Profil/Password berhasil diperbarui! Gunakan kredensial baru saat login berikutnya.');
-      const updatedUser = { ...user, ...updateData };
+      
+      // Update local state dan localStorage (tanpa password)
+      const updatedUser = { ...user };
+      if (updateData.username) updatedUser.username = updateData.username;
+      
       setUser(updatedUser);
-      sessionStorage.setItem('pengurusSession', JSON.stringify(updatedUser));
+      localStorage.setItem('pengurusSession', JSON.stringify(updatedUser));
+      
       setShowPassModal(false);
       setNewPassword('');
       setConfirmPassword('');
@@ -222,8 +230,6 @@ export default function AdminDashboard() {
               {loading ? 'Memeriksa Akses...' : 'Masuk Dashboard'}
             </button>
           </form>
-          
-          {/* LINK KEMBALI KE HALAMAN WARGA SUDAH DIHAPUS */}
         </div>
       </div>
     );
@@ -375,9 +381,6 @@ export default function AdminDashboard() {
               <p className="text-xs text-slate-600 mt-1">Khusus akses Ketua & Operator Proyek.</p>
             </div>
           )}
-
-          {/* KARTU PENGAJUAN SURAT DAN WEB UTAMA SUDAH DIHAPUS */}
-          
         </div>
       </main>
 
