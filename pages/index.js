@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { createClient } from '@supabase/supabase-js';
 import Head from 'next/head';
+import InstallButton from '../components/InstallButton'; // TAMBAHAN IMPORT
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -49,17 +50,22 @@ export default function Home() {
       </Head>
 
       {/* Header / Navigasi Atas */}
-     <header className="px-4 py-3 border-b border-slate-800/80 flex items-center bg-slate-900/40 backdrop-blur sticky top-0 z-50">
-  <div className="flex items-center space-x-3 overflow-hidden">
-    <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0 shadow-md">
-      <img src="/logo-rt38.png" alt="Logo RT 38" className="w-full h-full object-cover" />
-    </div>
-    <div>
-      <h1 className="font-bold text-xs sm:text-sm tracking-wide text-white leading-tight">RT 38 PURI KENCANA WAGIR</h1>
-      <p className="text-[10px] sm:text-xs text-slate-400">Rukun • Peduli • Bersama</p>
-    </div>
-  </div>
-</header>
+     <header className="px-4 py-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/40 backdrop-blur sticky top-0 z-50">
+        <div className="flex items-center space-x-3 overflow-hidden">
+          <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0 shadow-md">
+            <img src="/logo-rt38.png" alt="Logo RT 38" className="w-full h-full object-cover" />
+          </div>
+          <div>
+            <h1 className="font-bold text-xs sm:text-sm tracking-wide text-white leading-tight">RT 38 PURI KENCANA WAGIR</h1>
+            <p className="text-[10px] sm:text-xs text-slate-400">Rukun • Peduli • Bersama</p>
+          </div>
+        </div>
+        
+        {/* TOMBOL INSTALL DITARUH DI HEADER KANAN */}
+        <div>
+          <InstallButton />
+        </div>
+      </header>
 
       {/* Konten Utama (Greeting & Card Login Warga) */}
       <main className="flex-1 flex flex-col items-center justify-center p-4 my-6">
