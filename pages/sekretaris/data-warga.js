@@ -9,7 +9,6 @@ export default function SekretarisDataWarga() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Form State
   const [namaLengkap, setNamaLengkap] = useState('');
   const [noRumah, setNoRumah] = useState('');
   const [nik, setNik] = useState('');
@@ -20,7 +19,8 @@ export default function SekretarisDataWarga() {
   const [password, setPassword] = useState('123456');
 
   useEffect(() => {
-    const savedUser = sessionStorage.getItem('pengurusSession');
+    // UBAH KE LOCALSTORAGE
+    const savedUser = localStorage.getItem('pengurusSession');
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser);
       if (parsedUser.role !== 'sekretaris' && parsedUser.role !== 'ketua') {
@@ -97,7 +97,6 @@ export default function SekretarisDataWarga() {
   return (
     <Layout user={user}>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Form Tambah Warga */}
         <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4 h-fit">
           <h2 className="text-base font-bold text-white flex items-center gap-2">
             <span>➕</span> Tambah Data Warga Baru
@@ -158,7 +157,6 @@ export default function SekretarisDataWarga() {
           </form>
         </div>
 
-        {/* Tabel Warga */}
         <div className="lg:col-span-2 space-y-4">
           <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-2xl flex items-center gap-3">
             <span className="text-slate-400 pl-2">🔍</span>
