@@ -38,7 +38,7 @@ export default function DashboardWargaProjek() {
   useEffect(() => {
     const savedSession = localStorage.getItem('warga_session');
     if (!savedSession) {
-      router.push('/');
+      router.replace('/');
       return;
     }
     const userData = JSON.parse(savedSession);
@@ -81,9 +81,11 @@ export default function DashboardWargaProjek() {
     }
   };
 
+  // ═══ PERBAIKAN FUNGSI LOGOUT ═══
   const handleLogout = () => {
+    if (!confirm('Keluar dari akun warga?')) return;
     localStorage.removeItem('warga_session');
-    router.push('/');
+    router.replace('/'); // Pakai replace agar tidak bisa di-back
   };
 
   const handleBayar = (proyek) => {
