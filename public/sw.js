@@ -32,17 +32,12 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // Skip cross-origin (Supabase, Google Fonts, dll)
   if (url.origin !== self.location.origin) return;
-
-  // Skip API routes Next.js
   if (url.pathname.startsWith('/api/')) return;
 
-  // Network-first: coba ambil dari network, fallback ke cache
   event.respondWith(
     fetch(request)
       .then((response) => {
-        // Cache asset statis yang berhasil di-fetch
         const isStatic =
           url.pathname.match(/\.(png|jpg|jpeg|svg|ico|css|js|woff2?)$/) ||
           url.pathname === '/';
@@ -54,5 +49,51 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => caches.match(request))
+  );
+});
+
+// ═══ TAMBAHAN: MENERIMA NOTIFIKASI PUSH ═══
+self.addEventListener('push', function (event) {
+  if (!event.data) return;
+
+  try {
+    const data = event.data.json();
+    const options = {
+      body: data.body,
+      icon: data.icon || '/logo-rt38.png',
+      badge: data.badge || '/logo-rt38.png',
+      data: { url: data.url || '/' },
+      vibrate: [100, 50, 100],
+      tag: data.tag || 'general'
+    };
+
+    event.waitUntil(
+      self.registration.showNotification(data.title, options)
+    );
+  } catch (err) {
+    console.error('Error parsing push data:', err);
+  }
+});
+
+// ═══ TAMBAHAN: SAAT NOTIF DI-KLIK, BUKA APLIKASI ═══
+self.addEventListener('notificationclick', function (event) {
+  event.notification.close();
+  
+  const urlToOpen = event.notification.data.url || '/';
+  
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (windowClients) {
+      // Kalau aplikasi sudah kebuka, fokuskan ke tab itu
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        if (client.url === urlToOpen && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Kalau belum kebuka, buka tab baru
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
   );
 });
