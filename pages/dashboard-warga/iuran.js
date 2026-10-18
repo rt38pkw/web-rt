@@ -46,7 +46,7 @@ export default function DashboardWargaIuran() {
   useEffect(() => {
     const savedSession = localStorage.getItem('warga_session');
     if (!savedSession) {
-      router.push('/');
+      router.replace('/');
       return;
     }
     const userData = JSON.parse(savedSession);
@@ -62,7 +62,11 @@ export default function DashboardWargaIuran() {
     try {
       const data = await fetchWargaById(wargaId);
       setWarga(data);
-      localStorage.setItem('warga_session', JSON.stringify(data));
+      
+      // ═══ PERBAIKAN: HAPUS PASSWORD SEBELUM DISIMPAN LAGI KE LOCALSTORAGE ═══
+      const { password: _, ...profilAman } = data;
+      localStorage.setItem('warga_session', JSON.stringify(profilAman));
+      
     } catch (err) {
       console.error('Gagal refresh session:', err);
     }
@@ -120,9 +124,11 @@ export default function DashboardWargaIuran() {
     }
   };
 
+  // ═══ PERBAIKAN FUNGSI LOGOUT ═══
   const handleLogout = () => {
+    if (!confirm('Keluar dari akun warga?')) return;
     localStorage.removeItem('warga_session');
-    router.push('/');
+    router.replace('/'); // Pakai replace agar tidak bisa di-back
   };
 
   if (!warga) return null;
