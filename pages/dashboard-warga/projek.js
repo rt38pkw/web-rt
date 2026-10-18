@@ -21,12 +21,10 @@ export default function DashboardWargaProjek() {
   const [kasProyekList, setKasProyekList] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal bayar
   const [showModalBayar, setShowModalBayar] = useState(false);
   const [proyekDipilih, setProyekDipilih] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Modal rekap
   const [showRekap, setShowRekap] = useState(false);
   const [rekapProyek, setRekapProyek] = useState(null);
   const [allWargaList, setAllWargaList] = useState([]);
@@ -44,8 +42,26 @@ export default function DashboardWargaProjek() {
     const userData = JSON.parse(savedSession);
     setWarga(userData);
     loadData(userData.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ═══ REALTIME: Dengerin perubahan dari Admin ═══
+  useEffect(() => {
+    if (!warga?.id) return;
+
+    const channel = supabase
+      .channel('warga-proyek-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran_proyek' }, () => {
+        loadData(warga.id);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'kas_proyek' }, () => {
+        loadData(warga.id);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [warga?.id]);
 
   const loadData = async (wargaId) => {
     setLoading(true);
@@ -68,7 +84,6 @@ export default function DashboardWargaProjek() {
           .order('tanggal', { ascending: false }),
       ]);
       
-      // Filter proyek yang valid (punya id & nominal)
       const proyekValid = (resProyek.data || []).filter(p => p && p.id && p.nominal_per_warga);
       
       setProyekList(proyekValid);
@@ -81,11 +96,10 @@ export default function DashboardWargaProjek() {
     }
   };
 
-  // ═══ PERBAIKAN FUNGSI LOGOUT ═══
   const handleLogout = () => {
     if (!confirm('Keluar dari akun warga?')) return;
     localStorage.removeItem('warga_session');
-    router.replace('/'); // Pakai replace agar tidak bisa di-back
+    router.replace('/');
   };
 
   const handleBayar = (proyek) => {
@@ -186,7 +200,6 @@ export default function DashboardWargaProjek() {
 
   if (!warga) return null;
 
-  // Urutkan: Aktif di atas
   const proyekTampil = [...proyekList].sort((a, b) => {
     if (a.status === 'aktif' && b.status !== 'aktif') return -1;
     if (a.status !== 'aktif' && b.status === 'aktif') return 1;
@@ -335,7 +348,6 @@ export default function DashboardWargaProjek() {
         )}
       </Layout>
 
-      {/* ═══ MODAL BAYAR ═══ */}
       {showModalBayar && proyekDipilih && (
         <ModalBayarProjek
           show={showModalBayar}
@@ -351,7 +363,6 @@ export default function DashboardWargaProjek() {
         />
       )}
 
-      {/* ═══ MODAL REKAP ═══ */}
       {showRekap && rekapProyek && (
         <ModalRekapProjek
           show={showRekap}
