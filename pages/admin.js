@@ -163,6 +163,11 @@ export default function AdminDashboard() {
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-600/30 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-indigo-600/30 rounded-full blur-3xl pointer-events-none"></div>
 
+        {/* TOMBOL INSTALL DI POJOK KANAN ATAS HALAMAN LOGIN */}
+        <div className="absolute top-4 right-4 z-50">
+          <InstallButton />
+        </div>
+
         <div className="bg-slate-800/80 backdrop-blur-xl border border-slate-700/60 p-8 rounded-2xl shadow-2xl w-full max-w-md z-10">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full overflow-hidden border border-blue-500/30 shadow-lg shadow-blue-500/30 mb-3 bg-slate-950">
