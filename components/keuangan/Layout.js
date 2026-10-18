@@ -36,7 +36,8 @@ export default function Layout({ user, pendingCount = 0, children }) {
   const handleLogout = () => {
     if (!confirm('Keluar dari akun pengurus?')) return;
     sessionStorage.removeItem('pengurusSession');
-    window.location.replace('/');
+    // DIUBAH MENJADI /admin
+    window.location.replace('/admin');
   };
 
   return (
@@ -53,8 +54,6 @@ export default function Layout({ user, pendingCount = 0, children }) {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* <InstallButton /> DIHAPUS DARI SINI */}
-            
             {user && <NotifToggle userId={user.id} userType="pengurus" />}
 
             {/* ← Admin hanya untuk ketua */}
