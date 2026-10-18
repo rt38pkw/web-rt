@@ -39,6 +39,11 @@ export default function AdminDashboard() {
         window.location.replace('/proyek/dashboard');
         return;
       }
+      // REDIRECT SEKREATARIS
+      if (parsedUser.role === 'sekretaris') {
+        window.location.replace('/sekretaris/data-warga');
+        return;
+      }
 
       setUser(parsedUser);
       fetchStats();
@@ -70,9 +75,13 @@ export default function AdminDashboard() {
       window.location.replace('/keuangan/dashboard');
       return;
     }
-
     if (data.role === 'bendahara_2') {
       window.location.replace('/proyek/dashboard');
+      return;
+    }
+    // REDIRECT SEKREATARIS SAAT LOGIN
+    if (data.role === 'sekretaris') {
+      window.location.replace('/sekretaris/data-warga');
       return;
     }
 
@@ -82,7 +91,6 @@ export default function AdminDashboard() {
   const handleLogout = () => {
     if (!confirm('Keluar dari akun pengurus?')) return;
     sessionStorage.removeItem('pengurusSession');
-    // DIUBAH MENJADI /admin AGAR KEMBALI KE LOGIN ADMIN
     window.location.replace('/admin');
   };
 
@@ -228,7 +236,7 @@ export default function AdminDashboard() {
   }
 
   const canAccessKeuangan = user.role === 'ketua' || user.role === 'bendahara';
-  const canAccessWarga = user.role === 'ketua' || user.role === 'sekretaris';
+  const canAccessSekretariat = user.role === 'ketua' || user.role === 'sekretaris';
   const canAccessProyek = user.role === 'ketua' || user.role === 'bendahara_2';
 
   return (
@@ -335,19 +343,20 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {canAccessWarga ? (
-            <Link href="/admin-warga" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
+          {/* KARTU SEKREATARIAT (Ubah dari Data Warga) */}
+          {canAccessSekretariat ? (
+            <Link href="/sekretaris/data-warga" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-teal-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
               <div>
-                <div className="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition mb-4 text-indigo-400">👥</div>
-                <h4 className="text-lg font-bold text-white group-hover:text-indigo-400 transition">Data Warga</h4>
-                <p className="text-xs text-slate-400 mt-1">Kelola direktori data kependudukan dan Kepala Keluarga.</p>
+                <div className="w-12 h-12 bg-teal-500/10 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition mb-4 text-teal-400">📝</div>
+                <h4 className="text-lg font-bold text-white group-hover:text-teal-400 transition">Sekretariat</h4>
+                <p className="text-xs text-slate-400 mt-1">Kelola direktori warga, pengajuan surat, dan jadwal ronda.</p>
               </div>
-              <div className="mt-6 flex items-center text-xs font-semibold text-indigo-400 group-hover:translate-x-1 transition">Buka Layanan &rarr;</div>
+              <div className="mt-6 flex items-center text-xs font-semibold text-teal-400 group-hover:translate-x-1 transition">Buka Layanan &rarr;</div>
             </Link>
           ) : (
             <div className="bg-slate-900/30 border border-slate-800/50 rounded-2xl p-6 opacity-40 cursor-not-allowed">
               <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-xl mb-4 text-slate-500">🔒</div>
-              <h4 className="text-lg font-bold text-slate-500">Data Warga</h4>
+              <h4 className="text-lg font-bold text-slate-500">Sekretariat</h4>
               <p className="text-xs text-slate-600 mt-1">Khusus akses Ketua & Sekretaris.</p>
             </div>
           )}
