@@ -31,7 +31,6 @@ export default function AdminDashboard() {
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser);
 
-      // ── Redirect non-ketua ke dashboard mereka ──
       if (parsedUser.role === 'bendahara') {
         window.location.replace('/keuangan/dashboard');
         return;
@@ -67,13 +66,11 @@ export default function AdminDashboard() {
     setUser(data);
     sessionStorage.setItem('pengurusSession', JSON.stringify(data));
 
-    // Bendahara → dashboard keuangan
     if (data.role === 'bendahara') {
       window.location.replace('/keuangan/dashboard');
       return;
     }
 
-    // Bendahara 2 (operator proyek) → halaman proyek
     if (data.role === 'bendahara_2') {
       window.location.replace('/proyek/dashboard');
       return;
@@ -163,7 +160,6 @@ export default function AdminDashboard() {
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-600/30 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-indigo-600/30 rounded-full blur-3xl pointer-events-none"></div>
 
-        {/* TOMBOL INSTALL DI POJOK KANAN ATAS HALAMAN LOGIN */}
         <div className="absolute top-4 right-4 z-50">
           <InstallButton />
         </div>
@@ -251,7 +247,7 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <InstallButton />
+            {/* <InstallButton />  <-- INI SUDAH DIHAPUS */}
 
             <div className="hidden sm:flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-full">
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
@@ -295,7 +291,6 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* ═══ KARTU STATISTIK — 2 KARTU SAJA ═══ */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8">
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
             <div className="flex items-center justify-between mb-3">
@@ -319,7 +314,6 @@ export default function AdminDashboard() {
         <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">Akses Layanan Admin</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {/* ═══ Keuangan ═══ */}
           {canAccessKeuangan ? (
             <Link href="/keuangan" className="relative group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-blue-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
               {stats.pendingIuran > 0 && (
@@ -342,7 +336,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* ═══ Data Warga ═══ */}
           {canAccessWarga ? (
             <Link href="/admin-warga" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
               <div>
@@ -360,7 +353,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* ═══ Proyek ═══ */}
           {canAccessProyek ? (
             <Link href="/proyek/dashboard" className="relative group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
               {stats.pendingProyek > 0 && (
@@ -383,7 +375,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* ═══ Pengajuan Surat (Segera) ═══ */}
           <div className="relative bg-slate-900/40 border border-slate-800/50 rounded-2xl p-6 opacity-60 cursor-not-allowed overflow-hidden">
             <span className="absolute top-3 right-3 text-[9px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700 font-semibold uppercase tracking-wider">
               Segera
@@ -393,7 +384,6 @@ export default function AdminDashboard() {
             <p className="text-xs text-slate-600 mt-1">Fitur pengajuan surat pengantar sedang dalam tahap pengembangan.</p>
           </div>
 
-          {/* ═══ Web Utama ═══ */}
           <Link href="/" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-600 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
             <div>
               <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition mb-4 text-slate-300">🌐</div>
