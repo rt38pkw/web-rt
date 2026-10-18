@@ -82,7 +82,8 @@ export default function AdminDashboard() {
   const handleLogout = () => {
     if (!confirm('Keluar dari akun pengurus?')) return;
     sessionStorage.removeItem('pengurusSession');
-    window.location.replace('/');
+    // DIUBAH MENJADI /admin AGAR KEMBALI KE LOGIN ADMIN
+    window.location.replace('/admin');
   };
 
   async function fetchStats() {
@@ -247,8 +248,6 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* <InstallButton />  <-- INI SUDAH DIHAPUS */}
-
             <div className="hidden sm:flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-full">
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
               <span className="text-xs font-medium text-slate-200">{user.nama}</span>
