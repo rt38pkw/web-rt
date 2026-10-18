@@ -39,7 +39,6 @@ export default function AdminDashboard() {
         window.location.replace('/proyek/dashboard');
         return;
       }
-      // REDIRECT SEKREATARIS
       if (parsedUser.role === 'sekretaris') {
         window.location.replace('/sekretaris/data-warga');
         return;
@@ -79,7 +78,6 @@ export default function AdminDashboard() {
       window.location.replace('/proyek/dashboard');
       return;
     }
-    // REDIRECT SEKREATARIS SAAT LOGIN
     if (data.role === 'sekretaris') {
       window.location.replace('/sekretaris/data-warga');
       return;
@@ -224,12 +222,8 @@ export default function AdminDashboard() {
               {loading ? 'Memeriksa Akses...' : 'Masuk Dashboard'}
             </button>
           </form>
-
-          <div className="mt-6 text-center">
-            <Link href="/" className="text-xs text-slate-400 hover:text-white transition">
-              &larr; Kembali ke Halaman Utama Warga
-            </Link>
-          </div>
+          
+          {/* LINK KEMBALI KE HALAMAN WARGA SUDAH DIHAPUS */}
         </div>
       </div>
     );
@@ -343,7 +337,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* KARTU SEKREATARIAT (Ubah dari Data Warga) */}
           {canAccessSekretariat ? (
             <Link href="/sekretaris/data-warga" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-teal-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
               <div>
@@ -383,23 +376,8 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          <div className="relative bg-slate-900/40 border border-slate-800/50 rounded-2xl p-6 opacity-60 cursor-not-allowed overflow-hidden">
-            <span className="absolute top-3 right-3 text-[9px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700 font-semibold uppercase tracking-wider">
-              Segera
-            </span>
-            <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-xl mb-4 text-slate-500">📄</div>
-            <h4 className="text-lg font-bold text-slate-500">Pengajuan Surat</h4>
-            <p className="text-xs text-slate-600 mt-1">Fitur pengajuan surat pengantar sedang dalam tahap pengembangan.</p>
-          </div>
-
-          <Link href="/" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-600 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
-            <div>
-              <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition mb-4 text-slate-300">🌐</div>
-              <h4 className="text-lg font-bold text-white group-hover:text-slate-300 transition">Web Utama</h4>
-              <p className="text-xs text-slate-400 mt-1">Lihat tampilan beranda depan publik untuk warga.</p>
-            </div>
-            <div className="mt-6 flex items-center text-xs font-semibold text-slate-400 group-hover:translate-x-1 transition">Lihat Beranda &rarr;</div>
-          </Link>
+          {/* KARTU PENGAJUAN SURAT DAN WEB UTAMA SUDAH DIHAPUS */}
+          
         </div>
       </main>
 
