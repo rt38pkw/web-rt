@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import NotifToggle from '../NotifToggle';
@@ -8,15 +9,46 @@ const MENU = [
   { key: 'ronda', i: '🛡️', l: 'Ronda', path: '/sekretaris/ronda' },
 ];
 
-export default function Layout({ user, children }) {
+export default function Layout({ children }) {
   const router = useRouter();
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
   const activeKey = MENU.find((m) => router.pathname.startsWith(m.path))?.key;
+
+  // ═══ SATPAM UTAMA: CEK LOGIN DI SINI SAJA (PAKAI LOCALSTORAGE) ═══
+  useEffect(() => {
+    const savedUser = localStorage.getItem('pengurusSession');
+    if (!savedUser) {
+      router.replace('/admin');
+      return;
+    }
+    
+    const parsedUser = JSON.parse(savedUser);
+    // Hanya ketua dan sekretaris yang boleh masuk
+    if (parsedUser.role !== 'sekretaris' && parsedUser.role !== 'ketua') {
+      router.replace('/admin');
+      return;
+    }
+
+    setUser(parsedUser);
+    setLoading(false);
+  }, [router]);
 
   const handleLogout = () => {
     if (!confirm('Keluar dari akun pengurus?')) return;
-    localStorage.removeItem('pengurusSession'); // Ubah ke localStorage
+    localStorage.removeItem('pengurusSession');
     window.location.replace('/admin');
   };
+
+  // Tampilkan loading sebentar selagi ngecek
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-500 text-sm">
+        Memeriksa Akses...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
