@@ -6,7 +6,7 @@ const MENU = [
   { key: 'dashboard', i: '📊', l: 'Dashboard', path: '/proyek/dashboard' },
   { key: 'verifikasi', i: '⏳', l: 'Verifikasi', path: '/proyek/verifikasi' },
   { key: 'tunai', i: '💵', l: 'Tunai', path: '/proyek/tunai' },
-  { key: 'kas', i: '💰', l: 'Kas Proyek', path: '/proyek/kas' }, // <-- MENU BARU
+  { key: 'kas', i: '💰', l: 'Kas Proyek', path: '/proyek/kas' },
   { key: 'tunggakan', i: '⚠️', l: 'Tunggakan', path: '/proyek/tunggakan' },
   { key: 'kelola', i: '➕', l: 'Kelola', path: '/proyek/kelola' },
 ];
@@ -19,7 +19,8 @@ export default function Layout({ user, pendingCount = 0, children }) {
   const handleLogout = () => {
     if (!confirm('Keluar dari akun pengurus?')) return;
     sessionStorage.removeItem('pengurusSession');
-    window.location.replace('/');
+    // DIUBAH KE /admin AGAR KEMBALI KE HALAMAN LOGIN ADMIN
+    window.location.replace('/admin');
   };
 
   return (
