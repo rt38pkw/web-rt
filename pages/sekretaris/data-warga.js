@@ -3,7 +3,6 @@ import { supabase } from '../../lib/supabase';
 import Layout from '../../components/sekretaris/Layout';
 
 export default function SekretarisDataWarga() {
-  const [user, setUser] = useState(null);
   const [wargaList, setWargaList] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -19,19 +18,8 @@ export default function SekretarisDataWarga() {
   const [password, setPassword] = useState('123456');
 
   useEffect(() => {
-    // UBAH KE LOCALSTORAGE
-    const savedUser = localStorage.getItem('pengurusSession');
-    if (savedUser) {
-      const parsedUser = JSON.parse(savedUser);
-      if (parsedUser.role !== 'sekretaris' && parsedUser.role !== 'ketua') {
-        window.location.replace('/admin');
-        return;
-      }
-      setUser(parsedUser);
-      fetchWarga();
-    } else {
-      window.location.replace('/admin');
-    }
+    // LANGSUNG AMBIL DATA
+    fetchWarga();
   }, []);
 
   async function fetchWarga() {
@@ -92,11 +80,10 @@ export default function SekretarisDataWarga() {
       w.no_rumah?.toLowerCase().includes(search.toLowerCase())
   );
 
-  if (!user) return null;
-
   return (
-    <Layout user={user}>
+    <Layout>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* FORM TAMBAH WARGA */}
         <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4 h-fit">
           <h2 className="text-base font-bold text-white flex items-center gap-2">
             <span>➕</span> Tambah Data Warga Baru
@@ -157,6 +144,7 @@ export default function SekretarisDataWarga() {
           </form>
         </div>
 
+        {/* TABEL WARGA */}
         <div className="lg:col-span-2 space-y-4">
           <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-2xl flex items-center gap-3">
             <span className="text-slate-400 pl-2">🔍</span>
