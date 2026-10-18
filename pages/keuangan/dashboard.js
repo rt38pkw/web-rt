@@ -31,23 +31,16 @@ export default function PageDashboard() {
   const proyekSafe = Array.isArray(proyekList) ? proyekList : [];
   const iuranProyekSafe = Array.isArray(iuranProyekList) ? iuranProyekList : [];
 
-  // ══════════════════════════════════════════════
-  // PERHITUNGAN
-  // ══════════════════════════════════════════════
-
-  // Iuran bulanan REAL (exclude metode=deposit, karena uangnya sudah masuk dari deposit_warga)
   const totalIuranBulanan = iuranList
     .filter((i) => i.status === 'approved' && i.metode !== 'deposit')
     .reduce((s, i) => s + Number(i.jumlah || 0), 0);
 
-  // Total semua iuran approved (termasuk deposit) — untuk info
   const totalIuranApproved = iuranList
     .filter((i) => i.status === 'approved')
     .reduce((s, i) => s + Number(i.jumlah || 0), 0);
 
   const totalPemasukanLain = pemasukanSafe.reduce((s, p) => s + Number(p.nominal || 0), 0);
 
-  // Pisahkan pengeluaran umum vs proyek
   const totalPengeluaranUmum = pengeluaranSafe
     .filter((p) => !p.proyek_id)
     .reduce((s, p) => s + Number(p.nominal || 0), 0);
@@ -58,30 +51,20 @@ export default function PageDashboard() {
 
   const totalPengeluaran = totalPengeluaranUmum + totalPengeluaranProyek;
 
-  // Saldo deposit warga
   const saldoDepositTotal = depositSafe.reduce(
     (s, d) => s + (d.tipe === 'masuk' ? Number(d.jumlah) : -Number(d.jumlah)),
     0
   );
 
-  // Iuran proyek approved
   const totalIuranProyekApproved = iuranProyekSafe
     .filter((i) => i.status === 'approved')
     .reduce((s, i) => s + Number(i.jumlah || 0), 0);
 
-  // Dana proyek = iuran proyek approved - pengeluaran proyek
   const danaProyek = totalIuranProyekApproved - totalPengeluaranProyek;
-
-  // Saldo Kas Bebas (milik RT) — tidak include deposit & dana proyek
   const saldoKasBebas = totalIuranBulanan + totalPemasukanLain - totalPengeluaranUmum;
-
-  // Total uang di rekening
   const totalUangRekening = saldoKasBebas + saldoDepositTotal + danaProyek;
 
-  // Pending
   const pendingBatches = getPendingBatches(iuranList);
-
-  // Statistik proyek
   const proyekAktif = proyekSafe.filter((p) => p.status === 'aktif').length;
 
   return (
