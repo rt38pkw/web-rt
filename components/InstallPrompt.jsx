@@ -6,11 +6,7 @@ export default function InstallPrompt() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
-    // Kalau user pernah dismiss, jangan tampilkan lagi
     if (localStorage.getItem('pwa_install_dismissed') === '1') return;
-
-    // Kalau sudah di-install, tidak perlu prompt
     if (window.matchMedia('(display-mode: standalone)').matches) return;
 
     const handler = (e) => {
@@ -48,9 +44,10 @@ export default function InstallPrompt() {
           <img src="/logo-rt38.png" alt="Logo" className="w-full h-full object-cover" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-bold text-white mb-0.5">Install Portal Warga</div>
+          {/* TEKS DIUBAH JADI UMUM */}
+          <div className="text-xs font-bold text-white mb-0.5">Install Aplikasi RT 38</div>
           <div className="text-[10px] text-slate-400 leading-relaxed">
-            Tambahkan ke home screen untuk akses lebih cepat & notifikasi.
+            Tambahkan ke layar utama untuk akses cepat & notifikasi.
           </div>
           <div className="flex gap-2 mt-2.5">
             <button
@@ -67,12 +64,7 @@ export default function InstallPrompt() {
             </button>
           </div>
         </div>
-        <button
-          onClick={handleDismiss}
-          className="text-slate-500 hover:text-white text-xs shrink-0 -mt-1"
-        >
-          ✕
-        </button>
+        <button onClick={handleDismiss} className="text-slate-500 hover:text-white text-xs shrink-0 -mt-1">✕</button>
       </div>
     </div>
   );
