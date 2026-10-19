@@ -3,7 +3,7 @@ import { formatRupiah, formatTanggal } from '../../lib/keuangan/helpers';
 export default function ModalKasRT({
   show,
   onClose,
-  iuranList = [], // Ini nanti akan diisi dengan SEMUA iuran warga
+  iuranList = [],
   pemasukanLainList = [],
   pengeluaranList = [],
 }) {
@@ -24,16 +24,17 @@ export default function ModalKasRT({
   const saldoKas = (totalIuran + totalPemasukanLain) - totalPengeluaran;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-3xl p-6 space-y-4 shadow-2xl my-8">
+    // Container utama diubah pakai items-start biar kalau kepanjangan nggak kepotong di atas
+    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xl my-8">
         
         {/* HEADER */}
-        <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+        <div className="flex justify-between items-center border-b border-slate-800 pb-3 sticky top-0 bg-slate-900 z-10">
           <div>
             <h3 className="font-bold text-white text-base">💰 Transparansi Saldo Kas RT 38</h3>
             <p className="text-[11px] text-slate-400 mt-1">Rincian arus kas masuk dan keluar</p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center text-sm">
+          <button onClick={onClose} className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center text-sm shrink-0">
             ✕
           </button>
         </div>
@@ -67,7 +68,8 @@ export default function ModalKasRT({
               <div className="p-3 bg-slate-900 border-b border-slate-800 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                 ➕ Pemasukan Lainnya
               </div>
-              <div className="max-h-60 overflow-y-auto">
+              {/* HAPUS BATAS TINGGI (max-h) DISINI */}
+              <div>
                 <table className="w-full text-left text-[11px]">
                   <tbody className="divide-y divide-slate-800/60">
                     {pemasukanLainList.length === 0 ? (
@@ -77,13 +79,12 @@ export default function ModalKasRT({
                         <tr key={p.id} className="hover:bg-slate-800/40">
                           <td className="p-3">
                             <div className="text-slate-300 font-semibold">{p.jenis}</div>
-                            {/* TAMBAHAN KETERANGAN */}
-                            <div className="text-[10px] text-slate-400 italic truncate max-w-[180px]">
+                            <div className="text-[10px] text-slate-400 italic truncate max-w-[200px]">
                               {p.keterangan || '-'}
                             </div>
                             <div className="text-[10px] text-slate-500">{formatTanggal(p.tanggal)}</div>
                           </td>
-                          <td className="p-3 text-right font-mono text-emerald-400 font-semibold">
+                          <td className="p-3 text-right font-mono text-emerald-400 font-semibold align-top">
                             {formatRupiah(p.nominal)}
                           </td>
                         </tr>
@@ -102,7 +103,8 @@ export default function ModalKasRT({
               <div className="p-3 bg-slate-900 border-b border-slate-800 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                 Rincian Pengeluaran
               </div>
-              <div className="max-h-[315px] overflow-y-auto">
+              {/* HAPUS BATAS TINGGI (max-h) DISINI JUGA */}
+              <div>
                 <table className="w-full text-left text-[11px]">
                   <tbody className="divide-y divide-slate-800/60">
                     {pengeluaranList.length === 0 ? (
@@ -111,10 +113,10 @@ export default function ModalKasRT({
                       pengeluaranList.map((p) => (
                         <tr key={p.id} className="hover:bg-slate-800/40">
                           <td className="p-3">
-                            <div className="text-slate-300 font-semibold truncate max-w-[150px]">{p.keterangan || p.jenis}</div>
+                            <div className="text-slate-300 font-semibold truncate max-w-[200px]">{p.keterangan || p.jenis}</div>
                             <div className="text-[10px] text-slate-500">{formatTanggal(p.tanggal)}</div>
                           </td>
-                          <td className="p-3 text-right font-mono text-rose-400 font-semibold">
+                          <td className="p-3 text-right font-mono text-rose-400 font-semibold align-top">
                             {formatRupiah(p.nominal)}
                           </td>
                         </tr>
