@@ -3,13 +3,13 @@ import { formatRupiah, formatTanggal } from '../../lib/keuangan/helpers';
 export default function ModalKasRT({
   show,
   onClose,
-  iuranList = [],
+  iuranList = [], // Ini nanti akan diisi dengan SEMUA iuran warga
   pemasukanLainList = [],
   pengeluaranList = [],
 }) {
   if (!show) return null;
 
-  // 1. Hitung Total Iuran (hanya yang approved & bukan metode deposit)
+  // 1. Hitung Total Iuran GLOBAL (hanya yang approved & bukan metode deposit)
   const totalIuran = iuranList
     .filter((i) => i.status === 'approved' && i.metode !== 'deposit')
     .reduce((s, i) => s + Number(i.jumlah || 0), 0);
@@ -77,6 +77,10 @@ export default function ModalKasRT({
                         <tr key={p.id} className="hover:bg-slate-800/40">
                           <td className="p-3">
                             <div className="text-slate-300 font-semibold">{p.jenis}</div>
+                            {/* TAMBAHAN KETERANGAN */}
+                            <div className="text-[10px] text-slate-400 italic truncate max-w-[180px]">
+                              {p.keterangan || '-'}
+                            </div>
                             <div className="text-[10px] text-slate-500">{formatTanggal(p.tanggal)}</div>
                           </td>
                           <td className="p-3 text-right font-mono text-emerald-400 font-semibold">
