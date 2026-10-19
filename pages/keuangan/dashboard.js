@@ -35,10 +35,6 @@ export default function PageDashboard() {
     .filter((i) => i.status === 'approved' && i.metode !== 'deposit')
     .reduce((s, i) => s + Number(i.jumlah || 0), 0);
 
-  const totalIuranApproved = iuranList
-    .filter((i) => i.status === 'approved')
-    .reduce((s, i) => s + Number(i.jumlah || 0), 0);
-
   const totalPemasukanLain = pemasukanSafe.reduce((s, p) => s + Number(p.nominal || 0), 0);
 
   const totalPengeluaranUmum = pengeluaranSafe
@@ -81,6 +77,7 @@ export default function PageDashboard() {
         proyekAktif={proyekAktif}
         pendingBatches={pendingBatches}
         pengeluaran={pengeluaranSafe}
+        iuranList={iuranList} // <-- TAMBAHAN: Lempar data iuran ke TabDashboard
       />
     </KeuanganLayout>
   );
