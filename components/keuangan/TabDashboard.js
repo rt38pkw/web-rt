@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { formatRupiah, formatTanggal } from '../../lib/keuangan/helpers';
 import Link from 'next/link';
+import ModalRincianIuran from './ModalRincianIuran';
 
 export default function TabDashboard({
   saldoKasBebas,
@@ -13,8 +15,10 @@ export default function TabDashboard({
   proyekAktif,
   pendingBatches,
   pengeluaran,
+  iuranList = [], // <-- Terima data dari parent
 }) {
-  // Hitung persentase untuk progress bar
+  const [showModalIuran, setShowModalIuran] = useState(false);
+
   const persenIuran = totalPemasukan > 0 ? (totalIuranApproved / totalPemasukan) * 100 : 0;
   const persenLain = totalPemasukan > 0 ? (totalPemasukanLain / totalPemasukan) * 100 : 0;
 
@@ -32,7 +36,7 @@ export default function TabDashboard({
           </p>
         </div>
 
-        {/* KARTU PEMASUKAN YANG BARU & INFORMATIF */}
+        {/* KARTU PEMASUKAN */}
         <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-5 flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-start">
@@ -48,18 +52,23 @@ export default function TabDashboard({
             </div>
           </div>
           
-          {/* Visual Progress Bar */}
           <div className="w-full bg-slate-800 rounded-full h-1.5 mt-3 overflow-hidden flex">
             <div className="bg-emerald-500 h-full" style={{ width: `${persenIuran}%` }} title="Iuran"></div>
             <div className="bg-blue-500 h-full" style={{ width: `${persenLain}%` }} title="Lain-lain"></div>
           </div>
 
-          {/* Rincian Angka */}
           <div className="flex justify-between text-[10px] mt-2">
-            <div>
-              <span className="text-slate-400 block">💰 Iuran</span>
-              <span className="text-emerald-400 font-semibold">{formatRupiah(totalIuranApproved)}</span>
+            {/* BAGIAN INI DIUBAH JADI BISA DIKLIK */}
+            <div 
+              className="cursor-pointer group"
+              onClick={() => setShowModalIuran(true)}
+            >
+              <span className="text-slate-400 block group-hover:text-emerald-300 transition">💰 Iuran (Klik Rincian)</span>
+              <span className="text-emerald-400 font-semibold underline decoration-emerald-500/30 underline-offset-2">
+                {formatRupiah(totalIuranApproved)}
+              </span>
             </div>
+
             <div className="text-right">
               <span className="text-slate-400 block">➕ Lain-lain</span>
               <span className="text-blue-400 font-semibold">{formatRupiah(totalPemasukanLain)}</span>
@@ -79,7 +88,6 @@ export default function TabDashboard({
 
       {/* ═══ 2 BANNER: DEPOSIT + PROYEK ═══ */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {/* Banner Deposit */}
         <div className="bg-gradient-to-r from-purple-950/40 to-slate-900 border border-purple-500/30 rounded-2xl p-5 flex justify-between items-center flex-wrap gap-3">
           <div>
             <span className="text-[10px] text-purple-300 uppercase tracking-wider font-semibold">
@@ -90,15 +98,11 @@ export default function TabDashboard({
             </div>
             <p className="text-[10px] text-slate-500 mt-1">Titipan warga untuk iuran tahun berikutnya</p>
           </div>
-          <Link
-            href="/keuangan/deposit"
-            className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl shrink-0"
-          >
+          <Link href="/keuangan/deposit" className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl shrink-0">
             Kelola →
           </Link>
         </div>
 
-        {/* Banner Proyek */}
         <div className="bg-gradient-to-r from-amber-950/40 to-slate-900 border border-amber-500/30 rounded-2xl p-5 flex justify-between items-center flex-wrap gap-3">
           <div>
             <span className="text-[10px] text-amber-300 uppercase tracking-wider font-semibold">
@@ -108,15 +112,10 @@ export default function TabDashboard({
               {formatRupiah(danaProyek)}
             </div>
             <p className="text-[10px] text-slate-500 mt-1">
-              {proyekAktif > 0
-                ? `${proyekAktif} proyek aktif — uang terkumpul`
-                : 'Belum ada proyek aktif'}
+              {proyekAktif > 0 ? `${proyekAktif} proyek aktif — uang terkumpul` : 'Belum ada proyek aktif'}
             </p>
           </div>
-          <Link
-            href="/keuangan/projek"
-            className="text-xs bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-xl shrink-0"
-          >
+          <Link href="/keuangan/projek" className="text-xs bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-xl shrink-0">
             Kelola →
           </Link>
         </div>
@@ -128,9 +127,7 @@ export default function TabDashboard({
           <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
             📊 Total Uang di Rekening
           </span>
-          <p className="text-[10px] text-slate-500 mt-0.5">
-            Kas Bebas + Deposit + Dana Proyek
-          </p>
+          <p className="text-[10px] text-slate-500 mt-0.5">Kas Bebas + Deposit + Dana Proyek</p>
         </div>
         <div className="text-xl font-black text-white">
           {formatRupiah(totalUangRekening)}
@@ -139,14 +136,11 @@ export default function TabDashboard({
 
       {/* ═══ PENDING + PENGELUARAN ═══ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {/* Pending Verifikasi */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-sm font-bold text-white">⏳ Menunggu Verifikasi</h3>
             {pendingBatches.length > 0 && (
-              <Link href="/keuangan/verifikasi" className="text-[10px] text-blue-400 hover:underline">
-                Lihat semua →
-              </Link>
+              <Link href="/keuangan/verifikasi" className="text-[10px] text-blue-400 hover:underline">Lihat semua →</Link>
             )}
           </div>
           {pendingBatches.length === 0 ? (
@@ -156,33 +150,22 @@ export default function TabDashboard({
               {pendingBatches.slice(0, 3).map((b) => (
                 <div key={b.batchId} className="flex justify-between items-center bg-slate-950/60 rounded-xl p-3">
                   <div className="min-w-0">
-                    <div className="text-xs font-semibold text-white truncate">
-                      {b.items[0]?.warga?.nama_lengkap}
-                    </div>
+                    <div className="text-xs font-semibold text-white truncate">{b.items[0]?.warga?.nama_lengkap}</div>
                     <div className="text-[10px] text-slate-500">
-                      {b.items.length} bulan •{' '}
-                      {formatRupiah(b.items.reduce((s, i) => s + Number(i.jumlah || 0), 0))}
+                      {b.items.length} bulan • {formatRupiah(b.items.reduce((s, i) => s + Number(i.jumlah || 0), 0))}
                     </div>
                   </div>
-                  <Link
-                    href="/keuangan/verifikasi"
-                    className="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded-lg"
-                  >
-                    Lihat
-                  </Link>
+                  <Link href="/keuangan/verifikasi" className="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded-lg">Lihat</Link>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Pengeluaran Terbaru */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-sm font-bold text-white">➖ Pengeluaran Terbaru</h3>
-            <Link href="/keuangan/pengeluaran" className="text-[10px] text-blue-400 hover:underline">
-              Lihat semua →
-            </Link>
+            <Link href="/keuangan/pengeluaran" className="text-[10px] text-blue-400 hover:underline">Lihat semua →</Link>
           </div>
           <div className="space-y-2">
             {pengeluaran.slice(0, 4).map((p) => (
@@ -190,15 +173,11 @@ export default function TabDashboard({
                 <div className="min-w-0 flex-1">
                   <div className="text-[10px] text-slate-500">
                     {formatTanggal(p.tanggal)} • {p.jenis}
-                    {p.proyek_id && (
-                      <span className="ml-1 text-amber-400">🏗️ Proyek</span>
-                    )}
+                    {p.proyek_id && <span className="ml-1 text-amber-400">🏗️ Proyek</span>}
                   </div>
                   <div className="text-xs text-slate-300 truncate">{p.keterangan || '-'}</div>
                 </div>
-                <div className="text-xs font-bold text-rose-400 whitespace-nowrap">
-                  {formatRupiah(p.nominal)}
-                </div>
+                <div className="text-xs font-bold text-rose-400 whitespace-nowrap">{formatRupiah(p.nominal)}</div>
               </div>
             ))}
             {pengeluaran.length === 0 && (
@@ -207,6 +186,13 @@ export default function TabDashboard({
           </div>
         </div>
       </div>
+
+      {/* MODAL RINCIAN IURAN */}
+      <ModalRincianIuran 
+        show={showModalIuran} 
+        onClose={() => setShowModalIuran(false)} 
+        iuranList={iuranList} 
+      />
     </div>
   );
 }
