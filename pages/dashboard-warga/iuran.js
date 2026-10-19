@@ -21,7 +21,7 @@ import {
   fetchWargaById,
   fetchIuranByWarga,
   fetchAllWarga,
-  fetchAllIuran, // <-- Kita butuh ini
+  fetchAllIuran, 
   insertPengajuanIuran,
 } from '../../lib/iuran/queries';
 import { uploadBukti } from '../../lib/iuran/storage';
@@ -40,8 +40,7 @@ export default function DashboardWargaIuran() {
   const [showRekapModal, setShowRekapModal] = useState(false);
   const [showKasRTModal, setShowKasRTModal] = useState(false);
   
-  // State untuk Kas RT (Global)
-  const [kasRTIuranList, setKasRTIuranList] = useState([]); // Khusus narik semua iuran
+  const [kasRTIuranList, setKasRTIuranList] = useState([]);
   const [pengeluaranList, setPengeluaranList] = useState([]);
   const [pemasukanLainList, setPemasukanLainList] = useState([]);
 
@@ -67,14 +66,12 @@ export default function DashboardWargaIuran() {
     refreshSession(userData.id);
   }, []);
 
-  // ═══ REALTIME ═══
   useEffect(() => {
     if (!warga?.id) return;
     const channel = supabase
       .channel('warga-iuran-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran' }, () => loadIuran(warga.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deposit_warga' }, () => loadDeposit(warga.id))
-      // Jangan lupa realtime pengeluaran/pemasukan kalau modal kas RT sedang terbuka
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pengeluaran' }, () => { if(showKasRTModal) loadKasRT(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pemasukan_lain' }, () => { if(showKasRTModal) loadKasRT(); })
       .subscribe();
@@ -82,7 +79,6 @@ export default function DashboardWargaIuran() {
     return () => supabase.removeChannel(channel);
   }, [warga?.id, showKasRTModal]);
 
-  // ... (refreshSession, loadIuran, loadDeposit, loadTarif tetap sama seperti kodemu) ...
   const refreshSession = async (wargaId) => {
     try {
       const data = await fetchWargaById(wargaId);
@@ -113,11 +109,10 @@ export default function DashboardWargaIuran() {
     } catch (err) {}
   };
 
-  // ═══ FUNGSI BARU: Ambil data KAS RT GLOBAL ═══
   const loadKasRT = async () => {
     try {
       const [resIuranGlobal, resPengeluaran, resPemasukan] = await Promise.all([
-        fetchAllIuran(), // <-- Ambil SEMUA iuran dari semua warga
+        fetchAllIuran(), 
         supabase.from('pengeluaran').select('*').order('tanggal', { ascending: false }),
         supabase.from('pemasukan_lain').select('*').order('tanggal', { ascending: false })
       ]);
@@ -130,7 +125,7 @@ export default function DashboardWargaIuran() {
   };
 
   const handleBukaKasRT = () => {
-    loadKasRT(); // Tarik data terbaru dulu
+    loadKasRT(); 
     setShowKasRTModal(true);
   };
 
@@ -178,7 +173,6 @@ export default function DashboardWargaIuran() {
   };
 
   const handleSubmitBayar = async ({ fileBukti, catatan, bulanDipilih: bulanPilih }) => {
-    // ... (logika bayar tetap sama) ...
     setSubmitting(true);
     try {
       const batchId = crypto.randomUUID();
@@ -213,10 +207,16 @@ export default function DashboardWargaIuran() {
             <p className="text-xs text-slate-400 mt-0.5">Lihat rekapitulasi iuran dan arus kas RT secara terbuka.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
-            <button onClick={loadRekap} disabled={loadingRekap} className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition border border-slate-700 flex items-center justify-center gap-2">
+            
+            {/* ═══ TOMBOL REKAP WARGA (UDAH DIGANTI JADI INDIGO) ═══ */}
+            <button 
+              onClick={loadRekap} 
+              disabled={loadingRekap} 
+              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
+            >
               {loadingRekap ? 'Memuat...' : '📋 Rekap Warga'}
             </button>
-            {/* TOMBOL KAS RT PANGGIL FUNGSI BARU */}
+
             <button onClick={handleBukaKasRT} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">
               💰 Saldo Kas RT
             </button>
@@ -260,11 +260,10 @@ export default function DashboardWargaIuran() {
         <ModalRekap show={showRekapModal} onClose={() => setShowRekapModal(false)} allWargaList={allWargaList} allIuranList={allIuranList} tarifList={tarifList} />
       )}
 
-      {/* MODAL KAS RT PAKAI DATA GLOBAL */}
       <ModalKasRT
         show={showKasRTModal}
         onClose={() => setShowKasRTModal(false)}
-        iuranList={kasRTIuranList} // <-- Ini data SEMUA warga, bukan cuma 1
+        iuranList={kasRTIuranList}
         pemasukanLainList={pemasukanLainList}
         pengeluaranList={pengeluaranList}
       />
