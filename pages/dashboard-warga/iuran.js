@@ -8,6 +8,8 @@ import IuranGrid from '../../components/warga/IuranGrid';
 import ModalBayar from '../../components/warga/ModalBayar';
 import ModalRekap from '../../components/warga/ModalRekap';
 import ModalDetailBulan from '../../components/warga/ModalDetailBulan';
+import ModalKasRT from '../../components/warga/ModalKasRT'; // <-- TAMBAHAN IMPORT
+
 import {
   getPeriodeBulan,
   TAHUN_TERSEDIA,
@@ -33,8 +35,16 @@ export default function DashboardWargaIuran() {
   const [allWargaList, setAllWargaList] = useState([]);
   const [allIuranList, setAllIuranList] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // State untuk Rekap & Kas RT
   const [loadingRekap, setLoadingRekap] = useState(false);
   const [showRekapModal, setShowRekapModal] = useState(false);
+  const [showKasRTModal, setShowKasRTModal] = useState(false); // <-- STATE BARU
+  
+  // State untuk Kas RT
+  const [pengeluaranList, setPengeluaranList] = useState([]);
+  const [pemasukanLainList, setPemasukanLainList] = useState([]);
+
   const [selectedBulanDetail, setSelectedBulanDetail] = useState(null);
   const [showModalBayar, setShowModalBayar] = useState(false);
   const [bulanDipilih, setBulanDipilih] = useState([]);
@@ -54,6 +64,7 @@ export default function DashboardWargaIuran() {
     loadIuran(userData.id);
     loadDeposit(userData.id);
     loadTarif();
+    loadKasRT(); // <-- Panggil data Kas RT
     refreshSession(userData.id);
   }, []);
 
@@ -63,24 +74,19 @@ export default function DashboardWargaIuran() {
 
     const channel = supabase
       .channel('warga-iuran-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran' }, () => {
-        loadIuran(warga.id);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'deposit_warga' }, () => {
-        loadDeposit(warga.id);
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran' }, () => loadIuran(warga.id))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deposit_warga' }, () => loadDeposit(warga.id))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pengeluaran' }, () => loadKasRT())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pemasukan_lain' }, () => loadKasRT())
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => supabase.removeChannel(channel);
   }, [warga?.id]);
 
   const refreshSession = async (wargaId) => {
     try {
       const data = await fetchWargaById(wargaId);
       setWarga(data);
-      // Hapus password sebelum disimpan ke lokal
       const { password: _, ...profilAman } = data;
       localStorage.setItem('warga_session', JSON.stringify(profilAman));
     } catch (err) {
@@ -118,6 +124,20 @@ export default function DashboardWargaIuran() {
       setTarifList(data);
     } catch (err) {
       console.error('Gagal ambil tarif:', err);
+    }
+  };
+
+  // ═══ FUNGSI BARU: Ambil Data Kas RT ═══
+  const loadKasRT = async () => {
+    try {
+      const [resPengeluaran, resPemasukan] = await Promise.all([
+        supabase.from('pengeluaran').select('*').order('tanggal', { ascending: false }),
+        supabase.from('pemasukan_lain').select('*').order('tanggal', { ascending: false })
+      ]);
+      setPengeluaranList(resPengeluaran.data || []);
+      setPemasukanLainList(resPemasukan.data || []);
+    } catch (err) {
+      console.error('Gagal load kas RT:', err);
     }
   };
 
@@ -223,52 +243,52 @@ export default function DashboardWargaIuran() {
       <Layout warga={warga} onLogout={handleLogout}>
         <ProfileCard warga={warga} tarifBulanan={tarifBulanan} isUsaha={usaha} />
 
+        {/* ═══ TOMBOL TRANSPARANSI ═══ */}
         <div className="bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/30 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
             <h4 className="text-sm font-bold text-white flex items-center gap-2">
               📊 Transparansi Kas RT 38
             </h4>
             <p className="text-xs text-slate-400 mt-0.5">
-              Lihat rekapitulasi pembayaran iuran seluruh warga.
+              Lihat rekapitulasi iuran dan arus kas RT secara terbuka.
             </p>
           </div>
-          <button
-            onClick={loadRekap}
-            disabled={loadingRekap}
-            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 shrink-0"
-          >
-            {loadingRekap ? 'Memuat Data...' : '📋 Lihat Rekap Warga'}
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
+            <button
+              onClick={loadRekap}
+              disabled={loadingRekap}
+              className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition border border-slate-700 flex items-center justify-center gap-2"
+            >
+              {loadingRekap ? 'Memuat Data...' : '📋 Rekap Warga'}
+            </button>
+            
+            {/* TOMBOL BARU: LIHAT SALDO KAS */}
+            <button
+              onClick={() => setShowKasRTModal(true)}
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
+            >
+              💰 Saldo Kas RT
+            </button>
+          </div>
         </div>
 
+        {/* ... (Kode Total Setor, Deposit, IuranGrid, dll tetap sama) ... */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between">
-            <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">
-              Total Setor
-            </span>
-            <span className="text-lg font-black text-white mt-1">
-              Rp {totalDisetor.toLocaleString('id-ID')}
-            </span>
+            <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">Total Setor</span>
+            <span className="text-lg font-black text-white mt-1">Rp {totalDisetor.toLocaleString('id-ID')}</span>
           </div>
 
           <div className="bg-slate-900/60 border border-emerald-500/20 rounded-2xl p-4 flex flex-col justify-between">
-            <span className="text-[11px] text-emerald-400 uppercase tracking-wider font-medium">
-              Total Donasi 💚
-            </span>
+            <span className="text-[11px] text-emerald-400 uppercase tracking-wider font-medium">Total Donasi 💚</span>
             <span className="text-lg font-black text-emerald-400 mt-1">Rp 0</span>
           </div>
 
           <div className="bg-gradient-to-br from-purple-950/40 to-slate-900 border border-purple-500/30 rounded-2xl p-4 flex flex-col justify-between">
-            <span className="text-[11px] text-purple-300 uppercase tracking-wider font-medium">
-              💎 Saldo Deposit
-            </span>
-            <span className="text-lg font-black text-purple-300 mt-1">
-              Rp {saldoDeposit.toLocaleString('id-ID')}
-            </span>
+            <span className="text-[11px] text-purple-300 uppercase tracking-wider font-medium">💎 Saldo Deposit</span>
+            <span className="text-lg font-black text-purple-300 mt-1">Rp {saldoDeposit.toLocaleString('id-ID')}</span>
             {saldoDeposit > 0 && tarifBulanan > 0 && (
-              <span className="text-[9px] text-slate-400 mt-0.5">
-                Cukup untuk ±{estimasiBulan} bulan @ Rp{tarifBulanan.toLocaleString('id-ID')}
-              </span>
+              <span className="text-[9px] text-slate-400 mt-0.5">Cukup untuk ±{estimasiBulan} bulan @ Rp{tarifBulanan.toLocaleString('id-ID')}</span>
             )}
           </div>
         </div>
@@ -287,11 +307,8 @@ export default function DashboardWargaIuran() {
         )}
       </Layout>
 
-      <ModalDetailBulan
-        detail={selectedBulanDetail}
-        onClose={() => setSelectedBulanDetail(null)}
-      />
-
+      <ModalDetailBulan detail={selectedBulanDetail} onClose={() => setSelectedBulanDetail(null)} />
+      
       <ModalBayar
         show={showModalBayar}
         onClose={() => setShowModalBayar(false)}
@@ -314,6 +331,15 @@ export default function DashboardWargaIuran() {
           tarifList={tarifList}
         />
       )}
+
+      {/* ═══ MODAL KAS RT BARU ═══ */}
+      <ModalKasRT
+        show={showKasRTModal}
+        onClose={() => setShowKasRTModal(false)}
+        iuranList={iuranList}
+        pemasukanLainList={pemasukanLainList}
+        pengeluaranList={pengeluaranList}
+      />
     </>
   );
 }
