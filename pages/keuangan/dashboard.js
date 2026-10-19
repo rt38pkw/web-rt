@@ -9,10 +9,8 @@ export default function PageDashboard() {
     pengeluaran = [],
     pemasukanLain = [],
     depositList = [],
-    proyekList = [],
-    iuranProyekList = [],
     loading,
-  } = useKeuanganData();
+  } = useKeuanganData(); // ProyekList & IuranProyekList tidak perlu diambil lagi
 
   if (typeof window === 'undefined') return null;
 
@@ -28,56 +26,46 @@ export default function PageDashboard() {
   const pengeluaranSafe = Array.isArray(pengeluaran) ? pengeluaran : [];
   const pemasukanSafe = Array.isArray(pemasukanLain) ? pemasukanLain : [];
   const depositSafe = Array.isArray(depositList) ? depositList : [];
-  const proyekSafe = Array.isArray(proyekList) ? proyekList : [];
-  const iuranProyekSafe = Array.isArray(iuranProyekList) ? iuranProyekList : [];
 
+  // Iuran bulanan REAL
   const totalIuranBulanan = iuranList
     .filter((i) => i.status === 'approved' && i.metode !== 'deposit')
     .reduce((s, i) => s + Number(i.jumlah || 0), 0);
 
   const totalPemasukanLain = pemasukanSafe.reduce((s, p) => s + Number(p.nominal || 0), 0);
 
+  // Hanya hitung pengeluaran umum (bukan proyek)
   const totalPengeluaranUmum = pengeluaranSafe
     .filter((p) => !p.proyek_id)
     .reduce((s, p) => s + Number(p.nominal || 0), 0);
 
-  const totalPengeluaranProyek = pengeluaranSafe
-    .filter((p) => p.proyek_id)
-    .reduce((s, p) => s + Number(p.nominal || 0), 0);
-
-  const totalPengeluaran = totalPengeluaranUmum + totalPengeluaranProyek;
-
+  // Saldo deposit warga
   const saldoDepositTotal = depositSafe.reduce(
     (s, d) => s + (d.tipe === 'masuk' ? Number(d.jumlah) : -Number(d.jumlah)),
     0
   );
 
-  const totalIuranProyekApproved = iuranProyekSafe
-    .filter((i) => i.status === 'approved')
-    .reduce((s, i) => s + Number(i.jumlah || 0), 0);
-
-  const danaProyek = totalIuranProyekApproved - totalPengeluaranProyek;
+  // Saldo Kas Bebas (milik RT)
   const saldoKasBebas = totalIuranBulanan + totalPemasukanLain - totalPengeluaranUmum;
-  const totalUangRekening = saldoKasBebas + saldoDepositTotal + danaProyek;
+
+  // Total uang di rekening (Kas Bebas + Deposit)
+  const totalUangRekening = saldoKasBebas + saldoDepositTotal;
 
   const pendingBatches = getPendingBatches(iuranList);
-  const proyekAktif = proyekSafe.filter((p) => p.status === 'aktif').length;
 
   return (
     <KeuanganLayout user={user} pendingCount={pendingBatches.length}>
       <TabDashboard
         saldoKasBebas={saldoKasBebas}
         saldoDepositTotal={saldoDepositTotal}
-        danaProyek={danaProyek}
         totalUangRekening={totalUangRekening}
         totalPemasukan={totalIuranBulanan + totalPemasukanLain}
-        totalPengeluaran={totalPengeluaran}
+        totalPengeluaran={totalPengeluaranUmum} // Pengeluaran umum aja
         totalIuranApproved={totalIuranBulanan}
         totalPemasukanLain={totalPemasukanLain}
-        proyekAktif={proyekAktif}
         pendingBatches={pendingBatches}
         pengeluaran={pengeluaranSafe}
-        iuranList={iuranList} // <-- TAMBAHAN: Lempar data iuran ke TabDashboard
+        iuranList={iuranList}
       />
     </KeuanganLayout>
   );
