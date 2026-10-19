@@ -6,16 +6,14 @@ import ModalRincianIuran from './ModalRincianIuran';
 export default function TabDashboard({
   saldoKasBebas,
   saldoDepositTotal,
-  danaProyek,
   totalUangRekening,
   totalPemasukan,
   totalPengeluaran,
   totalIuranApproved,
   totalPemasukanLain,
-  proyekAktif,
   pendingBatches,
   pengeluaran,
-  iuranList = [], // <-- Terima data dari parent
+  iuranList = [],
 }) {
   const [showModalIuran, setShowModalIuran] = useState(false);
 
@@ -58,7 +56,6 @@ export default function TabDashboard({
           </div>
 
           <div className="flex justify-between text-[10px] mt-2">
-            {/* BAGIAN INI DIUBAH JADI BISA DIKLIK */}
             <div 
               className="cursor-pointer group"
               onClick={() => setShowModalIuran(true)}
@@ -86,39 +83,20 @@ export default function TabDashboard({
         </div>
       </div>
 
-      {/* ═══ 2 BANNER: DEPOSIT + PROYEK ═══ */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="bg-gradient-to-r from-purple-950/40 to-slate-900 border border-purple-500/30 rounded-2xl p-5 flex justify-between items-center flex-wrap gap-3">
-          <div>
-            <span className="text-[10px] text-purple-300 uppercase tracking-wider font-semibold">
-              💎 Saldo Deposit Warga
-            </span>
-            <div className="text-xl font-black text-purple-300 mt-1">
-              {formatRupiah(saldoDepositTotal)}
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">Titipan warga untuk iuran tahun berikutnya</p>
+      {/* ═══ BANNER DEPOSIT (FULL WIDTH) ═══ */}
+      <div className="bg-gradient-to-r from-purple-950/40 to-slate-900 border border-purple-500/30 rounded-2xl p-5 flex justify-between items-center flex-wrap gap-3">
+        <div>
+          <span className="text-[10px] text-purple-300 uppercase tracking-wider font-semibold">
+            💎 Saldo Deposit Warga
+          </span>
+          <div className="text-xl font-black text-purple-300 mt-1">
+            {formatRupiah(saldoDepositTotal)}
           </div>
-          <Link href="/keuangan/deposit" className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl shrink-0">
-            Kelola →
-          </Link>
+          <p className="text-[10px] text-slate-500 mt-1">Titipan warga untuk iuran tahun berikutnya</p>
         </div>
-
-        <div className="bg-gradient-to-r from-amber-950/40 to-slate-900 border border-amber-500/30 rounded-2xl p-5 flex justify-between items-center flex-wrap gap-3">
-          <div>
-            <span className="text-[10px] text-amber-300 uppercase tracking-wider font-semibold">
-              🏗️ Dana Proyek
-            </span>
-            <div className="text-xl font-black text-amber-300 mt-1">
-              {formatRupiah(danaProyek)}
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">
-              {proyekAktif > 0 ? `${proyekAktif} proyek aktif — uang terkumpul` : 'Belum ada proyek aktif'}
-            </p>
-          </div>
-          <Link href="/keuangan/projek" className="text-xs bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-xl shrink-0">
-            Kelola →
-          </Link>
-        </div>
+        <Link href="/keuangan/deposit" className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl shrink-0">
+          Kelola Deposit →
+        </Link>
       </div>
 
       {/* ═══ TOTAL UANG REKENING ═══ */}
@@ -127,7 +105,7 @@ export default function TabDashboard({
           <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
             📊 Total Uang di Rekening
           </span>
-          <p className="text-[10px] text-slate-500 mt-0.5">Kas Bebas + Deposit + Dana Proyek</p>
+          <p className="text-[10px] text-slate-500 mt-0.5">Kas Bebas + Deposit</p>
         </div>
         <div className="text-xl font-black text-white">
           {formatRupiah(totalUangRekening)}
@@ -173,7 +151,6 @@ export default function TabDashboard({
                 <div className="min-w-0 flex-1">
                   <div className="text-[10px] text-slate-500">
                     {formatTanggal(p.tanggal)} • {p.jenis}
-                    {p.proyek_id && <span className="ml-1 text-amber-400">🏗️ Proyek</span>}
                   </div>
                   <div className="text-xs text-slate-300 truncate">{p.keterangan || '-'}</div>
                 </div>
