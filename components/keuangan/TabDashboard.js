@@ -14,6 +14,10 @@ export default function TabDashboard({
   pendingBatches,
   pengeluaran,
 }) {
+  // Hitung persentase untuk progress bar
+  const persenIuran = totalPemasukan > 0 ? (totalIuranApproved / totalPemasukan) * 100 : 0;
+  const persenLain = totalPemasukan > 0 ? (totalPemasukanLain / totalPemasukan) * 100 : 0;
+
   return (
     <div className="space-y-4">
       {/* ═══ KARTU UTAMA ═══ */}
@@ -28,15 +32,38 @@ export default function TabDashboard({
           </p>
         </div>
 
-        <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-5">
-          <span className="text-[10px] text-emerald-400 uppercase tracking-wider font-semibold">
-            Total Pemasukan
-          </span>
-          <div className="text-xl font-black text-emerald-400 mt-1">
-            {formatRupiah(totalPemasukan)}
+        {/* KARTU PEMASUKAN YANG BARU & INFORMATIF */}
+        <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-start">
+              <span className="text-[10px] text-emerald-400 uppercase tracking-wider font-semibold">
+                Total Pemasukan
+              </span>
+              <span className="text-[9px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded font-bold">
+                {persenIuran.toFixed(0)}% dari Iuran
+              </span>
+            </div>
+            <div className="text-xl font-black text-emerald-400 mt-1">
+              {formatRupiah(totalPemasukan)}
+            </div>
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">
-            Iuran: {formatRupiah(totalIuranApproved)} • Lain: {formatRupiah(totalPemasukanLain)}
+          
+          {/* Visual Progress Bar */}
+          <div className="w-full bg-slate-800 rounded-full h-1.5 mt-3 overflow-hidden flex">
+            <div className="bg-emerald-500 h-full" style={{ width: `${persenIuran}%` }} title="Iuran"></div>
+            <div className="bg-blue-500 h-full" style={{ width: `${persenLain}%` }} title="Lain-lain"></div>
+          </div>
+
+          {/* Rincian Angka */}
+          <div className="flex justify-between text-[10px] mt-2">
+            <div>
+              <span className="text-slate-400 block">💰 Iuran</span>
+              <span className="text-emerald-400 font-semibold">{formatRupiah(totalIuranApproved)}</span>
+            </div>
+            <div className="text-right">
+              <span className="text-slate-400 block">➕ Lain-lain</span>
+              <span className="text-blue-400 font-semibold">{formatRupiah(totalPemasukanLain)}</span>
+            </div>
           </div>
         </div>
 
