@@ -6,6 +6,7 @@ export default function TabVerifikasi({
   filterVerif,
   setFilterVerif,
   handleApprove,
+  handleReject,
 }) {
   const grouped = {};
   iuran
@@ -18,6 +19,7 @@ export default function TabVerifikasi({
           items: [],
           status: i.status,
           tanggal: i.tanggal_transaksi,
+          catatan: i.catatan,
         };
       }
       grouped[key].items.push(i);
@@ -35,6 +37,7 @@ export default function TabVerifikasi({
         {[
           { k: 'pending', l: `⏳ Pending (${pendingBatches.length})` },
           { k: 'approved', l: '✓ Approved' },
+          { k: 'rejected', l: '✗ Ditolak' },
           { k: 'all', l: '📋 Semua' },
         ].map((f) => (
           <button
@@ -78,6 +81,14 @@ export default function TabVerifikasi({
                   const total = b.items.reduce((s, i) => s + Number(i.jumlah || 0), 0);
                   const bukti = b.items[0]?.bukti_urls || [];
                   const metode = b.items[0]?.metode || '-';
+                  
+                  // Deteksi Revisi
+                  const isRevisi = b.status === 'pending' && b.catatan?.toLowerCase().includes('revisi');
+
+                  let statusColor = 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+                  if (b.status === 'approved') statusColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                  if (b.status === 'rejected') statusColor = 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+
                   return (
                     <tr key={b.batchId} className="hover:bg-slate-800/40">
                       <td className="p-3">
@@ -122,24 +133,38 @@ export default function TabVerifikasi({
                         )}
                       </td>
                       <td className="p-3">
-                        <span
-                          className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full border ${
-                            b.status === 'approved'
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                              : 'bg-orange-500/10 text-orange-400 border-orange-500/20'
-                          }`}
-                        >
-                          {b.status}
-                        </span>
+                        <div className="flex flex-col items-start gap-1">
+                          <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full border ${statusColor}`}>
+                            {b.status}
+                          </span>
+                          {isRevisi && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-blue-500/20 text-blue-300 border-blue-500/30">
+                              🔄 Revisi
+                            </span>
+                          )}
+                          {b.status === 'rejected' && b.catatan && (
+                            <div className="text-[9px] text-rose-300 max-w-[120px] truncate" title={b.catatan}>
+                              {b.catatan}
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="p-3">
                         {b.status === 'pending' && (
-                          <button
-                            onClick={() => handleApprove(b)}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-semibold px-3 py-1.5 rounded-lg"
-                          >
-                            ✓ Approve
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleApprove(b)}
+                              className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-semibold px-3 py-1.5 rounded-lg"
+                            >
+                              ✓ Approve
+                            </button>
+                            <button
+                              onClick={() => handleReject(b)}
+                              className="bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-semibold px-3 py-1.5 rounded-lg"
+                            >
+                              ✗ Tolak
+                            </button>
+                          </div>
                         )}
                         {b.status === 'approved' && b.tanggal && (
                           <span className="text-[10px] text-slate-500">
