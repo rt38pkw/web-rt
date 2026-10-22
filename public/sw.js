@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rt38-pwa-v1';
+const CACHE_NAME = 'rt38-pwa-v2'; // UBAH KE V2
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
@@ -83,14 +83,12 @@ self.addEventListener('notificationclick', function (event) {
   
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (windowClients) {
-      // Kalau aplikasi sudah kebuka, fokuskan ke tab itu
       for (let i = 0; i < windowClients.length; i++) {
         const client = windowClients[i];
         if (client.url === urlToOpen && 'focus' in client) {
           return client.focus();
         }
       }
-      // Kalau belum kebuka, buka tab baru
       if (clients.openWindow) {
         return clients.openWindow(urlToOpen);
       }
