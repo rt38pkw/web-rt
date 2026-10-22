@@ -19,68 +19,33 @@ export default function PageVerifikasi() {
     if (!confirm('Approve pembayaran ini?')) return;
     try {
       const today = new Date().toISOString().split('T')[0];
-      const batchId = batch.batchId;
-      await supabase
-        .from('iuran')
-        .update({ status: 'approved', tanggal_transaksi: today, metode: 'qris' })
-        .eq('batch_id', batchId);
+      await supabase.from('iuran').update({ status: 'approved', tanggal_transaksi: today, metode: 'qris' }).eq('batch_id', batch.batchId);
       const urls = batch.items[0]?.bukti_urls || [];
       const paths = urls.map(getPathFromUrl).filter(Boolean);
       if (paths.length > 0) {
         await supabase.storage.from('bukti-transfer').remove(paths);
-        await supabase.from('iuran').update({ bukti_urls: null }).eq('batch_id', batchId);
+        await supabase.from('iuran').update({ bukti_urls: null }).eq('batch_id', batch.batchId);
       }
-      alert('✅ Berhasil di-approve.');
-      invalidateKeuanganCache();
-      refetch();
-    } catch (err) {
-      alert('Gagal approve: ' + err.message);
-    }
+      alert('✅ Berhasil di-approve.'); invalidateKeuanganCache(); refetch();
+    } catch (err) { alert('Gagal approve: ' + err.message); }
   }
 
-  // --- FUNGSI BARU: REJECT ---
   async function handleReject(batch) {
     const alasan = prompt('Masukkan alasan penolakan (wajib diisi):');
     if (alasan === null) return;
-    if (!alasan.trim()) {
-      alert('Alasan penolakan tidak boleh kosong!');
-      return;
-    }
-    
+    if (!alasan.trim()) { alert('Alasan penolakan tidak boleh kosong!'); return; }
     try {
-      await supabase
-        .from('iuran')
-        .update({ status: 'rejected', catatan: `Ditolak: ${alasan.trim()}` })
-        .eq('batch_id', batch.batchId);
-      
-      alert('✅ Pembayaran ditolak. Warga dapat mengunggah ulang.');
-      invalidateKeuanganCache();
-      refetch();
-    } catch (err) {
-      alert('Gagal menolak: ' + err.message);
-    }
+      await supabase.from('iuran').update({ status: 'rejected', catatan: `Ditolak: ${alasan.trim()}` }).eq('batch_id', batch.batchId);
+      alert('✅ Pembayaran ditolak.'); invalidateKeuanganCache(); refetch();
+    } catch (err) { alert('Gagal menolak: ' + err.message); }
   }
 
-  if (loading) {
-    return (
-      <KeuanganLayout user={user}>
-        <div className="text-center py-10 text-slate-500 text-xs">Memuat data...</div>
-      </KeuanganLayout>
-    );
-  }
-
+  if (loading) return <KeuanganLayout user={user}><div className="text-center py-10 text-slate-500 text-xs">Memuat data...</div></KeuanganLayout>;
   const pendingBatches = getPendingBatches(iuran);
 
   return (
     <KeuanganLayout user={user} pendingCount={pendingBatches.length}>
-      <TabVerifikasi
-        pendingBatches={pendingBatches}
-        iuran={iuran}
-        filterVerif={filterVerif}
-        setFilterVerif={setFilterVerif}
-        handleApprove={handleApprove}
-        handleReject={handleReject}
-      />
+      <TabVerifikasi pendingBatches={pendingBatches} iuran={iuran} filterVerif={filterVerif} setFilterVerif={setFilterVerif} handleApprove={handleApprove} handleReject={handleReject} />
     </KeuanganLayout>
   );
 }
