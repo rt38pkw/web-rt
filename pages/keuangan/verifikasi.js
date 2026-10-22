@@ -38,6 +38,29 @@ export default function PageVerifikasi() {
     }
   }
 
+  // --- FUNGSI BARU: REJECT ---
+  async function handleReject(batch) {
+    const alasan = prompt('Masukkan alasan penolakan (wajib diisi):');
+    if (alasan === null) return;
+    if (!alasan.trim()) {
+      alert('Alasan penolakan tidak boleh kosong!');
+      return;
+    }
+    
+    try {
+      await supabase
+        .from('iuran')
+        .update({ status: 'rejected', catatan: `Ditolak: ${alasan.trim()}` })
+        .eq('batch_id', batch.batchId);
+      
+      alert('✅ Pembayaran ditolak. Warga dapat mengunggah ulang.');
+      invalidateKeuanganCache();
+      refetch();
+    } catch (err) {
+      alert('Gagal menolak: ' + err.message);
+    }
+  }
+
   if (loading) {
     return (
       <KeuanganLayout user={user}>
@@ -56,6 +79,7 @@ export default function PageVerifikasi() {
         filterVerif={filterVerif}
         setFilterVerif={setFilterVerif}
         handleApprove={handleApprove}
+        handleReject={handleReject}
       />
     </KeuanganLayout>
   );
