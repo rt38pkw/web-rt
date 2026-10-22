@@ -1,147 +1,315 @@
-import { PERIODE_BULAN } from '../../lib/iuran/constants';
-import { getInfoBulan } from '../../lib/iuran/calculations';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
+import Head from 'next/head';
+import { supabase } from '../../lib/supabase';
+import Layout from '../../components/warga/Layout';
+import ProfileCard from '../../components/warga/ProfileCard';
+import IuranGrid from '../../components/warga/IuranGrid';
+import ModalBayar from '../../components/warga/ModalBayar';
+import ModalRekap from '../../components/warga/ModalRekap';
+import ModalDetailBulan from '../../components/warga/ModalDetailBulan';
+import ModalKasRT from '../../components/warga/ModalKasRT';
 
-export default function IuranGrid({
-  iuranList,
-  tarifBulanan,
-  adaPending,
-  bulanTombolBayar,
-  onKlikDetail,
-  onBayar,
-}) {
-  const now = new Date();
-  const bulanSekarang = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+import {
+  getPeriodeBulan,
+  TAHUN_TERSEDIA,
+  getTahunSekarang,
+  isWargaUsaha,
+} from '../../lib/iuran/constants';
+import { getInfoBulan, hitungBelumLunas, formatTanggal } from '../../lib/iuran/calculations';
+import {
+  fetchWargaById,
+  fetchIuranByWarga,
+  fetchAllWarga,
+  fetchAllIuran, 
+  insertPengajuanIuran,
+  updatePengajuanIuran, // IMPORT FUNGSI BARU
+} from '../../lib/iuran/queries';
+import { uploadBukti } from '../../lib/iuran/storage';
+import { fetchTarifList, getTarifWarga } from '../../lib/iuran/tarif';
+
+export default function DashboardWargaIuran() {
+  const [warga, setWarga] = useState(null);
+  const [iuranList, setIuranList] = useState([]);
+  const [depositList, setDepositList] = useState([]);
+  const [tarifList, setTarifList] = useState([]);
+  const [allWargaList, setAllWargaList] = useState([]);
+  const [allIuranList, setAllIuranList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingRekap, setLoadingRekap] = useState(false);
+  
+  const [showRekapModal, setShowRekapModal] = useState(false);
+  const [showKasRTModal, setShowKasRTModal] = useState(false);
+  
+  const [kasRTIuranList, setKasRTIuranList] = useState([]);
+  const [pengeluaranList, setPengeluaranList] = useState([]);
+  const [pemasukanLainList, setPemasukanLainList] = useState([]);
+
+  const [selectedBulanDetail, setSelectedBulanDetail] = useState(null);
+  const [showModalBayar, setShowModalBayar] = useState(false);
+  const [bulanDipilih, setBulanDipilih] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [tahunTerpilih, setTahunTerpilih] = useState(getTahunSekarang());
+
+  const router = useRouter();
+
+  useEffect(() => {
+    const savedSession = localStorage.getItem('warga_session');
+    if (!savedSession) {
+      router.push('/');
+      return;
+    }
+    const userData = JSON.parse(savedSession);
+    setWarga(userData);
+    loadIuran(userData.id);
+    loadDeposit(userData.id);
+    loadTarif();
+    refreshSession(userData.id);
+  }, []);
+
+  useEffect(() => {
+    if (!warga?.id) return;
+    const channel = supabase
+      .channel('warga-iuran-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran' }, () => loadIuran(warga.id))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deposit_warga' }, () => loadDeposit(warga.id))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pengeluaran' }, () => { if(showKasRTModal) loadKasRT(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pemasukan_lain' }, () => { if(showKasRTModal) loadKasRT(); })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [warga?.id, showKasRTModal]);
+
+  const refreshSession = async (wargaId) => {
+    try {
+      const data = await fetchWargaById(wargaId);
+      setWarga(data);
+      const { password: _, ...profilAman } = data;
+      localStorage.setItem('warga_session', JSON.stringify(profilAman));
+    } catch (err) {}
+  };
+
+  const loadIuran = async (wargaId) => {
+    try {
+      const data = await fetchIuranByWarga(wargaId);
+      setIuranList(data);
+    } catch (err) {} finally { setLoading(false); }
+  };
+
+  const loadDeposit = async (wargaId) => {
+    try {
+      const { data, error } = await supabase.from('deposit_warga').select('*').eq('warga_id', wargaId).order('tanggal', { ascending: false });
+      if (!error && data) setDepositList(data);
+    } catch (err) {}
+  };
+
+  const loadTarif = async () => {
+    try {
+      const data = await fetchTarifList();
+      setTarifList(data);
+    } catch (err) {}
+  };
+
+  const loadKasRT = async () => {
+    try {
+      const [resIuranGlobal, resPengeluaran, resPemasukan] = await Promise.all([
+        fetchAllIuran(), 
+        supabase.from('pengeluaran').select('*').order('tanggal', { ascending: false }),
+        supabase.from('pemasukan_lain').select('*').order('tanggal', { ascending: false })
+      ]);
+      setKasRTIuranList(resIuranGlobal || []);
+      setPengeluaranList(resPengeluaran.data || []);
+      setPemasukanLainList(resPemasukan.data || []);
+    } catch (err) {
+      console.error('Gagal load kas RT:', err);
+    }
+  };
+
+  const handleBukaKasRT = () => {
+    loadKasRT(); 
+    setShowKasRTModal(true);
+  };
+
+  const loadRekap = async () => {
+    if (allWargaList.length > 0) {
+      setShowRekapModal(true);
+      return;
+    }
+    setLoadingRekap(true);
+    try {
+      const [wargaData, iuranData] = await Promise.all([fetchAllWarga(), fetchAllIuran()]);
+      setAllWargaList(wargaData);
+      setAllIuranList(iuranData);
+      setShowRekapModal(true);
+    } catch (err) {
+      alert('Gagal memuat rekap.');
+    } finally {
+      setLoadingRekap(false);
+    }
+  };
+
+  const handleLogout = () => {
+    if (!confirm('Keluar dari akun warga?')) return;
+    localStorage.removeItem('warga_session');
+    router.replace('/');
+  };
+
+  if (!warga) return null;
+
+  const periodeBulanAktif = getPeriodeBulan(tahunTerpilih);
+  const tarifBulanan = getTarifWarga(warga, tarifList, tahunTerpilih);
+  const usaha = isWargaUsaha(warga);
+
+  const totalDisetor = iuranList.filter((i) => i.status === 'approved').reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
+  const saldoDeposit = depositList.reduce((s, d) => s + (d.tipe === 'masuk' ? Number(d.jumlah) : -Number(d.jumlah)), 0);
+  const estimasiBulan = tarifBulanan > 0 ? Math.floor(saldoDeposit / tarifBulanan) : 0;
+
+  const adaPending = iuranList.some((i) => i.status === 'pending');
+  const adaDitolak = iuranList.some((i) => i.status === 'rejected'); // CEK BANNER DITOLAK
+  const belumLunasList = hitungBelumLunas(iuranList, periodeBulanAktif, tarifBulanan);
+  const bulanTombolBayar = belumLunasList[0]?.kode || null;
+
+  const handleOpenModalBayar = () => {
+    setBulanDipilih(belumLunasList.map((b) => b.kode));
+    setShowModalBayar(true);
+  };
+
+  const handleSubmitBayar = async ({ fileBukti, catatan, bulanDipilih: bulanPilih }) => {
+    setSubmitting(true);
+    try {
+      const batchId = crypto.randomUUID();
+      const uploadedUrls = [];
+      for (let i = 0; i < 3; i++) {
+        const file = fileBukti[i];
+        if (!file) continue;
+        const url = await uploadBukti(file, warga.id, batchId, i);
+        uploadedUrls.push(url);
+      }
+
+      // ═══ LOGIKA OPSI B: UPDATE JIKA REVISI ═══
+      for (const bln of bulanPilih) {
+        const info = getInfoBulan(iuranList, bln, tarifBulanan);
+        if (info.kurang <= 0) continue;
+
+        // Cari apakah ada data yang pernah ditolak untuk bulan ini
+        const existingRejected = info.recs.find(r => r.status === 'rejected');
+
+        if (existingRejected) {
+          // Jika ADA, lakukan UPDATE (Timpa)
+          const newCatatan = existingRejected.catatan 
+            ? `${existingRejected.catatan} | Revisi : ${catatan || 'Diperbaiki warga'}` 
+            : `Revisi : ${catatan || 'Diperbaiki warga'}`;
+
+          await updatePengajuanIuran(existingRejected.id, {
+            jumlah: info.kurang,
+            status: 'pending',
+            batch_id: batchId, // Gunakan batch baru agar masuk grup verifikasi yg sama
+            bukti_urls: uploadedUrls,
+            catatan: newCatatan,
+            tanggal_transaksi: null
+          });
+        } else {
+          // Jika TIDAK ADA, lakukan INSERT (Baru)
+          await insertPengajuanIuran([{
+            warga_id: warga.id,
+            bulan_tahun: bln,
+            jumlah: info.kurang,
+            status: 'pending',
+            batch_id: batchId,
+            bukti_urls: uploadedUrls,
+            catatan: catatan || null,
+            tanggal_transaksi: null
+          }]);
+        }
+      }
+
+      alert('✅ Pengajuan berhasil dikirim!');
+      setShowModalBayar(false);
+      loadIuran(warga.id);
+    } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
+  };
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-5 sm:p-6 shadow-xl">
-      <div className="flex justify-between items-center mb-5">
-        <div>
-          <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
-            Grid Iuran Bulanan 2026
-          </h3>
-          <p className="text-xs text-slate-400">Klik grid untuk detail tanggal</p>
-        </div>
-        <span className="text-xs bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 font-medium">
-          9 Bulan
-        </span>
-      </div>
+    <>
+      <Head><title>Status Iuran - Portal Warga RT 38</title></Head>
+      <Layout warga={warga} onLogout={handleLogout}>
+        <ProfileCard warga={warga} tarifBulanan={tarifBulanan} isUsaha={usaha} />
 
-      {adaPending && (
-        <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-xl text-xs text-orange-300">
-          ⏳ Ada pengajuan yang menunggu approve bendahara.
+        {adaDitolak && (
+          <div className="bg-rose-950/40 border border-rose-500/50 rounded-2xl p-4 flex items-start gap-3">
+            <span className="text-xl">⚠️</span>
+            <div>
+              <h4 className="text-sm font-bold text-rose-300">Ada Pembayaran yang Ditolak</h4>
+              <p className="text-xs text-rose-400 mt-0.5">Silakan periksa bulan yang berwarna merah di bawah, lalu lakukan pembayaran ulang dengan bukti yang benar.</p>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/30 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div>
+            <h4 className="text-sm font-bold text-white flex items-center gap-2">📊 Transparansi Kas RT 38</h4>
+            <p className="text-xs text-slate-400 mt-0.5">Lihat rekapitulasi iuran dan arus kas RT secara terbuka.</p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
+            
+            <button 
+              onClick={loadRekap} 
+              disabled={loadingRekap} 
+              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
+            >
+              {loadingRekap ? 'Memuat...' : '📋 Rekap Warga'}
+            </button>
+
+            <button onClick={handleBukaKasRT} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">
+              💰 Saldo Kas RT
+            </button>
+          </div>
         </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between">
+            <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">Total Setor</span>
+            <span className="text-lg font-black text-white mt-1">Rp {totalDisetor.toLocaleString('id-ID')}</span>
+          </div>
+          <div className="bg-slate-900/60 border border-emerald-500/20 rounded-2xl p-4 flex flex-col justify-between">
+            <span className="text-[11px] text-emerald-400 uppercase tracking-wider font-medium">Total Donasi 💚</span>
+            <span className="text-lg font-black text-emerald-400 mt-1">Rp 0</span>
+          </div>
+          <div className="bg-gradient-to-br from-purple-950/40 to-slate-900 border border-purple-500/30 rounded-2xl p-4 flex flex-col justify-between">
+            <span className="text-[11px] text-purple-300 uppercase tracking-wider font-medium">💎 Saldo Deposit</span>
+            <span className="text-lg font-black text-purple-300 mt-1">Rp {saldoDeposit.toLocaleString('id-ID')}</span>
+            {saldoDeposit > 0 && tarifBulanan > 0 && (
+              <span className="text-[9px] text-slate-400 mt-0.5">Cukup untuk ±{estimasiBulan} bulan</span>
+            )}
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="py-12 text-center text-xs text-slate-500">Memuat data iuran...</div>
+        ) : (
+          <IuranGrid
+            iuranList={iuranList} tarifBulanan={tarifBulanan} adaPending={adaPending} bulanTombolBayar={bulanTombolBayar} onKlikDetail={setSelectedBulanDetail} onBayar={handleOpenModalBayar}
+          />
+        )}
+      </Layout>
+
+      <ModalDetailBulan detail={selectedBulanDetail} onClose={() => setSelectedBulanDetail(null)} />
+      
+      <ModalBayar
+        show={showModalBayar} onClose={() => setShowModalBayar(false)} iuranList={iuranList} tarifBulanan={tarifBulanan} belumLunasList={belumLunasList} bulanDipilih={bulanDipilih} setBulanDipilih={setBulanDipilih} onSubmit={handleSubmitBayar} submitting={submitting} tahun={tahunTerpilih}
+      />
+
+      {showRekapModal && (
+        <ModalRekap show={showRekapModal} onClose={() => setShowRekapModal(false)} allWargaList={allWargaList} allIuranList={allIuranList} tarifList={tarifList} />
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-        {PERIODE_BULAN.map((bln, idx) => {
-          const info = getInfoBulan(iuranList, bln.kode, tarifBulanan);
-          const isPending = info.adaPendingBulan;
-          const isRejected = info.adaRejectedBulan; // TAMBAHAN BARU
-          const isLunas = !isPending && !isRejected && info.totalApproved >= tarifBulanan;
-          const isSebagian = !isPending && !isRejected && info.totalApproved > 0 && info.totalApproved < tarifBulanan;
-          const isKosong = info.recs.length === 0;
-          const isJatuhTempo = bln.kode <= bulanSekarang;
-
-          const isTombolBayar =
-            !adaPending &&
-            !isPending &&
-            !isLunas &&
-            bln.kode === bulanTombolBayar;
-
-          let cardClass = 'bg-slate-950/60 border-slate-800/60 text-slate-400';
-          if (isLunas) {
-            cardClass = 'bg-emerald-950/20 border-emerald-500/20 text-emerald-300';
-          } else if (isSebagian) {
-            cardClass = 'bg-amber-950/20 border-amber-500/30 text-amber-300';
-          } else if (isPending) {
-            cardClass = 'bg-orange-950/20 border-orange-500/30 text-orange-300';
-          } else if (isRejected) {
-            cardClass = 'bg-rose-950/30 border-rose-500/40 text-rose-300'; // Warna khusus Ditolak
-          } else if (isKosong && isJatuhTempo) {
-            cardClass = 'bg-rose-950/20 border-rose-500/30 text-rose-300';
-          }
-
-          const canClick = !isPending && !isRejected && !isKosong && info.totalApproved > 0;
-
-          const label = isLunas
-            ? '✓ Lunas'
-            : isSebagian
-            ? `- Rp ${info.kurang.toLocaleString('id-ID')}`
-            : isPending
-            ? '⏳ Menunggu'
-            : isRejected
-            ? '❌ Ditolak'
-            : isJatuhTempo
-            ? '⚠️ Telat'
-            : 'Belum';
-
-          const badgeClass = isLunas
-            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-            : isSebagian
-            ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-            : isPending
-            ? 'bg-orange-500/10 text-orange-400 border-orange-500/30'
-            : isRejected
-            ? 'bg-rose-500/20 text-rose-400 border-rose-500/40'
-            : isJatuhTempo
-            ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-            : 'bg-slate-800/80 text-slate-400 border-slate-700/60';
-
-          return (
-            <div
-              key={idx}
-              onClick={() => {
-                if (canClick) {
-                  onKlikDetail({
-                    namaBulan: bln.nama,
-                    jumlah: info.totalApproved,
-                    tanggal: info.recs.find((r) => r.status === 'approved')?.tanggal_transaksi,
-                  });
-                }
-              }}
-              className={`p-3.5 rounded-2xl border transition-all duration-200 ${cardClass} ${
-                canClick ? 'cursor-pointer hover:scale-[1.01]' : ''
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-white tracking-wide">{bln.nama}</span>
-                  <span className="text-[10px] text-slate-400">2026</span>
-                </div>
-                <span
-                  className={`inline-block text-[10px] px-2.5 py-1 rounded-xl font-semibold border ${badgeClass}`}
-                >
-                  {label}
-                </span>
-              </div>
-
-              <div className="text-[11px] mt-1 text-slate-400">
-                {isLunas
-                  ? `Rp ${info.totalApproved.toLocaleString('id-ID')}`
-                  : isSebagian
-                  ? `Terbayar Rp ${info.totalApproved.toLocaleString('id-ID')}`
-                  : isPending
-                  ? `Rp ${info.totalApproved.toLocaleString('id-ID')}`
-                  : isRejected
-                  ? `Silakan perbaiki & bayar ulang`
-                  : `Rp 0 / ${tarifBulanan.toLocaleString('id-ID')}`}
-              </div>
-
-              {isTombolBayar && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onBayar();
-                  }}
-                  className="mt-2.5 w-full bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold py-2 rounded-xl transition shadow-lg shadow-blue-600/20"
-                >
-                  📱 Bayar via QRIS
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
+      <ModalKasRT
+        show={showKasRTModal}
+        onClose={() => setShowKasRTModal(false)}
+        iuranList={kasRTIuranList}
+        pemasukanLainList={pemasukanLainList}
+        pengeluaranList={pengeluaranList}
+      />
+    </>
   );
 }
