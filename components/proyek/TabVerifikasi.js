@@ -6,6 +6,7 @@ export default function TabVerifikasi({
   iuranProyekList = [],
   wargaList = [],
   onApprove,
+  onReject,
 }) {
   const [filterProyek, setFilterProyek] = useState('semua');
   const [processing, setProcessing] = useState(null);
@@ -21,6 +22,15 @@ export default function TabVerifikasi({
     setProcessing(item.id);
     try {
       await onApprove(item);
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleReject = async (item) => {
+    setProcessing(item.id);
+    try {
+      await onReject(item);
     } finally {
       setProcessing(null);
     }
@@ -81,6 +91,9 @@ export default function TabVerifikasi({
                   const w = wargaList.find((x) => x.id === item.warga_id);
                   const p = proyekList.find((x) => x.id === item.proyek_id);
                   const bukti = item.bukti_urls || [];
+                  
+                  // Deteksi Revisi
+                  const isRevisi = item.catatan?.toLowerCase().includes('revisi');
 
                   return (
                     <tr key={item.id} className="hover:bg-slate-800/40">
@@ -115,16 +128,29 @@ export default function TabVerifikasi({
                         )}
                       </td>
                       <td className="p-3 text-slate-400 text-[10px] max-w-[200px] truncate">
-                        {item.catatan || '-'}
+                        {isRevisi ? (
+                          <span className="text-blue-300 font-semibold bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">🔄 Revisi</span>
+                        ) : (
+                          item.catatan || '-'
+                        )}
                       </td>
                       <td className="p-3 text-right">
-                        <button
-                          onClick={() => handleApprove(item)}
-                          disabled={processing === item.id}
-                          className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white text-[10px] font-semibold px-3 py-1.5 rounded-lg"
-                        >
-                          {processing === item.id ? 'Memproses...' : '✓ Approve'}
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleApprove(item)}
+                            disabled={processing === item.id}
+                            className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white text-[10px] font-semibold px-3 py-1.5 rounded-lg"
+                          >
+                            {processing === item.id ? '...' : '✓ Approve'}
+                          </button>
+                          <button
+                            onClick={() => handleReject(item)}
+                            disabled={processing === item.id}
+                            className="bg-rose-600 hover:bg-rose-500 disabled:bg-slate-700 text-white text-[10px] font-semibold px-3 py-1.5 rounded-lg"
+                          >
+                            {processing === item.id ? '...' : '✗ Tolak'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
