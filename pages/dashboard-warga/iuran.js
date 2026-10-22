@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react'; // TAMBAHAN useRef
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { supabase } from '../../lib/supabase';
@@ -23,6 +23,7 @@ import {
   fetchAllWarga,
   fetchAllIuran, 
   insertPengajuanIuran,
+  updatePengajuanIuran,
 } from '../../lib/iuran/queries';
 import { uploadBukti } from '../../lib/iuran/storage';
 import { fetchTarifList, getTarifWarga } from '../../lib/iuran/tarif';
@@ -51,6 +52,12 @@ export default function DashboardWargaIuran() {
   const [tahunTerpilih, setTahunTerpilih] = useState(getTahunSekarang());
 
   const router = useRouter();
+  
+  // Gunakan useRef untuk mendeteksi status modal tanpa memicu re-render
+  const showKasRTModalRef = useRef(false);
+  useEffect(() => {
+    showKasRTModalRef.current = showKasRTModal;
+  }, [showKasRTModal]);
 
   useEffect(() => {
     const savedSession = localStorage.getItem('warga_session');
@@ -66,18 +73,25 @@ export default function DashboardWargaIuran() {
     refreshSession(userData.id);
   }, []);
 
+  // PERBAIKAN REALTIME: Hapus showKasRTModal dari dependency array
   useEffect(() => {
     if (!warga?.id) return;
+    
+    // Beri nama unik pada channel agar tidak bentrok
     const channel = supabase
-      .channel('warga-iuran-changes')
+      .channel(`warga-iuran-changes-${warga.id}`) 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran' }, () => loadIuran(warga.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deposit_warga' }, () => loadDeposit(warga.id))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pengeluaran' }, () => { if(showKasRTModal) loadKasRT(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pemasukan_lain' }, () => { if(showKasRTModal) loadKasRT(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pengeluaran' }, () => { 
+        if (showKasRTModalRef.current) loadKasRT(); 
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pemasukan_lain' }, () => { 
+        if (showKasRTModalRef.current) loadKasRT(); 
+      })
       .subscribe();
 
     return () => supabase.removeChannel(channel);
-  }, [warga?.id, showKasRTModal]);
+  }, [warga?.id]); // Hanya bergantung pada warga.id
 
   const refreshSession = async (wargaId) => {
     try {
@@ -164,6 +178,7 @@ export default function DashboardWargaIuran() {
   const estimasiBulan = tarifBulanan > 0 ? Math.floor(saldoDeposit / tarifBulanan) : 0;
 
   const adaPending = iuranList.some((i) => i.status === 'pending');
+  const adaDitolak = iuranList.some((i) => i.status === 'rejected');
   const belumLunasList = hitungBelumLunas(iuranList, periodeBulanAktif, tarifBulanan);
   const bulanTombolBayar = belumLunasList[0]?.kode || null;
 
@@ -183,13 +198,41 @@ export default function DashboardWargaIuran() {
         const url = await uploadBukti(file, warga.id, batchId, i);
         uploadedUrls.push(url);
       }
-      const records = bulanPilih.map((bln) => {
-          const info = getInfoBulan(iuranList, bln, tarifBulanan);
-          return { warga_id: warga.id, bulan_tahun: bln, jumlah: info.kurang, status: 'pending', batch_id: batchId, bukti_urls: uploadedUrls, catatan: catatan || null, tanggal_transaksi: null };
-        }).filter((r) => r.jumlah > 0);
-      if (records.length === 0) throw new Error('Tidak ada nominal');
-      await insertPengajuanIuran(records);
-      alert('✅ Pengajuan berhasil!');
+
+      for (const bln of bulanPilih) {
+        const info = getInfoBulan(iuranList, bln, tarifBulanan);
+        if (info.kurang <= 0) continue;
+
+        const existingRejected = info.recs.find(r => r.status === 'rejected');
+
+        if (existingRejected) {
+          const newCatatan = existingRejected.catatan 
+            ? `${existingRejected.catatan} | Revisi : ${catatan || 'Diperbaiki warga'}` 
+            : `Revisi : ${catatan || 'Diperbaiki warga'}`;
+
+          await updatePengajuanIuran(existingRejected.id, {
+            jumlah: info.kurang,
+            status: 'pending',
+            batch_id: batchId,
+            bukti_urls: uploadedUrls,
+            catatan: newCatatan,
+            tanggal_transaksi: null
+          });
+        } else {
+          await insertPengajuanIuran([{
+            warga_id: warga.id,
+            bulan_tahun: bln,
+            jumlah: info.kurang,
+            status: 'pending',
+            batch_id: batchId,
+            bukti_urls: uploadedUrls,
+            catatan: catatan || null,
+            tanggal_transaksi: null
+          }]);
+        }
+      }
+
+      alert('✅ Pengajuan berhasil dikirim!');
       setShowModalBayar(false);
       loadIuran(warga.id);
     } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
@@ -201,6 +244,16 @@ export default function DashboardWargaIuran() {
       <Layout warga={warga} onLogout={handleLogout}>
         <ProfileCard warga={warga} tarifBulanan={tarifBulanan} isUsaha={usaha} />
 
+        {adaDitolak && (
+          <div className="bg-rose-950/40 border border-rose-500/50 rounded-2xl p-4 flex items-start gap-3">
+            <span className="text-xl">⚠️</span>
+            <div>
+              <h4 className="text-sm font-bold text-rose-300">Ada Pembayaran yang Ditolak</h4>
+              <p className="text-xs text-rose-400 mt-0.5">Silakan periksa bulan yang berwarna merah di bawah, lalu lakukan pembayaran ulang dengan bukti yang benar.</p>
+            </div>
+          </div>
+        )}
+
         <div className="bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/30 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
             <h4 className="text-sm font-bold text-white flex items-center gap-2">📊 Transparansi Kas RT 38</h4>
@@ -208,7 +261,6 @@ export default function DashboardWargaIuran() {
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
             
-            {/* ═══ TOMBOL REKAP WARGA (UDAH DIGANTI JADI INDIGO) ═══ */}
             <button 
               onClick={loadRekap} 
               disabled={loadingRekap} 
