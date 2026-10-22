@@ -43,6 +43,33 @@ export default function PageProyekVerifikasi() {
     }
   }
 
+  async function handleReject(item) {
+    const alasan = prompt('Masukkan alasan penolakan (wajib diisi):');
+    if (alasan === null) return;
+    if (!alasan.trim()) {
+      alert('Alasan penolakan tidak boleh kosong!');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('iuran_proyek')
+        .update({ 
+          status: 'rejected', 
+          catatan: `Ditolak: ${alasan.trim()}` 
+        })
+        .eq('id', item.id);
+      
+      if (error) throw error;
+      
+      alert('✅ Cicilan berhasil ditolak.');
+      invalidateProyekCache();
+      refetch();
+    } catch (err) {
+      alert('Gagal menolak: ' + err.message);
+    }
+  }
+
   if (loading) {
     return (
       <Layout user={user}>
@@ -60,6 +87,7 @@ export default function PageProyekVerifikasi() {
         iuranProyekList={iuranProyekList}
         wargaList={warga}
         onApprove={handleApprove}
+        onReject={handleReject}
       />
     </Layout>
   );
