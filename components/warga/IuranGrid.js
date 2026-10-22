@@ -1,7 +1,6 @@
-import { PERIODE_BULAN } from '../../lib/iuran/constants';
 import { getInfoBulan } from '../../lib/iuran/calculations';
 
-export default function IuranGrid({ iuranList, tarifBulanan, adaPending, bulanTombolBayar, onKlikDetail, onBayar }) {
+export default function IuranGrid({ iuranList, tarifBulanan, adaPending, bulanTombolBayar, onKlikDetail, onBayar, periodeBulan = [] }) {
   const now = new Date();
   const bulanSekarang = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const safeTarif = Number(tarifBulanan) || 0;
@@ -10,12 +9,11 @@ export default function IuranGrid({ iuranList, tarifBulanan, adaPending, bulanTo
     <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-5 sm:p-6 shadow-xl">
       <div className="flex justify-between items-center mb-5">
         <div>
-          <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">Grid Iuran Bulanan 2026</h3>
+          <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">Grid Iuran Bulanan {now.getFullYear()}</h3>
           <p className="text-xs text-slate-400">Klik grid untuk detail tanggal</p>
         </div>
-        {/* Angka 9 Bulan otomatis ngikutin jumlah array PERIODE_BULAN */}
         <span className="text-xs bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 font-medium">
-          {PERIODE_BULAN.length} Bulan
+          {periodeBulan.length} Bulan
         </span>
       </div>
 
@@ -26,7 +24,7 @@ export default function IuranGrid({ iuranList, tarifBulanan, adaPending, bulanTo
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-        {PERIODE_BULAN.map((bln, idx) => {
+        {periodeBulan.map((bln, idx) => {
           const info = getInfoBulan(iuranList, bln.kode, safeTarif);
           const isPending = info.adaPendingBulan;
           const isRejected = info.adaRejectedBulan;
@@ -55,7 +53,7 @@ export default function IuranGrid({ iuranList, tarifBulanan, adaPending, bulanTo
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-white tracking-wide">{bln.nama}</span>
-                  <span className="text-[10px] text-slate-400">2026</span>
+                  <span className="text-[10px] text-slate-400">{bln.kode.split('-')[0]}</span>
                 </div>
                 <span className={`inline-block text-[10px] px-2.5 py-1 rounded-xl font-semibold border ${badgeClass}`}>{label}</span>
               </div>
