@@ -1,4 +1,4 @@
-import { PERIODE_BULAN, isWargaUsaha, TARIF_NORMAL, TARIF_USAHA } from '../../lib/iuran/constants';
+import { getPeriodeBulan, isWargaUsaha, TARIF_NORMAL, TARIF_USAHA } from '../../lib/iuran/constants';
 import { getTarifWarga } from '../../lib/iuran/tarif';
 
 export default function ModalRekap({ show, onClose, allWargaList, allIuranList, tarifList }) {
@@ -11,6 +11,9 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList, 
 
   const now = new Date();
   const bulanSekarang = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  
+  // Ambil data bulan secara dinamis (khusus 2026 mulai April)
+  const periodeBulanAktif = getPeriodeBulan(2026);
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
@@ -42,7 +45,8 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList, 
                 <th className="p-1.5 sm:p-3 text-[10px] sm:text-xs text-left sticky left-0 bg-slate-950 z-30 w-[80px] sm:w-[200px] border-r border-slate-800/80">
                   Warga
                 </th>
-                {PERIODE_BULAN.map((b, i) => {
+                {/* UBAH DARI PERIODE_BULAN KE periodeBulanAktif */}
+                {periodeBulanAktif.map((b, i) => {
                   const isJatuhTempo = b.kode <= bulanSekarang;
                   return (
                     <th
@@ -104,7 +108,8 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList, 
                     </td>
 
                     {/* Kolom Bulan */}
-                    {PERIODE_BULAN.map((bln, bIdx) => {
+                    {/* UBAH DARI PERIODE_BULAN KE periodeBulanAktif */}
+                    {periodeBulanAktif.map((bln, bIdx) => {
                       const recsBulan = iuranWarga.filter((i) => i && i.bulan_tahun === bln.kode);
                       const totalApproved = recsBulan
                         .filter((r) => r.status === 'approved')
