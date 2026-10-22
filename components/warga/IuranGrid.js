@@ -13,7 +13,10 @@ export default function IuranGrid({ iuranList, tarifBulanan, adaPending, bulanTo
           <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">Grid Iuran Bulanan 2026</h3>
           <p className="text-xs text-slate-400">Klik grid untuk detail tanggal</p>
         </div>
-        <span className="text-xs bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 font-medium">9 Bulan</span>
+        {/* Angka 9 Bulan otomatis ngikutin jumlah array PERIODE_BULAN */}
+        <span className="text-xs bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 font-medium">
+          {PERIODE_BULAN.length} Bulan
+        </span>
       </div>
 
       {adaPending && (
