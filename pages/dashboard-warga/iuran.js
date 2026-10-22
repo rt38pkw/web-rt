@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'; // TAMBAHAN useRef
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { supabase } from '../../lib/supabase';
@@ -53,7 +53,6 @@ export default function DashboardWargaIuran() {
 
   const router = useRouter();
   
-  // Gunakan useRef untuk mendeteksi status modal tanpa memicu re-render
   const showKasRTModalRef = useRef(false);
   useEffect(() => {
     showKasRTModalRef.current = showKasRTModal;
@@ -73,13 +72,17 @@ export default function DashboardWargaIuran() {
     refreshSession(userData.id);
   }, []);
 
-  // PERBAIKAN REALTIME: Hapus showKasRTModal dari dependency array
   useEffect(() => {
     if (!warga?.id) return;
     
-    // Beri nama unik pada channel agar tidak bentrok
+    // ═══ TANDA KODE BARU ═══
+    console.log("🚀 KODE BARU BERJALAN! Channel unik siap dibuat.");
+
+    // Gunakan nama channel yang benar-benar unik
+    const channelName = `realtime-iuran-warga-${warga.id}-${Math.random()}`;
+    
     const channel = supabase
-      .channel(`warga-iuran-changes-${warga.id}`) 
+      .channel(channelName) 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran' }, () => loadIuran(warga.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deposit_warga' }, () => loadDeposit(warga.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pengeluaran' }, () => { 
@@ -90,8 +93,11 @@ export default function DashboardWargaIuran() {
       })
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
-  }, [warga?.id]); // Hanya bergantung pada warga.id
+    return () => {
+      console.log("🛑 Membersihkan Channel Realtime");
+      supabase.removeChannel(channel);
+    };
+  }, [warga?.id]); 
 
   const refreshSession = async (wargaId) => {
     try {
