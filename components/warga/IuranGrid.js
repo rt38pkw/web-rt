@@ -36,8 +36,9 @@ export default function IuranGrid({
         {PERIODE_BULAN.map((bln, idx) => {
           const info = getInfoBulan(iuranList, bln.kode, tarifBulanan);
           const isPending = info.adaPendingBulan;
-          const isLunas = !isPending && info.totalApproved >= tarifBulanan;
-          const isSebagian = !isPending && info.totalApproved > 0 && info.totalApproved < tarifBulanan;
+          const isRejected = info.adaRejectedBulan; // TAMBAHAN BARU
+          const isLunas = !isPending && !isRejected && info.totalApproved >= tarifBulanan;
+          const isSebagian = !isPending && !isRejected && info.totalApproved > 0 && info.totalApproved < tarifBulanan;
           const isKosong = info.recs.length === 0;
           const isJatuhTempo = bln.kode <= bulanSekarang;
 
@@ -54,11 +55,13 @@ export default function IuranGrid({
             cardClass = 'bg-amber-950/20 border-amber-500/30 text-amber-300';
           } else if (isPending) {
             cardClass = 'bg-orange-950/20 border-orange-500/30 text-orange-300';
+          } else if (isRejected) {
+            cardClass = 'bg-rose-950/30 border-rose-500/40 text-rose-300'; // Warna khusus Ditolak
           } else if (isKosong && isJatuhTempo) {
             cardClass = 'bg-rose-950/20 border-rose-500/30 text-rose-300';
           }
 
-          const canClick = !isPending && !isKosong && info.totalApproved > 0;
+          const canClick = !isPending && !isRejected && !isKosong && info.totalApproved > 0;
 
           const label = isLunas
             ? '✓ Lunas'
@@ -66,6 +69,8 @@ export default function IuranGrid({
             ? `- Rp ${info.kurang.toLocaleString('id-ID')}`
             : isPending
             ? '⏳ Menunggu'
+            : isRejected
+            ? '❌ Ditolak'
             : isJatuhTempo
             ? '⚠️ Telat'
             : 'Belum';
@@ -76,6 +81,8 @@ export default function IuranGrid({
             ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
             : isPending
             ? 'bg-orange-500/10 text-orange-400 border-orange-500/30'
+            : isRejected
+            ? 'bg-rose-500/20 text-rose-400 border-rose-500/40'
             : isJatuhTempo
             ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
             : 'bg-slate-800/80 text-slate-400 border-slate-700/60';
@@ -115,6 +122,8 @@ export default function IuranGrid({
                   ? `Terbayar Rp ${info.totalApproved.toLocaleString('id-ID')}`
                   : isPending
                   ? `Rp ${info.totalApproved.toLocaleString('id-ID')}`
+                  : isRejected
+                  ? `Silakan perbaiki & bayar ulang`
                   : `Rp 0 / ${tarifBulanan.toLocaleString('id-ID')}`}
               </div>
 
