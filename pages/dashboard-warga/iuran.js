@@ -10,21 +10,9 @@ import ModalRekap from '../../components/warga/ModalRekap';
 import ModalDetailBulan from '../../components/warga/ModalDetailBulan';
 import ModalKasRT from '../../components/warga/ModalKasRT';
 
-import {
-  getPeriodeBulan,
-  TAHUN_TERSEDIA,
-  getTahunSekarang,
-  isWargaUsaha,
-} from '../../lib/iuran/constants';
+import { getPeriodeBulan, TAHUN_TERSEDIA, getTahunSekarang, isWargaUsaha } from '../../lib/iuran/constants';
 import { getInfoBulan, hitungBelumLunas, formatTanggal } from '../../lib/iuran/calculations';
-import {
-  fetchWargaById,
-  fetchIuranByWarga,
-  fetchAllWarga,
-  fetchAllIuran, 
-  insertPengajuanIuran,
-  updatePengajuanIuran,
-} from '../../lib/iuran/queries';
+import { fetchWargaById, fetchIuranByWarga, fetchAllWarga, fetchAllIuran, insertPengajuanIuran, updatePengajuanIuran } from '../../lib/iuran/queries';
 import { uploadBukti } from '../../lib/iuran/storage';
 import { fetchTarifList, getTarifWarga } from '../../lib/iuran/tarif';
 
@@ -52,18 +40,13 @@ export default function DashboardWargaIuran() {
   const [tahunTerpilih, setTahunTerpilih] = useState(getTahunSekarang());
 
   const router = useRouter();
-  
   const showKasRTModalRef = useRef(false);
-  useEffect(() => {
-    showKasRTModalRef.current = showKasRTModal;
-  }, [showKasRTModal]);
+
+  useEffect(() => { showKasRTModalRef.current = showKasRTModal; }, [showKasRTModal]);
 
   useEffect(() => {
     const savedSession = localStorage.getItem('warga_session');
-    if (!savedSession) {
-      router.push('/');
-      return;
-    }
+    if (!savedSession) { router.push('/'); return; }
     const userData = JSON.parse(savedSession);
     setWarga(userData);
     loadIuran(userData.id);
@@ -74,29 +57,17 @@ export default function DashboardWargaIuran() {
 
   useEffect(() => {
     if (!warga?.id) return;
+    console.log("🚀 KODE BARU BERJALAN! Realtime aman.");
     
-    // ═══ TANDA KODE BARU ═══
-    console.log("🚀 KODE BARU BERJALAN! Channel unik siap dibuat.");
-
-    // Gunakan nama channel yang benar-benar unik
     const channelName = `realtime-iuran-warga-${warga.id}-${Math.random()}`;
-    
-    const channel = supabase
-      .channel(channelName) 
+    const channel = supabase.channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran' }, () => loadIuran(warga.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deposit_warga' }, () => loadDeposit(warga.id))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pengeluaran' }, () => { 
-        if (showKasRTModalRef.current) loadKasRT(); 
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pemasukan_lain' }, () => { 
-        if (showKasRTModalRef.current) loadKasRT(); 
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pengeluaran' }, () => { if (showKasRTModalRef.current) loadKasRT(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pemasukan_lain' }, () => { if (showKasRTModalRef.current) loadKasRT(); })
       .subscribe();
 
-    return () => {
-      console.log("🛑 Membersihkan Channel Realtime");
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [warga?.id]); 
 
   const refreshSession = async (wargaId) => {
@@ -109,68 +80,38 @@ export default function DashboardWargaIuran() {
   };
 
   const loadIuran = async (wargaId) => {
-    try {
-      const data = await fetchIuranByWarga(wargaId);
-      setIuranList(data);
-    } catch (err) {} finally { setLoading(false); }
+    try { const data = await fetchIuranByWarga(wargaId); setIuranList(data); } catch (err) {} finally { setLoading(false); }
   };
 
   const loadDeposit = async (wargaId) => {
-    try {
-      const { data, error } = await supabase.from('deposit_warga').select('*').eq('warga_id', wargaId).order('tanggal', { ascending: false });
-      if (!error && data) setDepositList(data);
-    } catch (err) {}
+    try { const { data, error } = await supabase.from('deposit_warga').select('*').eq('warga_id', wargaId).order('tanggal', { ascending: false }); if (!error && data) setDepositList(data); } catch (err) {}
   };
 
   const loadTarif = async () => {
-    try {
-      const data = await fetchTarifList();
-      setTarifList(data);
-    } catch (err) {}
+    try { const data = await fetchTarifList(); setTarifList(data); } catch (err) {}
   };
 
   const loadKasRT = async () => {
     try {
-      const [resIuranGlobal, resPengeluaran, resPemasukan] = await Promise.all([
-        fetchAllIuran(), 
-        supabase.from('pengeluaran').select('*').order('tanggal', { ascending: false }),
-        supabase.from('pemasukan_lain').select('*').order('tanggal', { ascending: false })
-      ]);
-      setKasRTIuranList(resIuranGlobal || []);
-      setPengeluaranList(resPengeluaran.data || []);
-      setPemasukanLainList(resPemasukan.data || []);
-    } catch (err) {
-      console.error('Gagal load kas RT:', err);
-    }
+      const [resIuranGlobal, resPengeluaran, resPemasukan] = await Promise.all([fetchAllIuran(), supabase.from('pengeluaran').select('*').order('tanggal', { ascending: false }), supabase.from('pemasukan_lain').select('*').order('tanggal', { ascending: false })]);
+      setKasRTIuranList(resIuranGlobal || []); setPengeluaranList(resPengeluaran.data || []); setPemasukanLainList(resPemasukan.data || []);
+    } catch (err) { console.error('Gagal load kas RT:', err); }
   };
 
-  const handleBukaKasRT = () => {
-    loadKasRT(); 
-    setShowKasRTModal(true);
-  };
+  const handleBukaKasRT = () => { loadKasRT(); setShowKasRTModal(true); };
 
   const loadRekap = async () => {
-    if (allWargaList.length > 0) {
-      setShowRekapModal(true);
-      return;
-    }
+    if (allWargaList.length > 0) { setShowRekapModal(true); return; }
     setLoadingRekap(true);
     try {
       const [wargaData, iuranData] = await Promise.all([fetchAllWarga(), fetchAllIuran()]);
-      setAllWargaList(wargaData);
-      setAllIuranList(iuranData);
-      setShowRekapModal(true);
-    } catch (err) {
-      alert('Gagal memuat rekap.');
-    } finally {
-      setLoadingRekap(false);
-    }
+      setAllWargaList(wargaData); setAllIuranList(iuranData); setShowRekapModal(true);
+    } catch (err) { alert('Gagal memuat rekap.'); } finally { setLoadingRekap(false); }
   };
 
   const handleLogout = () => {
     if (!confirm('Keluar dari akun warga?')) return;
-    localStorage.removeItem('warga_session');
-    router.replace('/');
+    localStorage.removeItem('warga_session'); router.replace('/');
   };
 
   if (!warga) return null;
@@ -188,10 +129,7 @@ export default function DashboardWargaIuran() {
   const belumLunasList = hitungBelumLunas(iuranList, periodeBulanAktif, tarifBulanan);
   const bulanTombolBayar = belumLunasList[0]?.kode || null;
 
-  const handleOpenModalBayar = () => {
-    setBulanDipilih(belumLunasList.map((b) => b.kode));
-    setShowModalBayar(true);
-  };
+  const handleOpenModalBayar = () => { setBulanDipilih(belumLunasList.map((b) => b.kode)); setShowModalBayar(true); };
 
   const handleSubmitBayar = async ({ fileBukti, catatan, bulanDipilih: bulanPilih }) => {
     setSubmitting(true);
@@ -212,35 +150,14 @@ export default function DashboardWargaIuran() {
         const existingRejected = info.recs.find(r => r.status === 'rejected');
 
         if (existingRejected) {
-          const newCatatan = existingRejected.catatan 
-            ? `${existingRejected.catatan} | Revisi : ${catatan || 'Diperbaiki warga'}` 
-            : `Revisi : ${catatan || 'Diperbaiki warga'}`;
-
-          await updatePengajuanIuran(existingRejected.id, {
-            jumlah: info.kurang,
-            status: 'pending',
-            batch_id: batchId,
-            bukti_urls: uploadedUrls,
-            catatan: newCatatan,
-            tanggal_transaksi: null
-          });
+          const newCatatan = existingRejected.catatan ? `${existingRejected.catatan} | Revisi : ${catatan || 'Diperbaiki warga'}` : `Revisi : ${catatan || 'Diperbaiki warga'}`;
+          await updatePengajuanIuran(existingRejected.id, { jumlah: info.kurang, status: 'pending', batch_id: batchId, bukti_urls: uploadedUrls, catatan: newCatatan, tanggal_transaksi: null });
         } else {
-          await insertPengajuanIuran([{
-            warga_id: warga.id,
-            bulan_tahun: bln,
-            jumlah: info.kurang,
-            status: 'pending',
-            batch_id: batchId,
-            bukti_urls: uploadedUrls,
-            catatan: catatan || null,
-            tanggal_transaksi: null
-          }]);
+          await insertPengajuanIuran([{ warga_id: warga.id, bulan_tahun: bln, jumlah: info.kurang, status: 'pending', batch_id: batchId, bukti_urls: uploadedUrls, catatan: catatan || null, tanggal_transaksi: null }]);
         }
       }
 
-      alert('✅ Pengajuan berhasil dikirim!');
-      setShowModalBayar(false);
-      loadIuran(warga.id);
+      alert('✅ Pengajuan berhasil dikirim!'); setShowModalBayar(false); loadIuran(warga.id);
     } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
   };
 
@@ -266,15 +183,9 @@ export default function DashboardWargaIuran() {
             <p className="text-xs text-slate-400 mt-0.5">Lihat rekapitulasi iuran dan arus kas RT secara terbuka.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
-            
-            <button 
-              onClick={loadRekap} 
-              disabled={loadingRekap} 
-              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
-            >
+            <button onClick={loadRekap} disabled={loadingRekap} className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2">
               {loadingRekap ? 'Memuat...' : '📋 Rekap Warga'}
             </button>
-
             <button onClick={handleBukaKasRT} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">
               💰 Saldo Kas RT
             </button>
@@ -293,38 +204,21 @@ export default function DashboardWargaIuran() {
           <div className="bg-gradient-to-br from-purple-950/40 to-slate-900 border border-purple-500/30 rounded-2xl p-4 flex flex-col justify-between">
             <span className="text-[11px] text-purple-300 uppercase tracking-wider font-medium">💎 Saldo Deposit</span>
             <span className="text-lg font-black text-purple-300 mt-1">Rp {saldoDeposit.toLocaleString('id-ID')}</span>
-            {saldoDeposit > 0 && tarifBulanan > 0 && (
-              <span className="text-[9px] text-slate-400 mt-0.5">Cukup untuk ±{estimasiBulan} bulan</span>
-            )}
+            {saldoDeposit > 0 && tarifBulanan > 0 && (<span className="text-[9px] text-slate-400 mt-0.5">Cukup untuk ±{estimasiBulan} bulan</span>)}
           </div>
         </div>
 
         {loading ? (
           <div className="py-12 text-center text-xs text-slate-500">Memuat data iuran...</div>
         ) : (
-          <IuranGrid
-            iuranList={iuranList} tarifBulanan={tarifBulanan} adaPending={adaPending} bulanTombolBayar={bulanTombolBayar} onKlikDetail={setSelectedBulanDetail} onBayar={handleOpenModalBayar}
-          />
+          <IuranGrid iuranList={iuranList} tarifBulanan={tarifBulanan} adaPending={adaPending} bulanTombolBayar={bulanTombolBayar} onKlikDetail={setSelectedBulanDetail} onBayar={handleOpenModalBayar} />
         )}
       </Layout>
 
       <ModalDetailBulan detail={selectedBulanDetail} onClose={() => setSelectedBulanDetail(null)} />
-      
-      <ModalBayar
-        show={showModalBayar} onClose={() => setShowModalBayar(false)} iuranList={iuranList} tarifBulanan={tarifBulanan} belumLunasList={belumLunasList} bulanDipilih={bulanDipilih} setBulanDipilih={setBulanDipilih} onSubmit={handleSubmitBayar} submitting={submitting} tahun={tahunTerpilih}
-      />
-
-      {showRekapModal && (
-        <ModalRekap show={showRekapModal} onClose={() => setShowRekapModal(false)} allWargaList={allWargaList} allIuranList={allIuranList} tarifList={tarifList} />
-      )}
-
-      <ModalKasRT
-        show={showKasRTModal}
-        onClose={() => setShowKasRTModal(false)}
-        iuranList={kasRTIuranList}
-        pemasukanLainList={pemasukanLainList}
-        pengeluaranList={pengeluaranList}
-      />
+      <ModalBayar show={showModalBayar} onClose={() => setShowModalBayar(false)} iuranList={iuranList} tarifBulanan={tarifBulanan} belumLunasList={belumLunasList} bulanDipilih={bulanDipilih} setBulanDipilih={setBulanDipilih} onSubmit={handleSubmitBayar} submitting={submitting} tahun={tahunTerpilih} />
+      {showRekapModal && (<ModalRekap show={showRekapModal} onClose={() => setShowRekapModal(false)} allWargaList={allWargaList} allIuranList={allIuranList} tarifList={tarifList} />)}
+      <ModalKasRT show={showKasRTModal} onClose={() => setShowKasRTModal(false)} iuranList={kasRTIuranList} pemasukanLainList={pemasukanLainList} pengeluaranList={pengeluaranList} />
     </>
   );
 }
