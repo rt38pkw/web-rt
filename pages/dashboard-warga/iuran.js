@@ -211,7 +211,15 @@ export default function DashboardWargaIuran() {
         {loading ? (
           <div className="py-12 text-center text-xs text-slate-500">Memuat data iuran...</div>
         ) : (
-          <IuranGrid iuranList={iuranList} tarifBulanan={tarifBulanan} adaPending={adaPending} bulanTombolBayar={bulanTombolBayar} onKlikDetail={setSelectedBulanDetail} onBayar={handleOpenModalBayar} />
+          <IuranGrid 
+            iuranList={iuranList} 
+            tarifBulanan={tarifBulanan} 
+            adaPending={adaPending} 
+            bulanTombolBayar={bulanTombolBayar} 
+            onKlikDetail={setSelectedBulanDetail} 
+            onBayar={handleOpenModalBayar} 
+            periodeBulan={periodeBulanAktif} // <--- TAMBAHAN INI
+          />
         )}
       </Layout>
 
