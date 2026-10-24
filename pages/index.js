@@ -24,21 +24,51 @@ export default function Home() {
     }
   }, [router]);
 
+  // FUNGSI AJAIB: Menyeragamkan format nomor rumah
+  // Contoh input: "a1-01", "A101", "a1 01" -> Output: "A1 - 01"
+  const formatNoRumah = (input) => {
+    if (!input) return '';
+    const clean = input.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const match = clean.match(/^([A-Z]+)(\d+)$/);
+    if (match) {
+      const letter = match[1];
+      const numbers = match[2];
+      if (numbers.length >= 3) {
+        const blok = numbers.slice(0, -2);
+        const no = numbers.slice(-2);
+        return `${letter}${blok} - ${no}`;
+      }
+    }
+    return input.trim(); // Fallback jika format tidak dikenali
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
 
     try {
+      const formattedNoRumah = formatNoRumah(noRumah);
+
+      // Cek Nomor Rumah dulu
       const { data, error } = await supabase
         .from('warga')
         .select('*')
-        .eq('no_rumah', noRumah.trim())
-        .eq('password', password)
-        .single();
+        .eq('no_rumah', formattedNoRumah)
+        .maybeSingle();
 
-      if (error || !data) {
-        setErrorMsg('Nomor Rumah atau Password salah! Periksa kembali.');
+      if (error) throw error;
+
+      // Validasi 1: Cek apakah No Rumah terdaftar
+      if (!data) {
+        setErrorMsg(`Nomor rumah "${noRumah}" tidak terdaftar. Hubungi Sekretaris jika ini kesalahan.`);
+        setLoading(false);
+        return;
+      }
+
+      // Validasi 2: Cek apakah Password cocok
+      if (data.password !== password) {
+        setErrorMsg('Password salah. Silakan periksa kembali.');
         setLoading(false);
         return;
       }
@@ -52,6 +82,10 @@ export default function Home() {
       setErrorMsg('Terjadi kesalahan koneksi. Silakan coba lagi.');
       setLoading(false);
     }
+  };
+
+  const handleLupaPassword = () => {
+    alert(`Silakan hubungi Sekretaris RT untuk mereset password Anda.\n\nNomor rumah Anda: ${formatNoRumah(noRumah) || '(Belum diisi)'}`);
   };
 
   return (
@@ -136,7 +170,14 @@ export default function Home() {
                   {showPassword ? '🙈' : '🐵'}
                 </button>
               </div>
-              <span className="text-[10px] text-slate-500 mt-1.5 block">Default awal: <code className="text-slate-300 font-mono">123456</code></span>
+              
+              {/* FITUR LUPA PASSWORD */}
+              <div className="flex justify-between items-center mt-2">
+                <span className="text-[10px] text-slate-500 block">Default awal: <code className="text-slate-300 font-mono">123456</code></span>
+                <button type="button" onClick={handleLupaPassword} className="text-[10px] text-blue-400 hover:text-blue-300 transition hover:underline">
+                  Lupa Password?
+                </button>
+              </div>
             </div>
 
             <button
