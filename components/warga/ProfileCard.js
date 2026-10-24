@@ -1,19 +1,53 @@
-export default function ProfileCard({ warga, tarifBulanan, isUsaha }) {
+import { useState, useEffect } from 'react';
+
+export default function ProfileCard({ warga, tarifBulanan, isUsaha, penyewaAktif }) {
+  const [loginRole, setLoginRole] = useState('pemilik');
+
+  useEffect(() => {
+    const savedSession = localStorage.getItem('warga_session');
+    if (savedSession) {
+      const parsed = JSON.parse(savedSession);
+      setLoginRole(parsed.role_login || 'pemilik');
+    }
+  }, []);
+
   if (!warga) return null;
+
+  const isPenyewa = loginRole === 'penyewa';
+  const isPemilikTidakDiketahui = warga.nama_lengkap === 'Belum Ada' || !warga.nama_lengkap;
+  
+  let namaTampil = warga.nama_lengkap || 'Belum Ada';
+  let subNama = null;
+
+  if (isPenyewa) {
+    const namaPenyewa = penyewaAktif || 'Penyewa';
+    if (isPemilikTidakDiketahui) {
+      namaTampil = namaPenyewa;
+      subNama = '(Penyewa)';
+    } else {
+      namaTampil = warga.nama_lengkap;
+      subNama = ` / ${namaPenyewa} (Penyewa)`;
+    }
+  }
 
   return (
     <section className="bg-slate-900/80 border border-slate-800/80 rounded-3xl p-5 sm:p-6 shadow-2xl relative overflow-hidden backdrop-blur-sm">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+            <span className={`w-2 h-2 rounded-full animate-pulse ${isPenyewa ? 'bg-orange-500' : 'bg-blue-500'}`}></span>
             <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
-              Warga RT 38
+              {isPenyewa ? 'Akun Penyewa' : 'Akun Pemilik'}
             </span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-            {warga.nama_lengkap}
+          
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            {namaTampil}
+            {subNama && <span className="text-sm font-normal text-orange-400">{subNama}</span>}
           </h2>
+          {isPemilikTidakDiketahui && !isPenyewa && (
+             <p className="text-xs text-slate-500 italic mt-1">*Nama pemilik belum didata</p>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-2 text-xs">
@@ -24,7 +58,7 @@ export default function ProfileCard({ warga, tarifBulanan, isUsaha }) {
           <div className="bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
             <span className="text-slate-400">Tarif:</span>
             <strong className="text-blue-400 font-semibold">
-              Rp {tarifBulanan.toLocaleString('id-ID')}/bln
+              Rp {tarifBulanan?.toLocaleString('id-ID') || 0}/bln
             </strong>
           </div>
           {isUsaha && (
@@ -32,6 +66,14 @@ export default function ProfileCard({ warga, tarifBulanan, isUsaha }) {
               Tempat Usaha
             </div>
           )}
+          
+          <div className={`px-3 py-1.5 rounded-xl font-bold border ${
+            isPenyewa 
+              ? 'bg-orange-500/10 text-orange-400 border-orange-500/30' 
+              : 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+          }`}>
+            {isPenyewa ? '🔑 Penyewa' : '👑 Pemilik (Mode Pantau)'}
+          </div>
         </div>
       </div>
     </section>
