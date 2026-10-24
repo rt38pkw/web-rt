@@ -9,6 +9,7 @@ import ModalBayar from '../../components/warga/ModalBayar';
 import ModalRekap from '../../components/warga/ModalRekap';
 import ModalDetailBulan from '../../components/warga/ModalDetailBulan';
 import ModalKasRT from '../../components/warga/ModalKasRT';
+import ModalLengkapiProfil from '../../components/warga/ModalLengkapiProfil'; // IMPORT BARU
 
 import { getPeriodeBulan, TAHUN_TERSEDIA, getTahunSekarang, isWargaUsaha } from '../../lib/iuran/constants';
 import { getInfoBulan, hitungBelumLunas, formatTanggal } from '../../lib/iuran/calculations';
@@ -18,6 +19,7 @@ import { fetchTarifList, getTarifWarga } from '../../lib/iuran/tarif';
 
 export default function DashboardWargaIuran() {
   const [warga, setWarga] = useState(null);
+  const [penghuniList, setPenghuniList] = useState([]); // STATE BARU UNTUK PENGHUNI
   const [iuranList, setIuranList] = useState([]);
   const [depositList, setDepositList] = useState([]);
   const [tarifList, setTarifList] = useState([]);
@@ -28,6 +30,7 @@ export default function DashboardWargaIuran() {
   
   const [showRekapModal, setShowRekapModal] = useState(false);
   const [showKasRTModal, setShowKasRTModal] = useState(false);
+  const [showModalProfil, setShowModalProfil] = useState(false); // STATE BARU UNTUK WIZARD
   
   const [kasRTIuranList, setKasRTIuranList] = useState([]);
   const [pengeluaranList, setPengeluaranList] = useState([]);
@@ -52,6 +55,7 @@ export default function DashboardWargaIuran() {
     loadIuran(userData.id);
     loadDeposit(userData.id);
     loadTarif();
+    loadPenghuni(userData.id); // PANGGIL FUNGSI INI
     refreshSession(userData.id);
   }, []);
 
@@ -87,6 +91,14 @@ export default function DashboardWargaIuran() {
     try { const { data, error } = await supabase.from('deposit_warga').select('*').eq('warga_id', wargaId).order('tanggal', { ascending: false }); if (!error && data) setDepositList(data); } catch (err) {}
   };
 
+  // FUNGSI BARU: Ambil data penghuni (untuk nampilin nama penyewa)
+  const loadPenghuni = async (wargaId) => {
+    try {
+      const { data, error } = await supabase.from('penghuni').select('*').eq('warga_id', wargaId).eq('is_aktif', true);
+      if (!error && data) setPenghuniList(data);
+    } catch (err) {}
+  };
+
   const loadTarif = async () => {
     try { const data = await fetchTarifList(); setTarifList(data); } catch (err) {}
   };
@@ -119,6 +131,9 @@ export default function DashboardWargaIuran() {
   const periodeBulanAktif = getPeriodeBulan(tahunTerpilih);
   const tarifBulanan = getTarifWarga(warga, tarifList, tahunTerpilih);
   const usaha = isWargaUsaha(warga);
+
+  // CARI DATA PENYEWA DARI LIST UNTUK DIKIRIM KE PROFIL CARD
+  const penyewaAktif = penghuniList.find(p => p.hubungan === 'Kepala Keluarga')?.nama_lengkap || null;
 
   const totalDisetor = iuranList.filter((i) => i.status === 'approved').reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
   const saldoDeposit = depositList.reduce((s, d) => s + (d.tipe === 'masuk' ? Number(d.jumlah) : -Number(d.jumlah)), 0);
@@ -161,15 +176,44 @@ export default function DashboardWargaIuran() {
     } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
   };
 
+  const isProfilBelumLengkap = warga.status_verifikasi_profil === 'belum' || !warga.status_verifikasi_profil;
+  const isProfilPending = warga.status_verifikasi_profil === 'pending';
+
   return (
     <>
       <Head><title>Status Iuran - Portal Warga RT 38</title></Head>
       <Layout warga={warga} onLogout={handleLogout}>
-        <ProfileCard warga={warga} tarifBulanan={tarifBulanan} isUsaha={usaha} />
+        <ProfileCard warga={warga} tarifBulanan={tarifBulanan} isUsaha={usaha} penyewaAktif={penyewaAktif} />
+
+        {/* BANNER PERINGATAN KELENGKAPAN PROFIL */}
+        {isProfilBelumLengkap && (
+          <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
+            <div className="flex items-start gap-3">
+              <span className="text-xl">⚠️</span>
+              <div>
+                <h4 className="text-sm font-bold text-amber-300">Profil Anda Belum Lengkap</h4>
+                <p className="text-xs text-amber-400 mt-0.5">Silakan lengkapi data diri & upload KK agar data Anda tervalidasi oleh Sekretaris RT.</p>
+              </div>
+            </div>
+            <button onClick={() => setShowModalProfil(true)} className="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-xs px-4 py-2.5 rounded-xl shrink-0 transition active:scale-95">
+              Lengkapi Sekarang
+            </button>
+          </div>
+        )}
+
+        {isProfilPending && (
+          <div className="bg-blue-950/40 border border-blue-500/30 rounded-2xl p-4 flex items-start gap-3">
+            <span className="text-xl">⏳</span>
+            <div>
+              <h4 className="text-sm font-bold text-blue-300">Menunggu Verifikasi Sekretaris</h4>
+              <p className="text-xs text-blue-400 mt-0.5">Data Anda sudah kami terima. Mohon tunggu Sekretaris memvalidasi data dan KK Anda.</p>
+            </div>
+          </div>
+        )}
 
         {adaDitolak && (
           <div className="bg-rose-950/40 border border-rose-500/50 rounded-2xl p-4 flex items-start gap-3">
-            <span className="text-xl">⚠️</span>
+            <span className="text-xl">❌</span>
             <div>
               <h4 className="text-sm font-bold text-rose-300">Ada Pembayaran yang Ditolak</h4>
               <p className="text-xs text-rose-400 mt-0.5">Silakan periksa bulan yang berwarna merah di bawah, lalu lakukan pembayaran ulang dengan bukti yang benar.</p>
@@ -211,15 +255,7 @@ export default function DashboardWargaIuran() {
         {loading ? (
           <div className="py-12 text-center text-xs text-slate-500">Memuat data iuran...</div>
         ) : (
-          <IuranGrid 
-            iuranList={iuranList} 
-            tarifBulanan={tarifBulanan} 
-            adaPending={adaPending} 
-            bulanTombolBayar={bulanTombolBayar} 
-            onKlikDetail={setSelectedBulanDetail} 
-            onBayar={handleOpenModalBayar} 
-            periodeBulan={periodeBulanAktif} // <--- TAMBAHAN INI
-          />
+          <IuranGrid iuranList={iuranList} tarifBulanan={tarifBulanan} adaPending={adaPending} bulanTombolBayar={bulanTombolBayar} onKlikDetail={setSelectedBulanDetail} onBayar={handleOpenModalBayar} periodeBulan={periodeBulanAktif} />
         )}
       </Layout>
 
@@ -227,6 +263,9 @@ export default function DashboardWargaIuran() {
       <ModalBayar show={showModalBayar} onClose={() => setShowModalBayar(false)} iuranList={iuranList} tarifBulanan={tarifBulanan} belumLunasList={belumLunasList} bulanDipilih={bulanDipilih} setBulanDipilih={setBulanDipilih} onSubmit={handleSubmitBayar} submitting={submitting} tahun={tahunTerpilih} />
       {showRekapModal && (<ModalRekap show={showRekapModal} onClose={() => setShowRekapModal(false)} allWargaList={allWargaList} allIuranList={allIuranList} tarifList={tarifList} />)}
       <ModalKasRT show={showKasRTModal} onClose={() => setShowKasRTModal(false)} iuranList={kasRTIuranList} pemasukanLainList={pemasukanLainList} pengeluaranList={pengeluaranList} />
+      
+      {/* MODAL WIZARD LENGKAPI PROFIL */}
+      <ModalLengkapiProfil show={showModalProfil} onClose={() => setShowModalProfil(false)} warga={warga} />
     </>
   );
 }
