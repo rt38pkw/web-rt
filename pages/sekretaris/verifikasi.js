@@ -131,8 +131,12 @@ export default function SekretarisVerifikasi() {
         ) : (
           <div className="space-y-4">
             {antrean.map((item, idx) => {
+              // TENTUKAN SIAPA YANG MUNCUL DI TAB INI
               const isPemilikTabMatch = item.pemilik.status_verifikasi_profil === activeTab;
               const isPenyewaTabMatch = item.penyewa && item.penyewa.status_verifikasi === activeTab;
+
+              // Jika pemilik tidak match dan penyewa tidak match, jangan tampilkan kartu ini (guard)
+              if (!isPemilikTabMatch && !isPenyewaTabMatch) return null;
 
               return (
                 <div key={idx} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
@@ -145,48 +149,48 @@ export default function SekretarisVerifikasi() {
                     </div>
                   </div>
 
-                  <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* DATA PEMILIK */}
-                    <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-4 space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Data Pemilik</h4>
-                          <div className="text-sm font-bold text-white">{item.pemilik.nama_lengkap}</div>
-                          <div className="text-[10px] text-slate-400 mt-0.5">NIK: {item.pemilik.nik || '-'}</div>
-                          <div className="text-[10px] text-slate-400 mt-0.5">WA: {item.pemilik.no_wa || '-'}</div>
+                  {/* GRID DINAMIS: Jika hanya 1 yang muncul, grid jadi 1 kolom penuh */}
+                  <div className={`p-4 grid grid-cols-1 ${isPemilikTabMatch && isPenyewaTabMatch ? 'md:grid-cols-2' : ''} gap-4`}>
+                    
+                    {/* DATA PEMILIK (Hanya muncul jika status pemilik cocok dengan tab) */}
+                    {isPemilikTabMatch && (
+                      <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-4 space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Data Pemilik</h4>
+                            <div className="text-sm font-bold text-white">{item.pemilik.nama_lengkap}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">NIK: {item.pemilik.nik || '-'}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">WA: {item.pemilik.no_wa || '-'}</div>
+                          </div>
+                          {item.pemilik.url_kk && (
+                            <a href={item.pemilik.url_kk} target="_blank" rel="noreferrer" className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-1.5 rounded-lg hover:bg-blue-500/20 transition">📄 Lihat KK</a>
+                          )}
                         </div>
-                        {item.pemilik.url_kk && (
-                          <a href={item.pemilik.url_kk} target="_blank" rel="noreferrer" className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-1.5 rounded-lg hover:bg-blue-500/20 transition">📄 Lihat KK</a>
+
+                        {item.anggotaKeluarga.length > 0 && (
+                          <div className="mt-2 border-t border-slate-800/60 pt-2">
+                            <span className="text-[10px] text-slate-500 font-semibold mb-1 block">Anggota Keluarga:</span>
+                            <ul className="text-[10px] text-slate-300 list-disc pl-4 space-y-0.5">
+                              {item.anggotaKeluarga.map((a, i) => <li key={i}>{a.nama_lengkap} ({a.hubungan})</li>)}
+                            </ul>
+                          </div>
                         )}
-                      </div>
 
-                      {item.anggotaKeluarga.length > 0 && (
-                        <div className="mt-2 border-t border-slate-800/60 pt-2">
-                          <span className="text-[10px] text-slate-500 font-semibold mb-1 block">Anggota Keluarga:</span>
-                          <ul className="text-[10px] text-slate-300 list-disc pl-4 space-y-0.5">
-                            {item.anggotaKeluarga.map((a, i) => <li key={i}>{a.nama_lengkap} ({a.hubungan})</li>)}
-                          </ul>
-                        </div>
-                      )}
+                        {activeTab === 'rejected' && item.pemilik.alasan_reject && (
+                          <div className="text-[10px] text-rose-400 bg-rose-500/10 p-2 rounded border border-rose-500/20 mt-2"><strong>Alasan Ditolak:</strong> {item.pemilik.alasan_reject}</div>
+                        )}
 
-                      {activeTab === 'rejected' && item.pemilik.alasan_reject && (
-                        <div className="text-[10px] text-rose-400 bg-rose-500/10 p-2 rounded border border-rose-500/20 mt-2"><strong>Alasan Ditolak:</strong> {item.pemilik.alasan_reject}</div>
-                      )}
-
-                      {activeTab === 'pending' && (
-                        isPemilikTabMatch ? (
+                        {activeTab === 'pending' && (
                           <div className="flex gap-2 pt-2">
                             <button onClick={() => handleRejectPemilik(item.pemilik)} disabled={processing} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-semibold py-2 rounded-lg transition">✗ Tolak</button>
                             <button onClick={() => handleApprovePemilik(item.pemilik)} disabled={processing} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold py-2 rounded-lg transition">✓ Approve Pemilik</button>
                           </div>
-                        ) : (
-                          <div className="text-[10px] text-slate-500 italic mt-2">Pemilik belum mengajukan verifikasi.</div>
-                        )
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
 
-                    {/* DATA PENYEWA */}
-                    {item.penyewa ? (
+                    {/* DATA PENYEWA (Hanya muncul jika status penyewa cocok dengan tab) */}
+                    {isPenyewaTabMatch && (
                       <div className="bg-orange-950/10 border border-orange-500/20 rounded-xl p-4 space-y-3">
                         <div className="flex justify-between items-start">
                           <div>
@@ -205,19 +209,11 @@ export default function SekretarisVerifikasi() {
                         )}
 
                         {activeTab === 'pending' && (
-                          isPenyewaTabMatch ? (
-                            <div className="flex gap-2 pt-2">
-                              <button onClick={() => handleRejectPenyewa(item.penyewa)} disabled={processing} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-semibold py-2 rounded-lg transition">✗ Tolak</button>
-                              <button onClick={() => handleApprovePenyewa(item.penyewa)} disabled={processing} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold py-2 rounded-lg transition">✓ Approve Penyewa</button>
-                            </div>
-                          ) : (
-                            <div className="text-[10px] text-slate-500 italic mt-2">Penyewa belum mengajukan verifikasi.</div>
-                          )
+                          <div className="flex gap-2 pt-2">
+                            <button onClick={() => handleRejectPenyewa(item.penyewa)} disabled={processing} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-semibold py-2 rounded-lg transition">✗ Tolak</button>
+                            <button onClick={() => handleApprovePenyewa(item.penyewa)} disabled={processing} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold py-2 rounded-lg transition">✓ Approve Penyewa</button>
+                          </div>
                         )}
-                      </div>
-                    ) : (
-                      <div className="bg-slate-950/20 border border-slate-800/50 border-dashed rounded-xl p-4 flex items-center justify-center">
-                        <p className="text-xs text-slate-500 text-center">Tidak ada data penyewa yang perlu diverifikasi.</p>
                       </div>
                     )}
                   </div>
