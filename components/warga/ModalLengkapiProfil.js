@@ -2,18 +2,30 @@ import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { uploadKK } from '../../lib/iuran/storage';
 
-export default function ModalLengkapiProfil({ show, onClose, warga, role, onSuccess }) {
+export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPenyewaAktif, onSuccess }) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const isPenyewa = role === 'penyewa';
 
   // State Step 1
-  // Inisialisasi nama: Jika "Belum Ada", kosongkan. Jika ada, isi dengan nama saat ini.
   const [namaLengkap, setNamaLengkap] = useState(
-    warga?.nama_lengkap === 'Belum Ada' ? '' : (warga?.nama_lengkap || '')
+    isPenyewa 
+      ? (dataPenyewaAktif?.nama_lengkap || '') 
+      : (warga?.nama_lengkap === 'Belum Ada' ? '' : (warga?.nama_lengkap || ''))
   );
-  const [nik, setNik] = useState(warga?.nik && warga.nik.length === 16 ? warga.nik : '');
-  const [noWa, setNoWa] = useState(warga?.no_wa || '');
+  
+  const [nik, setNik] = useState(
+    isPenyewa 
+      ? (dataPenyewaAktif?.nik && dataPenyewaAktif.nik.length === 16 ? dataPenyewaAktif.nik : '')
+      : (warga?.nik && warga.nik.length === 16 ? warga.nik : '')
+  );
+  
+  const [noWa, setNoWa] = useState(
+    isPenyewa 
+      ? (dataPenyewaAktif?.no_hp || '')
+      : (warga?.no_wa || '')
+  );
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -107,7 +119,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
 
         if (existingPenghuni) {
           await supabase.from('penghuni').update({
-            nama_lengkap: namaLengkap.trim(), // Simpan nama baru penyewa
+            nama_lengkap: namaLengkap.trim(), 
             nik: nik.trim(),
             no_hp: noWa.trim(),
             url_kk: urlKK,
@@ -126,7 +138,6 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
           }]);
         }
 
-        // Insert anggota keluarga
         if (anggotaKeluarga.length > 0) {
           const records = anggotaKeluarga.map(a => ({
             warga_id: warga.id,
@@ -142,7 +153,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
       } else {
         // === LOGIKA SIMPAN PEMILIK ===
         const updateData = {
-          nama_lengkap: namaLengkap.trim(), // Simpan nama baru pemilik
+          nama_lengkap: namaLengkap.trim(), 
           nik: nik.trim(),
           no_wa: noWa.trim(),
           url_kk: urlKK,
@@ -150,10 +161,8 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
         };
         if (password.trim()) updateData.password_pending = password.trim();
 
-        // 1. Update data Profil Pemilik
         await supabase.from('warga').update(updateData).eq('id', warga.id);
 
-        // 2. AUTO-FILL KEPALA KELUARGA DI TABEL PENGHUNI
         const { data: existingKK } = await supabase
           .from('penghuni')
           .select('id')
@@ -163,7 +172,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
 
         if (existingKK) {
           await supabase.from('penghuni').update({
-            nama_lengkap: namaLengkap.trim(), // Gunakan nama dari input
+            nama_lengkap: namaLengkap.trim(), 
             nik: nik.trim(),
             no_hp: noWa.trim(),
             url_kk: urlKK,
@@ -182,7 +191,6 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
           }]);
         }
 
-        // 3. Insert Anggota Keluarga Lainnya
         if (anggotaKeluarga.length > 0) {
           const records = anggotaKeluarga.map(a => ({
             warga_id: warga.id,
@@ -220,9 +228,11 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
 
         {step === 1 && (
           <div className="space-y-3 animate-in fade-in">
-            <h4 className="text-sm font-semibold text-white mb-2">1. Identitas & Keamanan</h4>
+            <div className="mb-2">
+              <h4 className="text-sm font-semibold text-white">1. Identitas Kepala Keluarga</h4>
+              <p className="text-[11px] text-blue-400 mt-0.5">* Data ini akan tercatat sebagai Kepala Keluarga.</p>
+            </div>
             
-            {/* FIELD NAMA BARU */}
             <div>
               <label className="block text-xs text-slate-300 mb-1">Nama Lengkap (Sesuai KTP/KK) <span className="text-rose-400">*</span></label>
               <input 
@@ -268,8 +278,10 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
 
         {step === 2 && (
           <div className="space-y-3 animate-in fade-in">
-            <h4 className="text-sm font-semibold text-white mb-2">2. Daftar Penghuni</h4>
-            <p className="text-xs text-slate-400 mb-2">Tambahkan anggota keluarga yang tinggal serumah (Istri, Anak, Saudara).</p>
+            <div className="mb-2">
+              <h4 className="text-sm font-semibold text-white">2. Anggota Keluarga Lainnya</h4>
+              <p className="text-xs text-slate-400 mt-0.5">Tambahkan anggota keluarga yang ikut tinggal (Istri, Anak, Saudara).</p>
+            </div>
             
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
               <input type="text" placeholder="Nama Lengkap" value={newNama} onChange={(e) => setNewNama(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" />
