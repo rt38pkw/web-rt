@@ -34,7 +34,7 @@ export default function SekretarisDataWarga() {
   const [editKategori, setEditKategori] = useState('Warga');
   const [editStatusHuni, setEditStatusHuni] = useState('pemilik');
 
-  // State Form Tambah Penghuni Baru (Kepala Keluarga)
+  // State Form Tambah Kepala Keluarga Baru
   const [showTambahPenghuni, setShowTambahPenghuni] = useState(false);
   const [targetRumahId, setTargetRumahId] = useState('');
   const [selectedRumahInfo, setSelectedRumahInfo] = useState(null);
@@ -44,7 +44,7 @@ export default function SekretarisDataWarga() {
   const [newNoHp, setNewNoHp] = useState('');
   const [newHubungan, setNewHubungan] = useState('Kepala Keluarga');
 
-  // State Form Tambah Anggota Keluarga (dari baris tabel)
+  // State Form Tambah Anggota Keluarga
   const [showTambahAnggota, setShowTambahAnggota] = useState(false);
   const [targetAnggotaKeluarga, setTargetAnggotaKeluarga] = useState(null); 
   const [anggotaNama, setAnggotaNama] = useState('');
@@ -230,10 +230,10 @@ export default function SekretarisDataWarga() {
     } catch (err) { alert('Gagal: ' + err.message); } finally { setProcessingId(null); }
   };
 
-  const handleHapusPenghuni = async (p) => {
-    if (!confirm(`Arsipkan ${p.nama_lengkap} dari daftar penghuni? (Data akan masuk arsip)`)) return;
-    setProcessingId(p.id);
-    await supabase.from('penghuni').update({ is_aktif: false }).eq('id', p.id);
+  const handleHapusAnggota = async (id, nama) => {
+    if (!confirm(`Keluarkan ${nama} dari daftar penghuni aktif? (Data akan masuk arsip)`)) return;
+    setProcessingId(id);
+    await supabase.from('penghuni').update({ is_aktif: false }).eq('id', id);
     fetchPenghuni();
     setProcessingId(null);
   };
@@ -384,12 +384,17 @@ export default function SekretarisDataWarga() {
                             <div className="font-bold text-white text-sm">{grup.kepalaKeluarga.nama_lengkap}</div>
                             <div className="text-[11px] text-teal-400 font-mono mt-0.5">{grup.no_rumah}</div>
                             
+                            {/* Daftar Anggota Keluarga */}
                             {grup.anggota.length > 0 && (
-                              <div className="mt-2 pl-2 border-l-2 border-slate-700 space-y-1">
+                              <div className="mt-3 pl-3 border-l-2 border-slate-700 space-y-2">
                                 {grup.anggota.map((a, i) => (
-                                  <div key={i} className="text-[11px] text-slate-300">
-                                    <span className="text-slate-500 mr-1">↳</span> 
-                                    {a.nama_lengkap} <span className="text-[9px] text-slate-500">({a.hubungan})</span>
+                                  <div key={i} className="flex justify-between items-center group text-[11px]">
+                                    <div className="text-slate-300">
+                                      <span className="text-slate-500 mr-1">↳</span> 
+                                      {a.nama_lengkap} <span className="text-[9px] text-slate-500">({a.hubungan})</span>
+                                    </div>
+                                    {/* Tombol Hapus KHUSUS Anggota Keluarga */}
+                                    <button onClick={() => handleHapusAnggota(a.id, a.nama_lengkap)} className="text-rose-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition px-1" title="Keluarkan Anggota">✕</button>
                                   </div>
                                 ))}
                               </div>
@@ -408,10 +413,8 @@ export default function SekretarisDataWarga() {
                         </span>
                       </td>
                       <td className="p-4 text-right align-top">
-                         <div className="flex flex-col gap-1.5 items-end">
-                           <button onClick={() => openTambahAnggota(grup.kepalaKeluarga)} className="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] whitespace-nowrap transition">+ Tambah Anggota</button>
-                           <button onClick={() => handleHapusPenghuni(grup.kepalaKeluarga)} className="bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] whitespace-nowrap transition">Arsipkan KK</button>
-                         </div>
+                         {/* Hanya ada tombol Tambah Anggota, TIDAK ADA tombol Hapus KK */}
+                         <button onClick={() => openTambahAnggota(grup.kepalaKeluarga)} className="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] whitespace-nowrap transition">+ Tambah Anggota</button>
                       </td>
                     </tr>
                   ))}
