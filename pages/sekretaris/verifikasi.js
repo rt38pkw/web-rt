@@ -13,79 +13,109 @@ export default function SekretarisVerifikasi() {
 
   useEffect(() => {
     fetchAntrean();
+    
+    // Realtime: Refresh otomatis jika ada warga yang submit
     const channel = supabase
       .channel('realtime-verifikasi-sekretaris')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'warga' }, () => fetchAntrean())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'penghuni' }, () => fetchAntrean())
       .subscribe();
+      
     return () => { supabase.removeChannel(channel); };
   }, [activeTab]);
 
   const fetchAntrean = async () => {
     setLoading(true);
     try {
-      const { data: wPending } = await supabase.from('warga').select('id').eq('status_verifikasi_profil', activeTab);
-      const { data: pPending } = await supabase.from('penghuni').select('warga_id').eq('status_verifikasi', activeTab).eq('is_aktif', true);
-      const wargaIds = [...new Set([...(wPending || []).map(w => w.id), ...(pPending || []).map(p => p.warga_id)])];
+      // 1. Ambil data penghuni yang statusnya sesuai tab (pending/rejected)
+      const { data: penghuniPending, error } = await supabase
+        .from('penghuni')
+        .select('*, warga: warga_id (no_rumah, status_huni)')
+        .eq('status_verifikasi', activeTab)
+        .eq('is_aktif', true)
+        .order('nama_lengkap');
 
-      if (wargaIds.length === 0) { setAntrean([]); setLoading(false); return; }
+      if (error) throw error;
 
-      const { data: wargaData } = await supabase.from('warga').select('*').in('id', wargaIds);
-      const { data: penghuniData } = await supabase.from('penghuni').select('*').in('warga_id', wargaIds).eq('is_aktif', true);
-
+      // 2. Kelompokkan berdasarkan No Rumah (warga_id)
       const grouped = {};
-      if (wargaData) wargaData.forEach(w => { grouped[w.id] = { warga: w, pemilik: w, penyewa: null, anggotaKeluarga: [] }; });
-      if (penghuniData) {
-        penghuniData.forEach(p => {
-          if (grouped[p.warga_id]) {
-            if (p.hubungan === 'Kepala Keluarga') grouped[p.warga_id].penyewa = p;
-            else grouped[p.warga_id].anggotaKeluarga.push(p);
+      if (penghuniPending) {
+        penghuniPending.forEach(p => {
+          const wId = p.warga_id;
+          if (!grouped[wId]) {
+            grouped[wId] = {
+              warga_id: wId,
+              no_rumah: p.warga?.no_rumah,
+              status_huni: p.warga?.status_huni,
+              anggota: []
+            };
           }
+          grouped[wId].anggota.push(p);
         });
       }
+
       setAntrean(Object.values(grouped));
-    } catch (err) { console.error(err); } finally { setLoading(false); }
+    } catch (err) {
+      console.error(err);
+      alert('Gagal memuat data antrean.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleApprovePemilik = async (warga) => {
-    if (!confirm(`Approve profil pemilik (${warga.nama_lengkap}) dan seluruh anggota keluarganya?`)) return;
+  const handleApprove = async (item) => {
+    if (!confirm(`Approve data penghuni untuk rumah ${item.no_rumah}?`)) return;
     setProcessing(true);
     try {
-      const updateData = { status_verifikasi_profil: 'approved', alasan_reject: null };
-      if (warga.password_pending) { updateData.password = warga.password_pending; updateData.password_pending = null; }
-      await supabase.from('warga').update(updateData).eq('id', warga.id);
-      await supabase.from('penghuni').update({ status_verifikasi: 'approved', alasan_reject: null }).eq('warga_id', warga.id);
-      alert('✅ Profil Pemilik & Keluarga berhasil disetujui!');
-    } catch (err) { alert('Gagal approve: ' + err.message); } finally { setProcessing(false); }
+      // 1. Cari tahu apakah ada Kepala Keluarga bertipe 'pemilik'
+      const kepalaKeluarga = item.anggota.find(a => a.hubungan === 'Kepala Keluarga' && a.tipe_penghuni === 'pemilik');
+
+      // 2. Update semua status verifikasi di tabel penghuni untuk rumah ini menjadi approved
+      const { error: errPenghuni } = await supabase
+        .from('penghuni')
+        .update({ status_verifikasi: 'approved', alasan_reject: null })
+        .eq('warga_id', item.warga_id)
+        .eq('status_verifikasi', 'pending');
+      
+      if (errPenghuni) throw errPenghuni;
+
+      // 3. Jika Pemilik yang di-approve, Sinkronkan NIK & KK ke tabel warga
+      if (kepalaKeluarga) {
+        await supabase.from('warga').update({
+          nama_lengkap: kepalaKeluarga.nama_lengkap,
+          nik: kepalaKeluarga.nik,
+          no_kk: kepalaKeluarga.no_kk,
+          no_wa: kepalaKeluarga.no_hp
+        }).eq('id', item.warga_id);
+      }
+
+      alert('✅ Data berhasil disetujui!');
+    } catch (err) {
+      alert('Gagal approve: ' + err.message);
+    } finally {
+      setProcessing(false);
+    }
   };
 
-  const handleApprovePenyewa = async (penyewa) => {
-    if (!confirm(`Approve data penyewa (${penyewa.nama_lengkap})?`)) return;
-    setProcessing(true);
-    try {
-      await supabase.from('penghuni').update({ status_verifikasi: 'approved', alasan_reject: null }).eq('id', penyewa.id);
-      alert('✅ Data Penyewa berhasil disetujui!');
-    } catch (err) { alert('Gagal approve: ' + err.message); } finally { setProcessing(false); }
-  };
-
-  const handleRejectPemilik = async (warga) => {
+  const handleReject = async (item) => {
     const alasan = prompt('Masukkan alasan penolakan (wajib diisi):');
     if (!alasan || !alasan.trim()) return;
+    
     setProcessing(true);
     try {
-      await supabase.from('warga').update({ status_verifikasi_profil: 'rejected', alasan_reject: alasan.trim() }).eq('id', warga.id);
-      alert('❌ Profil Pemilik ditolak.');
-    } catch (err) { alert('Gagal menolak: ' + err.message); } finally { setProcessing(false); }
-  };
-
-  const handleRejectPenyewa = async (penyewa) => {
-    const alasan = prompt('Masukkan alasan penolakan (wajib diisi):');
-    if (!alasan || !alasan.trim()) return;
-    setProcessing(true);
-    try {
-      await supabase.from('penghuni').update({ status_verifikasi: 'rejected', alasan_reject: alasan.trim() }).eq('id', penyewa.id);
-      alert('❌ Data Penyewa ditolak.');
-    } catch (err) { alert('Gagal menolak: ' + err.message); } finally { setProcessing(false); }
+      // Update semua yang pending di rumah ini menjadi rejected
+      const { error } = await supabase
+        .from('penghuni')
+        .update({ status_verifikasi: 'rejected', alasan_reject: alasan.trim() })
+        .eq('warga_id', item.warga_id)
+        .eq('status_verifikasi', 'pending');
+      
+      if (error) throw error;
+      alert('❌ Data ditolak. Warga dapat memperbaiki datanya.');
+    } catch (err) {
+      alert('Gagal menolak: ' + err.message);
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const openPreview = (data) => {
@@ -97,6 +127,7 @@ export default function SekretarisVerifikasi() {
     <Layout>
       <div className="max-w-5xl mx-auto space-y-4">
         
+        {/* MODAL SPLIT-SCREEN */}
         {previewData && (
           <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in">
             <div className="bg-slate-900 border border-slate-700 w-full max-w-6xl h-[95vh] rounded-3xl flex flex-col md:flex-row overflow-hidden shadow-2xl">
@@ -104,7 +135,9 @@ export default function SekretarisVerifikasi() {
                 <div>
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Pencocokan Data</h3>
-                    <span className={`text-[10px] px-2 py-1 rounded font-bold border ${previewData.tipe === 'Pemilik' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>{previewData.tipe}</span>
+                    <span className={`text-[10px] px-2 py-1 rounded font-bold border ${previewData.tipe === 'pemilik' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>
+                      {previewData.tipe === 'pemilik' ? 'Pemilik' : 'Penyewa'}
+                    </span>
                   </div>
                   <div className="space-y-4">
                     <div>
@@ -154,78 +187,73 @@ export default function SekretarisVerifikasi() {
         ) : (
           <div className="space-y-4">
             {antrean.map((item, idx) => {
-              const isPemilikTabMatch = item.pemilik.status_verifikasi_profil === activeTab;
-              const isPenyewaTabMatch = item.penyewa && item.penyewa.status_verifikasi === activeTab;
-              if (!isPemilikTabMatch && !isPenyewaTabMatch) return null;
+              // Pisahkan data untuk tampilan
+              const kepalaKeluarga = item.anggota.find(a => a.hubungan === 'Kepala Keluarga');
+              const anggotaLain = item.anggota.filter(a => a.hubungan !== 'Kepala Keluarga');
+              const tipePenghuni = kepalaKeluarga?.tipe_penghuni || 'pemilik';
+              const isPemilik = tipePenghuni === 'pemilik';
 
               return (
                 <div key={idx} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
                   <div className="bg-slate-950/60 px-4 py-3 border-b border-slate-800 flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-bold text-white bg-slate-800 px-3 py-1 rounded-lg">🏠 {item.warga.no_rumah}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${item.warga.status_huni === 'sewa' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>{item.warga.status_huni === 'sewa' ? 'Disewakan' : 'Dihuni Pemilik'}</span>
+                      <span className="text-sm font-bold text-white bg-slate-800 px-3 py-1 rounded-lg">🏠 {item.no_rumah}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${item.status_huni === 'sewa' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
+                        {item.status_huni === 'sewa' ? 'Disewakan' : 'Dihuni Pemilik'}
+                      </span>
                     </div>
                   </div>
 
-                  <div className={`p-4 grid grid-cols-1 ${isPemilikTabMatch && isPenyewaTabMatch ? 'md:grid-cols-2' : ''} gap-4`}>
-                    {isPemilikTabMatch && (
-                      <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-4 space-y-4">
-                        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 border-b border-slate-800 pb-2">Data Pemilik</h4>
-                        <div className="flex flex-col sm:flex-row gap-4">
-                          <div className="flex-1 space-y-2">
-                            <div><div className="text-[10px] text-slate-500">Nama Lengkap</div><div className="text-sm font-bold text-white">{item.pemilik.nama_lengkap}</div></div>
-                            <div><div className="text-[10px] text-slate-500">NIK</div><div className="text-xs text-slate-300 font-mono">{item.pemilik.nik || '-'}</div></div>
-                            <div><div className="text-[10px] text-slate-500">No. KK</div><div className="text-xs text-slate-300 font-mono">{item.pemilik.no_kk || '-'}</div></div>
-                            <div><div className="text-[10px] text-slate-500">No WhatsApp</div><div className="text-xs text-slate-300">{item.pemilik.no_wa || '-'}</div></div>
+                  <div className="p-4 space-y-4">
+                    {/* DATA KEPALA KELUARGA */}
+                    {kepalaKeluarga && (
+                      <div className={`rounded-xl p-4 space-y-4 border ${isPemilik ? 'bg-blue-950/10 border-blue-500/20' : 'bg-orange-950/10 border-orange-500/20'}`}>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className={`text-xs font-semibold uppercase tracking-wider mb-1 ${isPemilik ? 'text-blue-400' : 'text-orange-400'}`}>
+                              Kepala Keluarga ({isPemilik ? 'Pemilik' : 'Penyewa'})
+                            </h4>
+                            <div className="text-sm font-bold text-white">{kepalaKeluarga.nama_lengkap}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">NIK: {kepalaKeluarga.nik || '-'}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">No. KK: {kepalaKeluarga.no_kk || '-'}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">WA: {kepalaKeluarga.no_hp || '-'}</div>
                           </div>
-                          <div className="w-full sm:w-1/2 shrink-0">
-                            {item.pemilik.url_kk ? (
-                              <div className="relative group cursor-pointer" onClick={() => openPreview({ imageUrl: item.pemilik.url_kk, nama: item.pemilik.nama_lengkap, nik: item.pemilik.nik, noKk: item.pemilik.no_kk, wa: item.pemilik.no_wa, tipe: 'Pemilik' })}>
-                                <img src={item.pemilik.url_kk} alt="KK Pemilik" className="w-full h-32 object-cover rounded-lg border border-slate-700" />
-                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition"><span className="text-white text-xs font-semibold">🔍 Cocokkan</span></div>
-                              </div>
-                            ) : (<div className="w-full h-32 bg-slate-800/50 border border-slate-700 border-dashed rounded-lg flex items-center justify-center text-xs text-slate-500">Tidak ada KK</div>)}
-                          </div>
+                          {kepalaKeluarga.url_kk && (
+                            <div className="relative group cursor-pointer w-24 h-24 shrink-0" onClick={() => openPreview({ imageUrl: kepalaKeluarga.url_kk, nama: kepalaKeluarga.nama_lengkap, nik: kepalaKeluarga.nik, noKk: kepalaKeluarga.no_kk, wa: kepalaKeluarga.no_hp, tipe: tipePenghuni })}>
+                              <img src={kepalaKeluarga.url_kk} alt="KK" className="w-full h-full object-cover rounded-lg border border-slate-700" />
+                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition"><span className="text-white text-[10px] font-semibold">🔍 Zoom</span></div>
+                            </div>
+                          )}
                         </div>
-                        {item.anggotaKeluarga.length > 0 && (
-                          <div className="border-t border-slate-800/60 pt-2"><span className="text-[10px] text-slate-500 font-semibold mb-1 block">Anggota Keluarga:</span><ul className="text-[10px] text-slate-300 list-disc pl-4 space-y-0.5">{item.anggotaKeluarga.map((a, i) => <li key={i}>{a.nama_lengkap} ({a.hubungan})</li>)}</ul></div>
-                        )}
-                        {activeTab === 'rejected' && item.pemilik.alasan_reject && (<div className="text-[10px] text-rose-400 bg-rose-500/10 p-2 rounded border border-rose-500/20 mt-2"><strong>Alasan Ditolak:</strong> {item.pemilik.alasan_reject}</div>)}
-                        {activeTab === 'pending' && (
-                          <div className="flex gap-2 pt-2 border-t border-slate-800/60">
-                            <button onClick={() => handleRejectPemilik(item.pemilik)} disabled={processing} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-semibold py-2 rounded-lg transition">✗ Tolak</button>
-                            <button onClick={() => handleApprovePemilik(item.pemilik)} disabled={processing} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold py-2 rounded-lg transition">✓ Approve</button>
-                          </div>
-                        )}
                       </div>
                     )}
 
-                    {isPenyewaTabMatch && (
-                      <div className="bg-orange-950/10 border border-orange-500/20 rounded-xl p-4 space-y-4">
-                        <h4 className="text-xs font-semibold text-orange-400 uppercase tracking-wider mb-1 border-b border-orange-500/20 pb-2">Data Penyewa</h4>
-                        <div className="flex flex-col sm:flex-row gap-4">
-                          <div className="flex-1 space-y-2">
-                            <div><div className="text-[10px] text-slate-500">Nama Lengkap</div><div className="text-sm font-bold text-white">{item.penyewa.nama_lengkap}</div></div>
-                            <div><div className="text-[10px] text-slate-500">NIK</div><div className="text-xs text-slate-300 font-mono">{item.penyewa.nik || '-'}</div></div>
-                            <div><div className="text-[10px] text-slate-500">No. KK</div><div className="text-xs text-slate-300 font-mono">{item.penyewa.no_kk || '-'}</div></div>
-                            <div><div className="text-[10px] text-slate-500">No WhatsApp</div><div className="text-xs text-slate-300">{item.penyewa.no_hp || '-'}</div></div>
-                          </div>
-                          <div className="w-full sm:w-1/2 shrink-0">
-                            {item.penyewa.url_kk ? (
-                              <div className="relative group cursor-pointer" onClick={() => openPreview({ imageUrl: item.penyewa.url_kk, nama: item.penyewa.nama_lengkap, nik: item.penyewa.nik, noKk: item.penyewa.no_kk, wa: item.penyewa.no_hp, tipe: 'Penyewa' })}>
-                                <img src={item.penyewa.url_kk} alt="KK Penyewa" className="w-full h-32 object-cover rounded-lg border border-orange-500/30" />
-                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition"><span className="text-white text-xs font-semibold">🔍 Cocokkan</span></div>
-                              </div>
-                            ) : (<div className="w-full h-32 bg-slate-800/50 border border-slate-700 border-dashed rounded-lg flex items-center justify-center text-xs text-slate-500">Tidak ada KK</div>)}
-                          </div>
+                    {/* DATA ANGGOTA KELUARGA */}
+                    {anggotaLain.length > 0 && (
+                      <div className="border-t border-slate-800/60 pt-3">
+                        <span className="text-[10px] text-slate-500 font-semibold mb-2 block uppercase tracking-wider">Anggota Keluarga:</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {anggotaLain.map((a, i) => (
+                            <div key={i} className="bg-slate-950/40 p-2 rounded-lg border border-slate-800">
+                              <div className="text-xs text-white font-semibold">{a.nama_lengkap}</div>
+                              <div className="text-[9px] text-slate-400">{a.hubungan} • NIK: {a.nik || '-'}</div>
+                            </div>
+                          ))}
                         </div>
-                        {activeTab === 'rejected' && item.penyewa.alasan_reject && (<div className="text-[10px] text-rose-400 bg-rose-500/10 p-2 rounded border border-rose-500/20 mt-2"><strong>Alasan Ditolak:</strong> {item.penyewa.alasan_reject}</div>)}
-                        {activeTab === 'pending' && (
-                          <div className="flex gap-2 pt-2 border-t border-orange-500/20">
-                            <button onClick={() => handleRejectPenyewa(item.penyewa)} disabled={processing} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-semibold py-2 rounded-lg transition">✗ Tolak</button>
-                            <button onClick={() => handleApprovePenyewa(item.penyewa)} disabled={processing} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold py-2 rounded-lg transition">✓ Approve</button>
-                          </div>
-                        )}
+                      </div>
+                    )}
+
+                    {activeTab === 'rejected' && kepalaKeluarga?.alasan_reject && (
+                      <div className="text-[10px] text-rose-400 bg-rose-500/10 p-2 rounded border border-rose-500/20 mt-2">
+                        <strong>Alasan Ditolak:</strong> {kepalaKeluarga.alasan_reject}
+                      </div>
+                    )}
+
+                    {/* TOMBOL AKSI */}
+                    {activeTab === 'pending' && (
+                      <div className="flex gap-2 pt-2 border-t border-slate-800/60">
+                        <button onClick={() => handleReject(item)} disabled={processing} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-semibold py-2.5 rounded-lg transition">✗ Tolak Data</button>
+                        <button onClick={() => handleApprove(item)} disabled={processing} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold py-2.5 rounded-lg transition">✓ Approve Data</button>
                       </div>
                     )}
                   </div>
