@@ -13,18 +13,11 @@ export default function SekretarisVerifikasi() {
 
   useEffect(() => {
     fetchAntrean();
-
-    // ═══ FITUR REALTIME: DENGARKAN PERUBAHAN WARGA & PENGHUNI ═══
     const channel = supabase
       .channel('realtime-verifikasi-sekretaris')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'warga' }, () => {
-        fetchAntrean(); // Refresh antrean jika ada warga yang submit
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'penghuni' }, () => {
-        fetchAntrean(); // Refresh antrean jika ada penyewa yang submit
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'warga' }, () => fetchAntrean())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'penghuni' }, () => fetchAntrean())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [activeTab]);
 
@@ -33,30 +26,15 @@ export default function SekretarisVerifikasi() {
     try {
       const { data: wPending } = await supabase.from('warga').select('id').eq('status_verifikasi_profil', activeTab);
       const { data: pPending } = await supabase.from('penghuni').select('warga_id').eq('status_verifikasi', activeTab).eq('is_aktif', true);
+      const wargaIds = [...new Set([...(wPending || []).map(w => w.id), ...(pPending || []).map(p => p.warga_id)])];
 
-      const wargaIds = [
-        ...new Set([
-          ...(wPending || []).map(w => w.id),
-          ...(pPending || []).map(p => p.warga_id)
-        ])
-      ];
-
-      if (wargaIds.length === 0) {
-        setAntrean([]);
-        setLoading(false);
-        return;
-      }
+      if (wargaIds.length === 0) { setAntrean([]); setLoading(false); return; }
 
       const { data: wargaData } = await supabase.from('warga').select('*').in('id', wargaIds);
       const { data: penghuniData } = await supabase.from('penghuni').select('*').in('warga_id', wargaIds).eq('is_aktif', true);
 
       const grouped = {};
-      if (wargaData) {
-        wargaData.forEach(w => {
-          grouped[w.id] = { warga: w, pemilik: w, penyewa: null, anggotaKeluarga: [] };
-        });
-      }
-
+      if (wargaData) wargaData.forEach(w => { grouped[w.id] = { warga: w, pemilik: w, penyewa: null, anggotaKeluarga: [] }; });
       if (penghuniData) {
         penghuniData.forEach(p => {
           if (grouped[p.warga_id]) {
@@ -65,25 +43,16 @@ export default function SekretarisVerifikasi() {
           }
         });
       }
-
       setAntrean(Object.values(grouped));
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  // ... (Fungsi handleApprovePemilik, handleApprovePenyewa, handleRejectPemilik, handleRejectPenyewa, openPreview tetap SAMA seperti sebelumnya) ...
   const handleApprovePemilik = async (warga) => {
     if (!confirm(`Approve profil pemilik (${warga.nama_lengkap}) dan seluruh anggota keluarganya?`)) return;
     setProcessing(true);
     try {
       const updateData = { status_verifikasi_profil: 'approved', alasan_reject: null };
-      if (warga.password_pending) {
-        updateData.password = warga.password_pending;
-        updateData.password_pending = null;
-      }
+      if (warga.password_pending) { updateData.password = warga.password_pending; updateData.password_pending = null; }
       await supabase.from('warga').update(updateData).eq('id', warga.id);
       await supabase.from('penghuni').update({ status_verifikasi: 'approved', alasan_reject: null }).eq('warga_id', warga.id);
       alert('✅ Profil Pemilik & Keluarga berhasil disetujui!');
@@ -128,7 +97,6 @@ export default function SekretarisVerifikasi() {
     <Layout>
       <div className="max-w-5xl mx-auto space-y-4">
         
-        {/* MODAL SPLIT-SCREEN */}
         {previewData && (
           <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in">
             <div className="bg-slate-900 border border-slate-700 w-full max-w-6xl h-[95vh] rounded-3xl flex flex-col md:flex-row overflow-hidden shadow-2xl">
@@ -136,11 +104,9 @@ export default function SekretarisVerifikasi() {
                 <div>
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Pencocokan Data</h3>
-                    <span className={`text-[10px] px-2 py-1 rounded font-bold border ${previewData.tipe === 'Pemilik' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>
-                      {previewData.tipe}
-                    </span>
+                    <span className={`text-[10px] px-2 py-1 rounded font-bold border ${previewData.tipe === 'Pemilik' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>{previewData.tipe}</span>
                   </div>
-                  <div className="space-y-5">
+                  <div className="space-y-4">
                     <div>
                       <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">Nama Lengkap</div>
                       <div className="text-lg font-bold text-white leading-tight">{previewData.nama}</div>
@@ -148,6 +114,10 @@ export default function SekretarisVerifikasi() {
                     <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
                       <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">NIK (Cocokkan dengan KK)</div>
                       <div className="text-xl font-mono font-bold text-amber-400 tracking-wider">{previewData.nik || '-'}</div>
+                    </div>
+                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                      <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">No. KK (Cocokkan dengan KK)</div>
+                      <div className="text-xl font-mono font-bold text-blue-400 tracking-wider">{previewData.noKk || '-'}</div>
                     </div>
                     <div>
                       <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">No WhatsApp</div>
@@ -159,13 +129,8 @@ export default function SekretarisVerifikasi() {
               </div>
               
               <div className="w-full md:w-2/3 bg-black/50 relative flex flex-col">
-                <div className="absolute top-4 right-4 z-10 bg-slate-900/80 border border-slate-700 text-white text-[10px] px-3 py-1.5 rounded-lg pointer-events-none">
-                  {isZoomed ? '🔍 Klik gambar untuk perkecil' : '🔍 Klik gambar untuk Zoom'}
-                </div>
-                <div 
-                  className={`flex-1 p-2 sm:p-6 overflow-auto flex ${isZoomed ? 'items-start justify-start' : 'items-center justify-center'} ${isZoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'}`}
-                  onClick={() => setIsZoomed(!isZoomed)}
-                >
+                <div className="absolute top-4 right-4 z-10 bg-slate-900/80 border border-slate-700 text-white text-[10px] px-3 py-1.5 rounded-lg pointer-events-none">{isZoomed ? '🔍 Klik gambar untuk perkecil' : '🔍 Klik gambar untuk Zoom'}</div>
+                <div className={`flex-1 p-2 sm:p-6 overflow-auto flex ${isZoomed ? 'items-start justify-start' : 'items-center justify-center'} ${isZoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'}`} onClick={() => setIsZoomed(!isZoomed)}>
                   <img src={previewData.imageUrl} alt="Preview KK" className={`rounded-lg shadow-lg transition-all duration-200 ${isZoomed ? 'w-auto h-auto max-w-none max-h-none' : 'max-w-full max-h-full object-contain'}`} />
                 </div>
               </div>
@@ -191,7 +156,6 @@ export default function SekretarisVerifikasi() {
             {antrean.map((item, idx) => {
               const isPemilikTabMatch = item.pemilik.status_verifikasi_profil === activeTab;
               const isPenyewaTabMatch = item.penyewa && item.penyewa.status_verifikasi === activeTab;
-
               if (!isPemilikTabMatch && !isPenyewaTabMatch) return null;
 
               return (
@@ -199,9 +163,7 @@ export default function SekretarisVerifikasi() {
                   <div className="bg-slate-950/60 px-4 py-3 border-b border-slate-800 flex justify-between items-center">
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-bold text-white bg-slate-800 px-3 py-1 rounded-lg">🏠 {item.warga.no_rumah}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${item.warga.status_huni === 'sewa' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
-                        {item.warga.status_huni === 'sewa' ? 'Disewakan' : 'Dihuni Pemilik'}
-                      </span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${item.warga.status_huni === 'sewa' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>{item.warga.status_huni === 'sewa' ? 'Disewakan' : 'Dihuni Pemilik'}</span>
                     </div>
                   </div>
 
@@ -213,11 +175,12 @@ export default function SekretarisVerifikasi() {
                           <div className="flex-1 space-y-2">
                             <div><div className="text-[10px] text-slate-500">Nama Lengkap</div><div className="text-sm font-bold text-white">{item.pemilik.nama_lengkap}</div></div>
                             <div><div className="text-[10px] text-slate-500">NIK</div><div className="text-xs text-slate-300 font-mono">{item.pemilik.nik || '-'}</div></div>
+                            <div><div className="text-[10px] text-slate-500">No. KK</div><div className="text-xs text-slate-300 font-mono">{item.pemilik.no_kk || '-'}</div></div>
                             <div><div className="text-[10px] text-slate-500">No WhatsApp</div><div className="text-xs text-slate-300">{item.pemilik.no_wa || '-'}</div></div>
                           </div>
                           <div className="w-full sm:w-1/2 shrink-0">
                             {item.pemilik.url_kk ? (
-                              <div className="relative group cursor-pointer" onClick={() => openPreview({ imageUrl: item.pemilik.url_kk, nama: item.pemilik.nama_lengkap, nik: item.pemilik.nik, wa: item.pemilik.no_wa, tipe: 'Pemilik' })}>
+                              <div className="relative group cursor-pointer" onClick={() => openPreview({ imageUrl: item.pemilik.url_kk, nama: item.pemilik.nama_lengkap, nik: item.pemilik.nik, noKk: item.pemilik.no_kk, wa: item.pemilik.no_wa, tipe: 'Pemilik' })}>
                                 <img src={item.pemilik.url_kk} alt="KK Pemilik" className="w-full h-32 object-cover rounded-lg border border-slate-700" />
                                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition"><span className="text-white text-xs font-semibold">🔍 Cocokkan</span></div>
                               </div>
@@ -244,11 +207,12 @@ export default function SekretarisVerifikasi() {
                           <div className="flex-1 space-y-2">
                             <div><div className="text-[10px] text-slate-500">Nama Lengkap</div><div className="text-sm font-bold text-white">{item.penyewa.nama_lengkap}</div></div>
                             <div><div className="text-[10px] text-slate-500">NIK</div><div className="text-xs text-slate-300 font-mono">{item.penyewa.nik || '-'}</div></div>
+                            <div><div className="text-[10px] text-slate-500">No. KK</div><div className="text-xs text-slate-300 font-mono">{item.penyewa.no_kk || '-'}</div></div>
                             <div><div className="text-[10px] text-slate-500">No WhatsApp</div><div className="text-xs text-slate-300">{item.penyewa.no_hp || '-'}</div></div>
                           </div>
                           <div className="w-full sm:w-1/2 shrink-0">
                             {item.penyewa.url_kk ? (
-                              <div className="relative group cursor-pointer" onClick={() => openPreview({ imageUrl: item.penyewa.url_kk, nama: item.penyewa.nama_lengkap, nik: item.penyewa.nik, wa: item.penyewa.no_hp, tipe: 'Penyewa' })}>
+                              <div className="relative group cursor-pointer" onClick={() => openPreview({ imageUrl: item.penyewa.url_kk, nama: item.penyewa.nama_lengkap, nik: item.penyewa.nik, noKk: item.penyewa.no_kk, wa: item.penyewa.no_hp, tipe: 'Penyewa' })}>
                                 <img src={item.penyewa.url_kk} alt="KK Penyewa" className="w-full h-32 object-cover rounded-lg border border-orange-500/30" />
                                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition"><span className="text-white text-xs font-semibold">🔍 Cocokkan</span></div>
                               </div>
