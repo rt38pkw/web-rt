@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'; // TAMBAH useEffect
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { uploadKK } from '../../lib/iuran/storage';
 
@@ -7,35 +7,45 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
   const [loading, setLoading] = useState(false);
   const isPenyewa = role === 'penyewa';
 
-  // State Step 1 (Inisialisasi Awal)
+  // State Step 1
   const [namaLengkap, setNamaLengkap] = useState('');
   const [nik, setNik] = useState('');
   const [noWa, setNoWa] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // State Step 2 (Anggota Keluarga)
+  // State Step 2
   const [anggotaKeluarga, setAnggotaKeluarga] = useState([]);
   const [newNama, setNewNama] = useState('');
   const [newNik, setNewNik] = useState('');
   const [newHubungan, setNewHubungan] = useState('Istri');
 
-  // State Step 3 (Upload KK)
+  // State Step 3
   const [fileKK, setFileKK] = useState(null);
   const [previewKK, setPreviewKK] = useState(null);
 
-  // ═══ PERBAIKAN: SINKRONISASI DATA SAAT MODAL DIBUKA ═══
+  // ═══ FUNGSI SANITASI DATA DARI DATABASE ═══
+  const sanitizeNik = (val) => {
+    const str = String(val || '');
+    const numbersOnly = str.replace(/\D/g, ''); // Buang semua non-angka
+    return numbersOnly.length === 16 ? numbersOnly : ''; // Jika bukan 16 digit, kosongkan
+  };
+
+  const sanitizeWa = (val) => {
+    return String(val || '').replace(/\D/g, ''); // Buang semua non-angka
+  };
+
   useEffect(() => {
-    if (!show) return; // Hanya jalan jika modal terbuka
+    if (!show) return;
 
     if (isPenyewa && dataPenyewaAktif) {
       setNamaLengkap(dataPenyewaAktif.nama_lengkap || '');
-      setNik(dataPenyewaAktif.nik || '');
-      setNoWa(dataPenyewaAktif.no_hp || '');
+      setNik(sanitizeNik(dataPenyewaAktif.nik));
+      setNoWa(sanitizeWa(dataPenyewaAktif.no_hp));
     } else if (!isPenyewa && warga) {
       setNamaLengkap(warga.nama_lengkap === 'Belum Ada' ? '' : (warga.nama_lengkap || ''));
-      setNik(warga.nik || '');
-      setNoWa(warga.no_wa || '');
+      setNik(sanitizeNik(warga.nik));
+      setNoWa(sanitizeWa(warga.no_wa));
     }
   }, [show, isPenyewa, dataPenyewaAktif, warga]);
 
@@ -109,7 +119,6 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
       const urlKK = await uploadKK(fileKK, warga.id);
 
       if (isPenyewa) {
-        // === LOGIKA SIMPAN PENYEWA ===
         const { data: existingPenghuni } = await supabase
           .from('penghuni')
           .select('id')
@@ -151,7 +160,6 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
         }
 
       } else {
-        // === LOGIKA SIMPAN PEMILIK ===
         const updateData = {
           nama_lengkap: namaLengkap.trim(), 
           nik: nik.trim(),
