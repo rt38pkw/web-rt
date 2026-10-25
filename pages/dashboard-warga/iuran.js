@@ -74,14 +74,16 @@ export default function DashboardWargaIuran() {
   const refreshSession = async (wargaId) => {
     try {
       const data = await fetchWargaById(wargaId);
-      setWarga(data);
-      const { password: _, ...profilAman } = data;
-      // Pertahankan role_login di localStorage
-      const savedSession = localStorage.getItem('warga_session');
-      if (savedSession) {
-        const parsed = JSON.parse(savedSession);
-        profilAman.role_login = parsed.role_login;
-      }
+      
+      // PERBAIKAN: Ambil role_login dari state warga saat ini atau localStorage
+      const currentRole = warga?.role_login || JSON.parse(localStorage.getItem('warga_session'))?.role_login || 'pemilik';
+      
+      // Gabungkan data dari database dengan role_login yang sudah ada
+      const dataWithRole = { ...data, role_login: currentRole };
+      
+      setWarga(dataWithRole);
+      
+      const { password: _, ...profilAman } = dataWithRole;
       localStorage.setItem('warga_session', JSON.stringify(profilAman));
     } catch (err) {}
   };
@@ -182,11 +184,8 @@ export default function DashboardWargaIuran() {
     } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
   };
 
-  // CEK BANNER
   const isProfilBelumLengkap = warga.status_verifikasi_profil === 'belum' || !warga.status_verifikasi_profil;
   const isProfilPending = warga.status_verifikasi_profil === 'pending';
-  
-  // Cek jika penyewa, apakah dia sudah lengkapi penghuni?
   const isPenyewaBelumLengkap = isPenyewa && (penghuniList.length === 0 || penghuniList.some(p => p.status_verifikasi !== 'approved'));
 
   return (
@@ -195,7 +194,6 @@ export default function DashboardWargaIuran() {
       <Layout warga={warga} onLogout={handleLogout}>
         <ProfileCard warga={warga} tarifBulanan={tarifBulanan} isUsaha={usaha} penyewaAktif={penyewaAktif} />
 
-        {/* BANNER UNTUK PEMILIK */}
         {!isPenyewa && isProfilBelumLengkap && (
           <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
             <div className="flex items-start gap-3">
@@ -209,7 +207,6 @@ export default function DashboardWargaIuran() {
           </div>
         )}
 
-        {/* BANNER UNTUK PENYEWA */}
         {isPenyewa && isPenyewaBelumLengkap && (
           <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
             <div className="flex items-start gap-3">
@@ -281,7 +278,7 @@ export default function DashboardWargaIuran() {
             onKlikDetail={setSelectedBulanDetail} 
             onBayar={handleOpenModalBayar} 
             periodeBulan={periodeBulanAktif} 
-            isModePantau={isModePantau} // <--- KUNCI LOGIKA
+            isModePantau={isModePantau} 
           />
         )}
       </Layout>
