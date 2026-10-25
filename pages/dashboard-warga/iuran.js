@@ -74,15 +74,9 @@ export default function DashboardWargaIuran() {
   const refreshSession = async (wargaId) => {
     try {
       const data = await fetchWargaById(wargaId);
-      
-      // PERBAIKAN: Ambil role_login dari state warga saat ini atau localStorage
       const currentRole = warga?.role_login || JSON.parse(localStorage.getItem('warga_session'))?.role_login || 'pemilik';
-      
-      // Gabungkan data dari database dengan role_login yang sudah ada
       const dataWithRole = { ...data, role_login: currentRole };
-      
       setWarga(dataWithRole);
-      
       const { password: _, ...profilAman } = dataWithRole;
       localStorage.setItem('warga_session', JSON.stringify(profilAman));
     } catch (err) {}
@@ -139,7 +133,9 @@ export default function DashboardWargaIuran() {
   const periodeBulanAktif = getPeriodeBulan(tahunTerpilih);
   const tarifBulanan = getTarifWarga(warga, tarifList, tahunTerpilih);
   const usaha = isWargaUsaha(warga);
-  const penyewaAktif = penghuniList.find(p => p.hubungan === 'Kepala Keluarga')?.nama_lengkap || null;
+  
+  // --- MENCARI OBJEK PENYEWA AKTIF ---
+  const dataPenyewaAktif = penghuniList.find(p => p.hubungan === 'Kepala Keluarga') || null;
 
   const totalDisetor = iuranList.filter((i) => i.status === 'approved').reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
   const saldoDeposit = depositList.reduce((s, d) => s + (d.tipe === 'masuk' ? Number(d.jumlah) : -Number(d.jumlah)), 0);
@@ -192,7 +188,7 @@ export default function DashboardWargaIuran() {
     <>
       <Head><title>Status Iuran - Portal Warga RT 38</title></Head>
       <Layout warga={warga} onLogout={handleLogout}>
-        <ProfileCard warga={warga} tarifBulanan={tarifBulanan} isUsaha={usaha} penyewaAktif={penyewaAktif} />
+        <ProfileCard warga={warga} tarifBulanan={tarifBulanan} isUsaha={usaha} penyewaAktif={dataPenyewaAktif?.nama_lengkap || null} />
 
         {!isPenyewa && isProfilBelumLengkap && (
           <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
@@ -288,7 +284,14 @@ export default function DashboardWargaIuran() {
       {showRekapModal && (<ModalRekap show={showRekapModal} onClose={() => setShowRekapModal(false)} allWargaList={allWargaList} allIuranList={allIuranList} tarifList={tarifList} />)}
       <ModalKasRT show={showKasRTModal} onClose={() => setShowKasRTModal(false)} iuranList={kasRTIuranList} pemasukanLainList={pemasukanLainList} pengeluaranList={pengeluaranList} />
       
-      <ModalLengkapiProfil show={showModalProfil} onClose={() => setShowModalProfil(false)} warga={warga} role={loginRole} onSuccess={() => refreshSession(warga.id)} />
+      <ModalLengkapiProfil 
+        show={showModalProfil} 
+        onClose={() => setShowModalProfil(false)} 
+        warga={warga} 
+        role={loginRole} 
+        dataPenyewaAktif={dataPenyewaAktif} // <--- KIRIM DATA PENYEWA
+        onSuccess={() => refreshSession(warga.id)} 
+      />
     </>
   );
 }
