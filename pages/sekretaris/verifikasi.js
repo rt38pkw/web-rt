@@ -7,6 +7,9 @@ export default function SekretarisVerifikasi() {
   const [antrean, setAntrean] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  
+  // STATE BARU UNTUK ZOOM GAMBAR
+  const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
     fetchAntrean();
@@ -15,11 +18,9 @@ export default function SekretarisVerifikasi() {
   const fetchAntrean = async () => {
     setLoading(true);
     try {
-      // 1. Cari ID Warga yang punya antrean di tab ini (baik dari Pemilik maupun Penyewa)
       const { data: wPending } = await supabase.from('warga').select('id').eq('status_verifikasi_profil', activeTab);
       const { data: pPending } = await supabase.from('penghuni').select('warga_id').eq('status_verifikasi', activeTab).eq('is_aktif', true);
 
-      // Gabungkan semua ID unik
       const wargaIds = [
         ...new Set([
           ...(wPending || []).map(w => w.id),
@@ -33,11 +34,9 @@ export default function SekretarisVerifikasi() {
         return;
       }
 
-      // 2. Ambil data lengkap untuk ID tersebut
       const { data: wargaData } = await supabase.from('warga').select('*').in('id', wargaIds);
       const { data: penghuniData } = await supabase.from('penghuni').select('*').in('warga_id', wargaIds).eq('is_aktif', true);
 
-      // 3. Kelompokkan per Rumah
       const grouped = {};
       if (wargaData) {
         wargaData.forEach(w => {
@@ -115,6 +114,14 @@ export default function SekretarisVerifikasi() {
     <Layout>
       <div className="max-w-5xl mx-auto space-y-4">
         
+        {/* MODAL PREVIEW GAMBAR (ZOOM) */}
+        {previewImage && (
+          <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setPreviewImage(null)}>
+            <button className="absolute top-4 right-4 text-white text-3xl font-bold hover:text-rose-500 transition" onClick={() => setPreviewImage(null)}>✕</button>
+            <img src={previewImage} alt="Zoom KK" className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
+          </div>
+        )}
+
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-2 flex gap-2">
           <button onClick={() => setActiveTab('pending')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'pending' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>⏳ Menunggu Verifikasi</button>
           <button onClick={() => setActiveTab('rejected')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'rejected' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>✗ Riwayat Ditolak</button>
@@ -131,11 +138,9 @@ export default function SekretarisVerifikasi() {
         ) : (
           <div className="space-y-4">
             {antrean.map((item, idx) => {
-              // TENTUKAN SIAPA YANG MUNCUL DI TAB INI
               const isPemilikTabMatch = item.pemilik.status_verifikasi_profil === activeTab;
               const isPenyewaTabMatch = item.penyewa && item.penyewa.status_verifikasi === activeTab;
 
-              // Jika pemilik tidak match dan penyewa tidak match, jangan tampilkan kartu ini (guard)
               if (!isPemilikTabMatch && !isPenyewaTabMatch) return null;
 
               return (
@@ -149,26 +154,47 @@ export default function SekretarisVerifikasi() {
                     </div>
                   </div>
 
-                  {/* GRID DINAMIS: Jika hanya 1 yang muncul, grid jadi 1 kolom penuh */}
                   <div className={`p-4 grid grid-cols-1 ${isPemilikTabMatch && isPenyewaTabMatch ? 'md:grid-cols-2' : ''} gap-4`}>
                     
-                    {/* DATA PEMILIK (Hanya muncul jika status pemilik cocok dengan tab) */}
+                    {/* DATA PEMILIK */}
                     {isPemilikTabMatch && (
-                      <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-4 space-y-3">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Data Pemilik</h4>
-                            <div className="text-sm font-bold text-white">{item.pemilik.nama_lengkap}</div>
-                            <div className="text-[10px] text-slate-400 mt-0.5">NIK: {item.pemilik.nik || '-'}</div>
-                            <div className="text-[10px] text-slate-400 mt-0.5">WA: {item.pemilik.no_wa || '-'}</div>
+                      <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-4 space-y-4">
+                        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 border-b border-slate-800 pb-2">Data Pemilik</h4>
+                        
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          {/* KOLOM TEKS DATA */}
+                          <div className="flex-1 space-y-2">
+                            <div>
+                              <div className="text-[10px] text-slate-500">Nama Lengkap</div>
+                              <div className="text-sm font-bold text-white">{item.pemilik.nama_lengkap}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-500">NIK</div>
+                              <div className="text-xs text-slate-300 font-mono">{item.pemilik.nik || '-'}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-500">No WhatsApp</div>
+                              <div className="text-xs text-slate-300">{item.pemilik.no_wa || '-'}</div>
+                            </div>
                           </div>
-                          {item.pemilik.url_kk && (
-                            <a href={item.pemilik.url_kk} target="_blank" rel="noreferrer" className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-1.5 rounded-lg hover:bg-blue-500/20 transition">📄 Lihat KK</a>
-                          )}
+
+                          {/* KOLOM GAMBAR KK */}
+                          <div className="w-full sm:w-1/2 shrink-0">
+                            {item.pemilik.url_kk ? (
+                              <div className="relative group cursor-pointer" onClick={() => setPreviewImage(item.pemilik.url_kk)}>
+                                <img src={item.pemilik.url_kk} alt="KK Pemilik" className="w-full h-32 object-cover rounded-lg border border-slate-700" />
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition">
+                                  <span className="text-white text-xs font-semibold">🔍 Zoom KK</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="w-full h-32 bg-slate-800/50 border border-slate-700 border-dashed rounded-lg flex items-center justify-center text-xs text-slate-500">Tidak ada KK</div>
+                            )}
+                          </div>
                         </div>
 
                         {item.anggotaKeluarga.length > 0 && (
-                          <div className="mt-2 border-t border-slate-800/60 pt-2">
+                          <div className="border-t border-slate-800/60 pt-2">
                             <span className="text-[10px] text-slate-500 font-semibold mb-1 block">Anggota Keluarga:</span>
                             <ul className="text-[10px] text-slate-300 list-disc pl-4 space-y-0.5">
                               {item.anggotaKeluarga.map((a, i) => <li key={i}>{a.nama_lengkap} ({a.hubungan})</li>)}
@@ -181,27 +207,49 @@ export default function SekretarisVerifikasi() {
                         )}
 
                         {activeTab === 'pending' && (
-                          <div className="flex gap-2 pt-2">
+                          <div className="flex gap-2 pt-2 border-t border-slate-800/60">
                             <button onClick={() => handleRejectPemilik(item.pemilik)} disabled={processing} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-semibold py-2 rounded-lg transition">✗ Tolak</button>
-                            <button onClick={() => handleApprovePemilik(item.pemilik)} disabled={processing} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold py-2 rounded-lg transition">✓ Approve Pemilik</button>
+                            <button onClick={() => handleApprovePemilik(item.pemilik)} disabled={processing} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold py-2 rounded-lg transition">✓ Approve</button>
                           </div>
                         )}
                       </div>
                     )}
 
-                    {/* DATA PENYEWA (Hanya muncul jika status penyewa cocok dengan tab) */}
+                    {/* DATA PENYEWA */}
                     {isPenyewaTabMatch && (
-                      <div className="bg-orange-950/10 border border-orange-500/20 rounded-xl p-4 space-y-3">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="text-xs font-semibold text-orange-400 uppercase tracking-wider mb-1">Data Penyewa</h4>
-                            <div className="text-sm font-bold text-white">{item.penyewa.nama_lengkap}</div>
-                            <div className="text-[10px] text-slate-400 mt-0.5">NIK: {item.penyewa.nik || '-'}</div>
-                            <div className="text-[10px] text-slate-400 mt-0.5">WA: {item.penyewa.no_hp || '-'}</div>
+                      <div className="bg-orange-950/10 border border-orange-500/20 rounded-xl p-4 space-y-4">
+                        <h4 className="text-xs font-semibold text-orange-400 uppercase tracking-wider mb-1 border-b border-orange-500/20 pb-2">Data Penyewa</h4>
+                        
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          {/* KOLOM TEKS DATA */}
+                          <div className="flex-1 space-y-2">
+                            <div>
+                              <div className="text-[10px] text-slate-500">Nama Lengkap</div>
+                              <div className="text-sm font-bold text-white">{item.penyewa.nama_lengkap}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-500">NIK</div>
+                              <div className="text-xs text-slate-300 font-mono">{item.penyewa.nik || '-'}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-500">No WhatsApp</div>
+                              <div className="text-xs text-slate-300">{item.penyewa.no_hp || '-'}</div>
+                            </div>
                           </div>
-                          {item.penyewa.url_kk && (
-                            <a href={item.penyewa.url_kk} target="_blank" rel="noreferrer" className="text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-1.5 rounded-lg hover:bg-orange-500/20 transition">📄 Lihat KK</a>
-                          )}
+
+                          {/* KOLOM GAMBAR KK */}
+                          <div className="w-full sm:w-1/2 shrink-0">
+                            {item.penyewa.url_kk ? (
+                              <div className="relative group cursor-pointer" onClick={() => setPreviewImage(item.penyewa.url_kk)}>
+                                <img src={item.penyewa.url_kk} alt="KK Penyewa" className="w-full h-32 object-cover rounded-lg border border-orange-500/30" />
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition">
+                                  <span className="text-white text-xs font-semibold">🔍 Zoom KK</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="w-full h-32 bg-slate-800/50 border border-slate-700 border-dashed rounded-lg flex items-center justify-center text-xs text-slate-500">Tidak ada KK</div>
+                            )}
+                          </div>
                         </div>
 
                         {activeTab === 'rejected' && item.penyewa.alasan_reject && (
@@ -209,9 +257,9 @@ export default function SekretarisVerifikasi() {
                         )}
 
                         {activeTab === 'pending' && (
-                          <div className="flex gap-2 pt-2">
+                          <div className="flex gap-2 pt-2 border-t border-orange-500/20">
                             <button onClick={() => handleRejectPenyewa(item.penyewa)} disabled={processing} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-semibold py-2 rounded-lg transition">✗ Tolak</button>
-                            <button onClick={() => handleApprovePenyewa(item.penyewa)} disabled={processing} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold py-2 rounded-lg transition">✓ Approve Penyewa</button>
+                            <button onClick={() => handleApprovePenyewa(item.penyewa)} disabled={processing} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold py-2 rounded-lg transition">✓ Approve</button>
                           </div>
                         )}
                       </div>
