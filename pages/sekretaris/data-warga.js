@@ -19,7 +19,7 @@ export default function SekretarisDataWarga() {
   const [password, setPassword] = useState('123456');
   const [statusHuni, setStatusHuni] = useState('pemilik');
 
-  // State Modal Edit
+  // State Modal Edit Pemilik
   const [showEditModal, setShowEditModal] = useState(false);
   const [editId, setEditId] = useState(null);
   const [editNama, setEditNama] = useState('');
@@ -30,7 +30,25 @@ export default function SekretarisDataWarga() {
   const [editKategori, setEditKategori] = useState('Warga');
   const [editStatusHuni, setEditStatusHuni] = useState('pemilik');
 
+  // ═══ STATE MODAL KELOLA PENGHUNI ═══
+  const [showPenghuniModal, setShowPenghuniModal] = useState(false);
+  const [selectedWarga, setSelectedWarga] = useState(null);
+  const [penghuniListRumah, setPenghuniListRumah] = useState([]);
+  const [loadingPenghuni, setLoadingPenghuni] = useState(false);
+
+  // State Form Tambah Penghuni
+  const [newNama, setNewNama] = useState('');
+  const [newNik, setNewNik] = useState('');
+  const [newNoKk, setNewNoKk] = useState('');
+  const [newNoHp, setNewNoHp] = useState('');
+  const [newHubungan, setNewHubungan] = useState('Penyewa');
+
   useEffect(() => { fetchWarga(); }, []);
+
+  const sanitizeNumeric = (val) => {
+    const clean = String(val || '').replace(/\D/g, '');
+    return clean.length === 16 ? clean : ''; // Jika bukan 16 digit, kosongkan
+  };
 
   async function fetchWarga() {
     setLoading(true);
@@ -70,13 +88,13 @@ export default function SekretarisDataWarga() {
     }
   };
 
-  // ═══ FUNGSI EDIT DATA ═══
+  // ═══ FUNGSI EDIT DATA (DENGAN SANITASI) ═══
   const openEditModal = (w) => {
     setEditId(w.id);
     setEditNama(w.nama_lengkap || '');
     setEditNoRumah(w.no_rumah || '');
-    setEditNik(w.nik || '');
-    setEditNoKk(w.no_kk || '');
+    setEditNik(sanitizeNumeric(w.nik)); // Sanitasi NIK
+    setEditNoKk(sanitizeNumeric(w.no_kk)); // Sanitasi No KK
     setEditNoWa(w.no_wa || '');
     setEditKategori(w.kategori || 'Warga');
     setEditStatusHuni(w.status_huni || 'pemilik');
@@ -97,9 +115,8 @@ export default function SekretarisDataWarga() {
     }).eq('id', editId);
 
     setProcessingId(null);
-    if (error) {
-      alert('Gagal update data: ' + error.message);
-    } else {
+    if (error) alert('Gagal update data: ' + error.message);
+    else {
       alert('✅ Data warga berhasil diperbarui!');
       setShowEditModal(false);
       fetchWarga();
@@ -127,14 +144,8 @@ export default function SekretarisDataWarga() {
 
     setProcessingId(w.id);
     try {
-      // 1. Ubah status rumah
-      const { error: errWarga } = await supabase.from('warga').update({ status_huni: newStatusHuni }).eq('id', w.id);
-      if (errWarga) throw errWarga;
-
-      // 2. Arsipkan semua penghuni (is_aktif = false)
-      const { error: errPenghuni } = await supabase.from('penghuni').update({ is_aktif: false }).eq('warga_id', w.id).eq('is_aktif', true);
-      if (errPenghuni) throw errPenghuni;
-
+      await supabase.from('warga').update({ status_huni: newStatusHuni }).eq('id', w.id);
+      await supabase.from('penghuni').update({ is_aktif: false }).eq('warga_id', w.id).eq('is_aktif', true);
       alert('✅ Masa sewa selesai. Penyewa telah diarsipkan.');
       fetchWarga();
     } catch (err) {
@@ -144,30 +155,79 @@ export default function SekretarisDataWarga() {
     }
   };
 
-  // ═══ FUNGSI HAPUS WARGA (DENGAN PROTEKSI) ═══
+  // ═══ FUNGSI HAPUS WARGA ═══
   const handleHapusWarga = async (w) => {
     if (!confirm(`⚠️ PERINGATAN KERAS ⚠️\n\nHapus permanen data warga ${w.nama_lengkap} (${w.no_rumah})?\n\nData iuran dan riwayat transaksi yang terkait tidak akan ikut terhapus.`)) return;
     
     setProcessingId(w.id);
     try {
-      // Cek apakah punya riwayat iuran
       const { count: countIuran } = await supabase.from('iuran').select('*', { count: 'exact', head: true }).eq('warga_id', w.id);
       const { count: countProyek } = await supabase.from('iuran_proyek').select('*', { count: 'exact', head: true }).eq('warga_id', w.id);
 
       if (countIuran > 0 || countProyek > 0) {
-        alert(`❌ GAGAL MENGHAPUS.\n\nWarga ini sudah memiliki riwayat transaksi (Iuran/Proyek). Untuk keamanan data keuangan, data warga tidak bisa dihapus.`);
+        alert(`❌ GAGAL MENGHAPUS.\n\nWarga ini sudah memiliki riwayat transaksi (Iuran/Proyek).`);
         setProcessingId(null);
         return;
       }
 
-      // Jika aman, hapus (Supabase akan otomatis hapus data penghuni terkait jika ada CASCADE)
-      const { error } = await supabase.from('warga').delete().eq('id', w.id);
-      if (error) throw error;
-      
+      await supabase.from('warga').delete().eq('id', w.id);
       alert('✅ Data warga berhasil dihapus.');
       fetchWarga();
     } catch (err) {
       alert('Gagal menghapus warga: ' + err.message);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  // ═══ FUNGSI KELOLA PENGHUNI ═══
+  const openPenghuniModal = async (w) => {
+    setSelectedWarga(w);
+    setShowPenghuniModal(true);
+    setLoadingPenghuni(true);
+    try {
+      const { data, error } = await supabase.from('penghuni').select('*').eq('warga_id', w.id).eq('is_aktif', true).order('hubungan', { ascending: true });
+      if (!error && data) setPenghuniListRumah(data);
+    } catch (err) { console.error(err); } finally { setLoadingPenghuni(false); }
+  };
+
+  const handleTambahPenghuni = async (e) => {
+    e.preventDefault();
+    if (!newNama.trim()) { alert('Nama wajib diisi!'); return; }
+    
+    setProcessingId(selectedWarga.id);
+    try {
+      const { error } = await supabase.from('penghuni').insert([{
+        warga_id: selectedWarga.id,
+        nama_lengkap: newNama.trim(),
+        nik: newNik.trim() || null,
+        no_kk: newNoKk.trim() || null,
+        no_hp: newNoHp.trim() || null,
+        hubungan: newHubungan,
+        is_aktif: true,
+        status_verifikasi: 'approved' // Inputan sekretaris langsung approved
+      }]);
+      if (error) throw error;
+      
+      alert('✅ Penghuni baru berhasil ditambahkan!');
+      setNewNama(''); setNewNik(''); setNewNoKk(''); setNewNoHp(''); setNewHubungan('Penyewa');
+      openPenghuniModal(selectedWarga); // Refresh list
+    } catch (err) {
+      alert('Gagal menambah penghuni: ' + err.message);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleHapusPenghuni = async (penghuniId) => {
+    if (!confirm('Hapus/Nonaktifkan penghuni ini? (Data akan masuk arsip)')) return;
+    setProcessingId(penghuniId);
+    try {
+      await supabase.from('penghuni').update({ is_aktif: false }).eq('id', penghuniId);
+      alert('✅ Penghuni dinonaktifkan.');
+      openPenghuniModal(selectedWarga); // Refresh list
+    } catch (err) {
+      alert('Gagal menghapus penghuni: ' + err.message);
     } finally {
       setProcessingId(null);
     }
@@ -229,27 +289,22 @@ export default function SekretarisDataWarga() {
                           </td>
                           <td className="p-4 space-y-1">
                             <div>
-                              <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${w.status_huni === 'sewa' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : w.status_huni === 'kosong' ? 'bg-slate-800/60 text-slate-400 border-slate-700/60' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
-                                {w.status_huni || 'Pemilik'}
-                              </span>
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${w.status_huni === 'sewa' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : w.status_huni === 'kosong' ? 'bg-slate-800/60 text-slate-400 border-slate-700/60' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>{w.status_huni || 'Pemilik'}</span>
                             </div>
                             <div>
-                              <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${isUsaha ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-slate-800/60 text-slate-400 border-slate-700/60'}`}>
-                                {isUsaha ? '🏪 Usaha' : '🏠 Warga'}
-                              </span>
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${isUsaha ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-slate-800/60 text-slate-400 border-slate-700/60'}`}>{isUsaha ? '🏪 Usaha' : '🏠 Warga'}</span>
                             </div>
                           </td>
                           <td className="p-4">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${w.status_verifikasi_profil === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : w.status_verifikasi_profil === 'pending' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
-                              {w.status_verifikasi_profil || 'Belum'}
-                            </span>
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${w.status_verifikasi_profil === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : w.status_verifikasi_profil === 'pending' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>{w.status_verifikasi_profil || 'Belum'}</span>
                           </td>
                           <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                              <button onClick={() => openEditModal(w)} disabled={isProcessing} className="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white p-2 rounded-lg transition" title="Edit Data">✏️</button>
-                              <button onClick={() => handleResetPassword(w)} disabled={isProcessing} className="bg-amber-600/20 hover:bg-amber-600 text-amber-400 hover:text-white p-2 rounded-lg transition" title="Reset Password ke 123456">🔑</button>
+                              <button onClick={() => openPenghuniModal(w)} disabled={isProcessing} className="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white p-2 rounded-lg transition" title="Kelola Penghuni">👥</button>
+                              <button onClick={() => openEditModal(w)} disabled={isProcessing} className="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white p-2 rounded-lg transition" title="Edit Pemilik">✏️</button>
+                              <button onClick={() => handleResetPassword(w)} disabled={isProcessing} className="bg-amber-600/20 hover:bg-amber-600 text-amber-400 hover:text-white p-2 rounded-lg transition" title="Reset Password">🔑</button>
                               {w.status_huni === 'sewa' && (
-                                <button onClick={() => handleSelesaikanSewa(w)} disabled={isProcessing} className="bg-purple-600/20 hover:bg-purple-600 text-purple-400 hover:text-white p-2 rounded-lg transition" title="Selesaikan Sewa (Arsipkan Penyewa)">🚪</button>
+                                <button onClick={() => handleSelesaikanSewa(w)} disabled={isProcessing} className="bg-purple-600/20 hover:bg-purple-600 text-purple-400 hover:text-white p-2 rounded-lg transition" title="Selesaikan Sewa">🚪</button>
                               )}
                               <button onClick={() => handleHapusWarga(w)} disabled={isProcessing} className="bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white p-2 rounded-lg transition" title="Hapus Warga">🗑️</button>
                             </div>
@@ -301,6 +356,82 @@ export default function SekretarisDataWarga() {
                 <button type="submit" disabled={processingId === editId} className="w-2/3 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-xl text-xs">{processingId === editId ? 'Menyimpan...' : 'Simpan Perubahan'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KELOLA PENGHUNI */}
+      {showPenghuniModal && selectedWarga && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-white">👥 Kelola Penghuni</h3>
+                <p className="text-xs text-slate-400">Rumah: {selectedWarga.no_rumah} (Pemilik: {selectedWarga.nama_lengkap})</p>
+              </div>
+              <button onClick={() => setShowPenghuniModal(false)} className="text-slate-400 hover:text-white text-xl">✕</button>
+            </div>
+
+            {/* List Penghuni */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-slate-300">Daftar Penghuni Aktif</h4>
+              {loadingPenghuni ? (
+                <div className="text-center py-4 text-xs text-slate-500">Memuat...</div>
+              ) : penghuniListRumah.length === 0 ? (
+                <div className="text-center py-4 text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl">Belum ada data penghuni.</div>
+              ) : (
+                <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-900 text-slate-400">
+                      <tr>
+                        <th className="p-3">Nama</th>
+                        <th className="p-3">Hubungan</th>
+                        <th className="p-3">Status Verifikasi</th>
+                        <th className="p-3 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {penghuniListRumah.map((p) => (
+                        <tr key={p.id}>
+                          <td className="p-3">
+                            <div className="font-semibold text-white">{p.nama_lengkap}</div>
+                            <div className="text-[10px] text-slate-500 font-mono">{p.nik || '-'}</div>
+                          </td>
+                          <td className="p-3 text-slate-300">{p.hubungan}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${p.status_verifikasi === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>{p.status_verifikasi}</span>
+                          </td>
+                          <td className="p-3 text-right">
+                            <button onClick={() => handleHapusPenghuni(p.id)} disabled={processingId === p.id} className="text-rose-400 hover:text-rose-300 text-xs px-2 py-1 bg-rose-500/10 rounded">Hapus</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Form Tambah Penghuni Baru */}
+            <div className="border-t border-slate-800 pt-4">
+              <h4 className="text-sm font-semibold text-slate-300 mb-3">➕ Tambah Penghuni Baru</h4>
+              <form onSubmit={handleTambahPenghuni} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2"><input type="text" placeholder="Nama Lengkap *" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newNama} onChange={(e) => setNewNama(e.target.value)} /></div>
+                <div><input type="text" placeholder="NIK (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newNik} onChange={(e) => setNewNik(e.target.value.replace(/\D/g, '').slice(0,16))} /></div>
+                <div><input type="text" placeholder="No. KK (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newNoKk} onChange={(e) => setNewNoKk(e.target.value.replace(/\D/g, '').slice(0,16))} /></div>
+                <div><input type="text" placeholder="No. WhatsApp" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newNoHp} onChange={(e) => setNewNoHp(e.target.value)} /></div>
+                <div>
+                  <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newHubungan} onChange={(e) => setNewHubungan(e.target.value)}>
+                    <option value="Penyewa">Penyewa</option>
+                    <option value="Istri">Istri</option>
+                    <option value="Anak">Anak</option>
+                    <option value="Saudara">Saudara</option>
+                    <option value="Lainnya">Lainnya</option>
+                  </select>
+                </div>
+                <button type="submit" disabled={processingId === selectedWarga.id} className="sm:col-span-2 w-full bg-teal-600 hover:bg-teal-500 text-white font-semibold py-2.5 rounded-xl text-xs transition">Simpan Penghuni</button>
+              </form>
+            </div>
           </div>
         </div>
       )}
