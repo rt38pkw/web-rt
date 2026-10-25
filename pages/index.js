@@ -16,7 +16,6 @@ export default function Home() {
   const [errorMsg, setErrorMsg] = useState('');
   const router = useRouter();
 
-  // JIKA SUDAH PERNAH LOGIN, LANGSUNG MASUK DASHBOARD
   useEffect(() => {
     const savedSession = localStorage.getItem('warga_session');
     if (savedSession) {
@@ -24,7 +23,6 @@ export default function Home() {
     }
   }, [router]);
 
-  // FUNGSI AJAIB: Menyeragamkan format nomor rumah
   const formatNoRumah = (input) => {
     if (!input) return '';
     const clean = input.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
@@ -49,7 +47,6 @@ export default function Home() {
     try {
       const formattedNoRumah = formatNoRumah(noRumah);
 
-      // Cek Nomor Rumah dulu
       const { data, error } = await supabase
         .from('warga')
         .select('*')
@@ -58,28 +55,23 @@ export default function Home() {
 
       if (error) throw error;
 
-      // Validasi 1: Cek apakah No Rumah terdaftar
       if (!data) {
         setErrorMsg(`Nomor rumah "${noRumah}" tidak terdaftar.`);
         setLoading(false);
         return;
       }
 
-      // ═══ LOGIKA BARU: MENENTUKAN SIAPA YANG LOGIN ═══
-      let role_login = 'pemilik'; // Default
+      let role_login = 'pemilik';
 
       if (data.status_huni === 'sewa') {
         if (password === '123456') {
-          role_login = 'penyewa'; // Jika sewa & pakai password default, berarti Penyewa
+          role_login = 'penyewa'; 
         } else if (data.password !== password) {
-          // Jika sewa & bukan default, tapi password salah
           setErrorMsg('Password salah. Silakan periksa kembali.');
           setLoading(false);
           return;
         }
-        // Jika sewa & pakai password custom yang benar, role_login tetap 'pemilik'
       } else {
-        // Jika statusnya pemilik atau kosong, cek password
         if (data.password !== password) {
           setErrorMsg('Password salah. Silakan periksa kembali.');
           setLoading(false);
@@ -87,12 +79,10 @@ export default function Home() {
         }
       }
 
-      // SIMPAN DATA & ROLE KE LOCALSTORAGE
       const { password: _, ...profilAman } = data;
-      profilAman.role_login = role_login; // <--- INI KUNCI AGAR PROFILE CARD BERUBAH
+      profilAman.role_login = role_login; 
       
       localStorage.setItem('warga_session', JSON.stringify(profilAman));
-      
       router.push('/dashboard-warga');
     } catch (err) {
       setErrorMsg('Terjadi kesalahan koneksi. Silakan coba lagi.');
@@ -106,10 +96,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-blue-500 selection:text-white">
-      <Head>
-        <title>Portal Warga - RT 38 Puri Kencana Wagir</title>
-      </Head>
-
+      <Head><title>Portal Warga - RT 38 Puri Kencana Wagir</title></Head>
       <header className="px-4 py-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/40 backdrop-blur sticky top-0 z-50">
         <div className="flex items-center space-x-3 overflow-hidden">
           <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0 shadow-md">
@@ -120,24 +107,16 @@ export default function Home() {
             <p className="text-[10px] sm:text-xs text-slate-400">Rukun • Peduli • Bersama</p>
           </div>
         </div>
-        <div>
-          <InstallButton />
-        </div>
+        <div><InstallButton /></div>
       </header>
-
       <main className="flex-1 flex flex-col items-center justify-center p-4 my-6">
         <div className="text-center max-w-lg mb-6 px-4">
           <span className="inline-block px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold rounded-full mb-2">
             ✨ Layanan Mandiri Warga RT 38
           </span>
-          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
-            Selamat Datang di Portal Warga 👋
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-            Silakan masuk menggunakan Nomor Rumah dan Password untuk mengecek status iuran bulanan.
-          </p>
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">Selamat Datang di Portal Warga 👋</h2>
+          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">Silakan masuk menggunakan Nomor Rumah dan Password untuk mengecek status iuran bulanan.</p>
         </div>
-
         <div className="w-full max-w-md bg-slate-900/90 border border-slate-800/80 rounded-3xl p-8 shadow-2xl shadow-blue-950/30 backdrop-blur-md">
           <div className="text-center mb-6">
             <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-slate-950 border border-slate-700 flex items-center justify-center overflow-hidden shadow-inner p-1">
@@ -146,69 +125,36 @@ export default function Home() {
             <h3 className="text-lg font-bold tracking-tight text-white">Masuk Akun Warga</h3>
             <p className="text-xs text-slate-400 mt-0.5">RT 38 Puri Kencana Wagir</p>
           </div>
-
           {errorMsg && (
             <div className="mb-5 p-3.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-xl text-center font-medium">
               ⚠️ {errorMsg}
             </div>
           )}
-
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2">Nomor Rumah</label>
-              <input
-                type="text"
-                required
-                placeholder="Contoh: A1 - 06"
-                value={noRumah}
-                onChange={(e) => setNoRumah(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition shadow-inner"
-              />
+              <input type="text" required placeholder="Contoh: A1 - 06" value={noRumah} onChange={(e) => setNoRumah(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition shadow-inner" />
             </div>
-
             <div>
               <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2">Password / PIN</label>
               <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition pr-10 shadow-inner"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-3.5 text-slate-400 hover:text-white text-sm transition"
-                  tabIndex={-1}
-                >
+                <input type={showPassword ? 'text' : 'password'} required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition pr-10 shadow-inner" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-3.5 text-slate-400 hover:text-white text-sm transition" tabIndex={-1}>
                   {showPassword ? '🙈' : '🐵'}
                 </button>
               </div>
-              
               <div className="flex justify-between items-center mt-2">
                 <span className="text-[10px] text-slate-500 block">Default awal: <code className="text-slate-300 font-mono">123456</code></span>
-                <button type="button" onClick={handleLupaPassword} className="text-[10px] text-blue-400 hover:text-blue-300 transition hover:underline">
-                  Lupa Password?
-                </button>
+                <button type="button" onClick={handleLupaPassword} className="text-[10px] text-blue-400 hover:text-blue-300 transition hover:underline">Lupa Password?</button>
               </div>
             </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-3.5 rounded-xl text-sm transition shadow-lg shadow-blue-600/25 disabled:opacity-50 active:scale-[0.99]"
-            >
+            <button type="submit" disabled={loading} className="w-full mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold py-3.5 rounded-xl text-sm transition shadow-lg shadow-blue-600/25 disabled:opacity-50 active:scale-[0.99]">
               {loading ? 'Memproses Masuk...' : 'Masuk Dashboard Warga'}
             </button>
           </form>
         </div>
       </main>
-
-      <footer className="p-4 text-center text-xs text-slate-500 border-t border-slate-900 bg-slate-950/60">
-        RT 38 Puri Kencana Wagir &copy; 2026 • Sistem Administrasi Lingkungan
-      </footer>
+      <footer className="p-4 text-center text-xs text-slate-500 border-t border-slate-900 bg-slate-950/60">RT 38 Puri Kencana Wagir &copy; 2026 • Sistem Administrasi Lingkungan</footer>
     </div>
   );
 }
