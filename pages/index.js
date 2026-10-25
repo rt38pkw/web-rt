@@ -25,7 +25,6 @@ export default function Home() {
   }, [router]);
 
   // FUNGSI AJAIB: Menyeragamkan format nomor rumah
-  // Contoh input: "a1-01", "A101", "a1 01" -> Output: "A1 - 01"
   const formatNoRumah = (input) => {
     if (!input) return '';
     const clean = input.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
@@ -39,7 +38,7 @@ export default function Home() {
         return `${letter}${blok} - ${no}`;
       }
     }
-    return input.trim(); // Fallback jika format tidak dikenali
+    return input.trim();
   };
 
   const handleLogin = async (e) => {
@@ -61,20 +60,37 @@ export default function Home() {
 
       // Validasi 1: Cek apakah No Rumah terdaftar
       if (!data) {
-        setErrorMsg(`Nomor rumah "${noRumah}" tidak terdaftar. Hubungi Sekretaris jika ini kesalahan.`);
+        setErrorMsg(`Nomor rumah "${noRumah}" tidak terdaftar.`);
         setLoading(false);
         return;
       }
 
-      // Validasi 2: Cek apakah Password cocok
-      if (data.password !== password) {
-        setErrorMsg('Password salah. Silakan periksa kembali.');
-        setLoading(false);
-        return;
+      // ═══ LOGIKA BARU: MENENTUKAN SIAPA YANG LOGIN ═══
+      let role_login = 'pemilik'; // Default
+
+      if (data.status_huni === 'sewa') {
+        if (password === '123456') {
+          role_login = 'penyewa'; // Jika sewa & pakai password default, berarti Penyewa
+        } else if (data.password !== password) {
+          // Jika sewa & bukan default, tapi password salah
+          setErrorMsg('Password salah. Silakan periksa kembali.');
+          setLoading(false);
+          return;
+        }
+        // Jika sewa & pakai password custom yang benar, role_login tetap 'pemilik'
+      } else {
+        // Jika statusnya pemilik atau kosong, cek password
+        if (data.password !== password) {
+          setErrorMsg('Password salah. Silakan periksa kembali.');
+          setLoading(false);
+          return;
+        }
       }
 
-      // SIMPAN DATA TANPA PASSWORD (LEBIH AMAN)
+      // SIMPAN DATA & ROLE KE LOCALSTORAGE
       const { password: _, ...profilAman } = data;
+      profilAman.role_login = role_login; // <--- INI KUNCI AGAR PROFILE CARD BERUBAH
+      
       localStorage.setItem('warga_session', JSON.stringify(profilAman));
       
       router.push('/dashboard-warga');
@@ -171,7 +187,6 @@ export default function Home() {
                 </button>
               </div>
               
-              {/* FITUR LUPA PASSWORD */}
               <div className="flex justify-between items-center mt-2">
                 <span className="text-[10px] text-slate-500 block">Default awal: <code className="text-slate-300 font-mono">123456</code></span>
                 <button type="button" onClick={handleLupaPassword} className="text-[10px] text-blue-400 hover:text-blue-300 transition hover:underline">
