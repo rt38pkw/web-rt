@@ -10,7 +10,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
   // State Step 1
   const [namaLengkap, setNamaLengkap] = useState('');
   const [nik, setNik] = useState('');
-  const [noKk, setNoKk] = useState(''); // <--- STATE BARU
+  const [noKk, setNoKk] = useState('');
   const [noWa, setNoWa] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -36,16 +36,19 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
   useEffect(() => {
     if (!show) return;
 
+    // Isi data awal (baik dari dataPenyewaAktif untuk penyewa, atau dari data Warga untuk pemilik)
     if (isPenyewa && dataPenyewaAktif) {
       setNamaLengkap(dataPenyewaAktif.nama_lengkap || '');
       setNik(sanitizeNik(dataPenyewaAktif.nik));
-      setNoKk(sanitizeNik(dataPenyewaAktif.no_kk)); // <--- AMBIL NO KK PENYEWA
+      setNoKk(sanitizeNik(dataPenyewaAktif.no_kk));
       setNoWa(sanitizeWa(dataPenyewaAktif.no_hp));
-    } else if (!isPenyewa && warga) {
-      setNamaLengkap(warga.nama_lengkap === 'Belum Ada' ? '' : (warga.nama_lengkap || ''));
-      setNik(sanitizeNik(warga.nik));
-      setNoKk(sanitizeNik(warga.no_kk)); // <--- AMBIL NO KK PEMILIK
-      setNoWa(sanitizeWa(warga.no_wa));
+    } else if (!isPenyewa) {
+      // Jika Pemilik yang mengisi, data awalnya diambil dari tabel warga atau data penghuni (jika sudah ada)
+      const sumberData = dataPenyewaAktif || warga;
+      setNamaLengkap(sumberData.nama_lengkap === 'Belum Ada' ? '' : (sumberData.nama_lengkap || ''));
+      setNik(sanitizeNik(sumberData.nik));
+      setNoKk(sanitizeNik(sumberData.no_kk));
+      setNoWa(sanitizeWa(sumberData.no_wa || sumberData.no_hp));
     }
   }, [show, isPenyewa, dataPenyewaAktif, warga]);
 
@@ -62,7 +65,11 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
       if (!nik || nik.length !== 16) { alert('NIK wajib diisi dan harus tepat 16 digit angka!'); return; }
       if (!noKk || noKk.length !== 16) { alert('No. KK wajib diisi dan harus tepat 16 digit angka!'); return; }
       if (!noWa.trim()) { alert('No WhatsApp wajib diisi!'); return; }
-      if (!isPenyewa && password && password !== confirmPassword) { alert('Password baru dan Konfirmasi Password tidak cocok!'); return; }
+      
+      // Cek password hanya jika dia pemilik
+      if (!isPenyewa && password && password !== confirmPassword) { 
+        alert('Password baru dan Konfirmasi Password tidak cocok!'); return; 
+      }
       setStep(2);
     } else if (step === 2) {
       if (newNama.trim() !== '' || newNik.trim() !== '') {
@@ -95,62 +102,63 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
     setLoading(true);
     try {
       const urlKK = await uploadKK(fileKK, warga.id);
+      const tipe = isPenyewa ? 'penyewa' : 'pemilik';
 
-      if (isPenyewa) {
-        const { data: existingPenghuni } = await supabase
-          .from('penghuni')
-          .select('id')
-          .eq('warga_id', warga.id)
-          .eq('hubungan', 'Kepala Keluarga')
-          .maybeSingle();
+      // ═══ 1. SIMPAN PROFIL KEPALA KELUARGA KE TABEL PENGHUNI ═══
+      const { data: existingPenghuni } = await supabase
+        .from('penghuni')
+        .select('id')
+        .eq('warga_id', warga.id)
+        .eq('is_aktif', true)
+        .maybeSingle();
 
-        if (existingPenghuni) {
-          await supabase.from('penghuni').update({
-            nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_kk: noKk.trim(), no_hp: noWa.trim(), url_kk: urlKK, status_verifikasi: 'pending', alasan_reject: null
-          }).eq('id', existingPenghuni.id);
-        } else {
-          await supabase.from('penghuni').insert([{
-            warga_id: warga.id, nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_kk: noKk.trim(), no_hp: noWa.trim(), hubungan: 'Kepala Keluarga', is_aktif: true, url_kk: urlKK, status_verifikasi: 'pending'
-          }]);
-        }
+      const dataPenghuni = {
+        warga_id: warga.id,
+        nama_lengkap: namaLengkap.trim(),
+        nik: nik.trim(),
+        no_kk: noKk.trim(),
+        no_hp: noWa.trim(),
+        hubungan: 'Kepala Keluarga',
+        tipe_penghuni: tipe,
+        is_aktif: true,
+        status_verifikasi: 'pending',
+        url_kk: urlKK,
+        alasan_reject: null
+      };
 
-        if (anggotaKeluarga.length > 0) {
-          const records = anggotaKeluarga.map(a => ({
-            warga_id: warga.id, nama_lengkap: a.nama, nik: a.nik, hubungan: a.hubungan, is_aktif: true, status_verifikasi: 'pending'
-          }));
-          await supabase.from('penghuni').insert(records);
-        }
+      if (existingPenghuni) {
+        await supabase.from('penghuni').update(dataPenghuni).eq('id', existingPenghuni.id);
       } else {
-        const updateData = {
-          nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_kk: noKk.trim(), no_wa: noWa.trim(), url_kk: urlKK, status_verifikasi_profil: 'pending', alasan_reject: null
+        await supabase.from('penghuni').insert([dataPenghuni]);
+      }
+
+      // ═══ 2. SIMPAN DATA TAMBAHAN (JIKA PEMILIK, UPDATE PASSWORD & NAMA DI TABEL WARGA) ═══
+      if (!isPenyewa) {
+        const updateWarga = {
+          nama_lengkap: namaLengkap.trim(),
+          nik: nik.trim(),
+          no_kk: noKk.trim(),
+          no_wa: noWa.trim()
         };
-        if (password.trim()) updateData.password_pending = password.trim();
+        
+        // Simpan password ke pending (sesuai alur ganti password mandiri)
+        if (password.trim()) updateWarga.password_pending = password.trim();
 
-        await supabase.from('warga').update(updateData).eq('id', warga.id);
+        await supabase.from('warga').update(updateWarga).eq('id', warga.id);
+      }
 
-        const { data: existingKK } = await supabase
-          .from('penghuni')
-          .select('id')
-          .eq('warga_id', warga.id)
-          .eq('hubungan', 'Kepala Keluarga')
-          .maybeSingle();
-
-        if (existingKK) {
-          await supabase.from('penghuni').update({
-            nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_kk: noKk.trim(), no_hp: noWa.trim(), url_kk: urlKK, status_verifikasi: 'pending'
-          }).eq('id', existingKK.id);
-        } else {
-          await supabase.from('penghuni').insert([{
-            warga_id: warga.id, nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_kk: noKk.trim(), no_hp: noWa.trim(), hubungan: 'Kepala Keluarga', is_aktif: true, url_kk: urlKK, status_verifikasi: 'pending'
-          }]);
-        }
-
-        if (anggotaKeluarga.length > 0) {
-          const records = anggotaKeluarga.map(a => ({
-            warga_id: warga.id, nama_lengkap: a.nama, nik: a.nik, hubungan: a.hubungan, is_aktif: true, status_verifikasi: 'pending'
-          }));
-          await supabase.from('penghuni').insert(records);
-        }
+      // ═══ 3. SIMPAN ANGGOTA KELUARGA LAINNYA ═══
+      if (anggotaKeluarga.length > 0) {
+        const records = anggotaKeluarga.map(a => ({
+          warga_id: warga.id, 
+          nama_lengkap: a.nama, 
+          nik: a.nik, 
+          hubungan: a.hubungan, 
+          tipe_penghuni: tipe, // Ikut tipe Kepala Keluarga
+          is_aktif: true, 
+          status_verifikasi: 'pending'
+        }));
+        await supabase.from('penghuni').insert(records);
       }
 
       alert('✅ Data berhasil diajukan! Menunggu verifikasi Sekretaris.');
@@ -229,7 +237,6 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
           </div>
         )}
 
-        {/* Step 2 & 3 (Sama seperti sebelumnya) */}
         {step === 2 && (
           <div className="space-y-3 animate-in fade-in">
             <div className="mb-2">
