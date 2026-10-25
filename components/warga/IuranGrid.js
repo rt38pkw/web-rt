@@ -1,6 +1,6 @@
 import { getInfoBulan } from '../../lib/iuran/calculations';
 
-export default function IuranGrid({ iuranList, tarifBulanan, adaPending, bulanTombolBayar, onKlikDetail, onBayar, periodeBulan = [] }) {
+export default function IuranGrid({ iuranList, tarifBulanan, adaPending, bulanTombolBayar, onKlikDetail, onBayar, periodeBulan = [], isModePantau = false }) {
   const now = new Date();
   const bulanSekarang = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const safeTarif = Number(tarifBulanan) || 0;
@@ -12,15 +12,11 @@ export default function IuranGrid({ iuranList, tarifBulanan, adaPending, bulanTo
           <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">Grid Iuran Bulanan {now.getFullYear()}</h3>
           <p className="text-xs text-slate-400">Klik grid untuk detail tanggal</p>
         </div>
-        <span className="text-xs bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 font-medium">
-          {periodeBulan.length} Bulan
-        </span>
+        <span className="text-xs bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 font-medium">{periodeBulan.length} Bulan</span>
       </div>
 
       {adaPending && (
-        <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-xl text-xs text-orange-300">
-          ⏳ Ada pengajuan yang menunggu approve bendahara.
-        </div>
+        <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-xl text-xs text-orange-300">⏳ Ada pengajuan yang menunggu approve bendahara.</div>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
@@ -33,7 +29,7 @@ export default function IuranGrid({ iuranList, tarifBulanan, adaPending, bulanTo
           const isKosong = info.recs.length === 0;
           const isJatuhTempo = bln.kode <= bulanSekarang;
 
-          const isTombolBayar = !adaPending && !isPending && !isLunas && bln.kode === bulanTombolBayar;
+          const isTombolBayar = !adaPending && !isPending && !isLunas && bln.kode === bulanTombolBayar && !isModePantau;
 
           let cardClass = 'bg-slate-950/60 border-slate-800/60 text-slate-400';
           if (isLunas) cardClass = 'bg-emerald-950/20 border-emerald-500/20 text-emerald-300';
