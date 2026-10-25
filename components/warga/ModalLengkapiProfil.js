@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // TAMBAH useEffect
 import { supabase } from '../../lib/supabase';
 import { uploadKK } from '../../lib/iuran/storage';
 
@@ -7,25 +7,10 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
   const [loading, setLoading] = useState(false);
   const isPenyewa = role === 'penyewa';
 
-  // State Step 1
-  const [namaLengkap, setNamaLengkap] = useState(
-    isPenyewa 
-      ? (dataPenyewaAktif?.nama_lengkap || '') 
-      : (warga?.nama_lengkap === 'Belum Ada' ? '' : (warga?.nama_lengkap || ''))
-  );
-  
-  const [nik, setNik] = useState(
-    isPenyewa 
-      ? (dataPenyewaAktif?.nik && dataPenyewaAktif.nik.length === 16 ? dataPenyewaAktif.nik : '')
-      : (warga?.nik && warga.nik.length === 16 ? warga.nik : '')
-  );
-  
-  const [noWa, setNoWa] = useState(
-    isPenyewa 
-      ? (dataPenyewaAktif?.no_hp || '')
-      : (warga?.no_wa || '')
-  );
-
+  // State Step 1 (Inisialisasi Awal)
+  const [namaLengkap, setNamaLengkap] = useState('');
+  const [nik, setNik] = useState('');
+  const [noWa, setNoWa] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -38,6 +23,21 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
   // State Step 3 (Upload KK)
   const [fileKK, setFileKK] = useState(null);
   const [previewKK, setPreviewKK] = useState(null);
+
+  // ═══ PERBAIKAN: SINKRONISASI DATA SAAT MODAL DIBUKA ═══
+  useEffect(() => {
+    if (!show) return; // Hanya jalan jika modal terbuka
+
+    if (isPenyewa && dataPenyewaAktif) {
+      setNamaLengkap(dataPenyewaAktif.nama_lengkap || '');
+      setNik(dataPenyewaAktif.nik || '');
+      setNoWa(dataPenyewaAktif.no_hp || '');
+    } else if (!isPenyewa && warga) {
+      setNamaLengkap(warga.nama_lengkap === 'Belum Ada' ? '' : (warga.nama_lengkap || ''));
+      setNik(warga.nik || '');
+      setNoWa(warga.no_wa || '');
+    }
+  }, [show, isPenyewa, dataPenyewaAktif, warga]);
 
   if (!show) return null;
 
