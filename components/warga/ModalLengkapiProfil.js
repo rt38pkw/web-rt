@@ -8,6 +8,10 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
   const isPenyewa = role === 'penyewa';
 
   // State Step 1
+  // Inisialisasi nama: Jika "Belum Ada", kosongkan. Jika ada, isi dengan nama saat ini.
+  const [namaLengkap, setNamaLengkap] = useState(
+    warga?.nama_lengkap === 'Belum Ada' ? '' : (warga?.nama_lengkap || '')
+  );
   const [nik, setNik] = useState(warga?.nik && warga.nik.length === 16 ? warga.nik : '');
   const [noWa, setNoWa] = useState(warga?.no_wa || '');
   const [password, setPassword] = useState('');
@@ -32,6 +36,10 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
 
   const handleNextStep = () => {
     if (step === 1) {
+      if (!namaLengkap.trim()) {
+        alert('Nama Lengkap wajib diisi sesuai KTP/KK!');
+        return;
+      }
       if (!nik || nik.length !== 16) {
         alert('NIK wajib diisi dan harus tepat 16 digit angka!');
         return;
@@ -99,7 +107,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
 
         if (existingPenghuni) {
           await supabase.from('penghuni').update({
-            nama_lengkap: warga.nama_lengkap === 'Belum Ada' ? 'Penyewa' : warga.nama_lengkap,
+            nama_lengkap: namaLengkap.trim(), // Simpan nama baru penyewa
             nik: nik.trim(),
             no_hp: noWa.trim(),
             url_kk: urlKK,
@@ -108,7 +116,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
         } else {
           await supabase.from('penghuni').insert([{
             warga_id: warga.id,
-            nama_lengkap: 'Penyewa',
+            nama_lengkap: namaLengkap.trim(),
             nik: nik.trim(),
             no_hp: noWa.trim(),
             hubungan: 'Kepala Keluarga',
@@ -134,6 +142,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
       } else {
         // === LOGIKA SIMPAN PEMILIK ===
         const updateData = {
+          nama_lengkap: namaLengkap.trim(), // Simpan nama baru pemilik
           nik: nik.trim(),
           no_wa: noWa.trim(),
           url_kk: urlKK,
@@ -153,19 +162,17 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
           .maybeSingle();
 
         if (existingKK) {
-          // Jika sudah ada, update (jaga-jaga jika ada perubahan nama)
           await supabase.from('penghuni').update({
-            nama_lengkap: warga.nama_lengkap, // Ambil dari nama asli pemilik
+            nama_lengkap: namaLengkap.trim(), // Gunakan nama dari input
             nik: nik.trim(),
             no_hp: noWa.trim(),
             url_kk: urlKK,
             status_verifikasi: 'pending'
           }).eq('id', existingKK.id);
         } else {
-          // Jika belum ada, insert baru
           await supabase.from('penghuni').insert([{
             warga_id: warga.id,
-            nama_lengkap: warga.nama_lengkap,
+            nama_lengkap: namaLengkap.trim(),
             nik: nik.trim(),
             no_hp: noWa.trim(),
             hubungan: 'Kepala Keluarga',
@@ -214,6 +221,19 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
         {step === 1 && (
           <div className="space-y-3 animate-in fade-in">
             <h4 className="text-sm font-semibold text-white mb-2">1. Identitas & Keamanan</h4>
+            
+            {/* FIELD NAMA BARU */}
+            <div>
+              <label className="block text-xs text-slate-300 mb-1">Nama Lengkap (Sesuai KTP/KK) <span className="text-rose-400">*</span></label>
+              <input 
+                type="text" 
+                value={namaLengkap} 
+                onChange={(e) => setNamaLengkap(e.target.value)} 
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" 
+                placeholder="Masukkan nama lengkap" 
+              />
+            </div>
+
             <div>
               <label className="block text-xs text-slate-300 mb-1">NIK (Wajib)</label>
               <input type="text" inputMode="numeric" value={nik} onChange={(e) => handleNikChange(e, setNik)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="Masukkan 16 digit NIK" />
