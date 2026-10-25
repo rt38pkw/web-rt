@@ -64,8 +64,16 @@ export default function DashboardWargaIuran() {
 
   useEffect(() => {
     if (!warga?.id) return;
-    const channelName = `realtime-iuran-warga-${warga.id}-${Math.random()}`;
+    const channelName = `realtime-warga-profil-${warga.id}-${Math.random()}`;
     const channel = supabase.channel(channelName)
+      // ═══ FITUR REALTIME BARU: DENGARKAN PERUBAHAN PROFIL ═══
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'warga', filter: `id=eq.${warga.id}` }, () => {
+        refreshSession(warga.id); // Jika sekretaris approve/reject pemilik, refresh data warga
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'penghuni', filter: `warga_id=eq.${warga.id}` }, () => {
+        loadPenghuni(warga.id); // Jika sekretaris approve/reject penyewa, refresh data penghuni
+      })
+      // Listener Iuran & Kas yang sudah ada
       .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran' }, () => loadIuran(warga.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deposit_warga' }, () => loadDeposit(warga.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pengeluaran' }, () => { if (showKasRTModalRef.current) loadKasRT(); })
@@ -85,6 +93,7 @@ export default function DashboardWargaIuran() {
     } catch (err) {}
   };
 
+  // ... (Sisa fungsi lainnya tetap sama: loadIuran, loadDeposit, loadPenghuni, dll) ...
   const loadIuran = async (wargaId) => {
     try { const data = await fetchIuranByWarga(wargaId); setIuranList(data); } catch (err) {} finally { setLoading(false); }
   };
@@ -118,14 +127,9 @@ export default function DashboardWargaIuran() {
     setLoadingRekap(true);
     try {
       const [wargaData, iuranData, penghuniData] = await Promise.all([
-        fetchAllWarga(), 
-        fetchAllIuran(),
-        supabase.from('penghuni').select('*').eq('is_aktif', true)
+        fetchAllWarga(), fetchAllIuran(), supabase.from('penghuni').select('*').eq('is_aktif', true)
       ]);
-      setAllWargaList(wargaData); 
-      setAllIuranList(iuranData); 
-      setAllPenghuniList(penghuniData.data || []); 
-      setShowRekapModal(true);
+      setAllWargaList(wargaData); setAllIuranList(iuranData); setAllPenghuniList(penghuniData.data || []); setShowRekapModal(true);
     } catch (err) { alert('Gagal memuat rekap.'); } finally { setLoadingRekap(false); }
   };
 
@@ -189,16 +193,13 @@ export default function DashboardWargaIuran() {
     } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
   };
 
-  // ═══ LOGIKA BANNER YANG SUDAH DISEMPURNAKAN ═══
   const statusPemilik = warga.status_verifikasi_profil;
   const statusPenyewa = dataPenyewaAktif?.status_verifikasi;
 
-  // Untuk Pemilik
   const isPemilikBelum = statusPemilik === 'belum' || !statusPemilik;
   const isPemilikPending = statusPemilik === 'pending';
   const isPemilikRejected = statusPemilik === 'rejected';
 
-  // Untuk Penyewa
   const isPenyewaBelum = !dataPenyewaAktif || statusPenyewa === 'belum';
   const isPenyewaPending = statusPenyewa === 'pending';
   const isPenyewaRejected = statusPenyewa === 'rejected';
@@ -212,7 +213,6 @@ export default function DashboardWargaIuran() {
       <Layout warga={warga} onLogout={handleLogout}>
         <ProfileCard warga={warga} tarifBulanan={tarifBulanan} isUsaha={usaha} penyewaAktif={dataPenyewaAktif?.nama_lengkap || null} />
 
-        {/* BANNER PEMILIK */}
         {!isPenyewa && isPemilikBelum && (
           <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
             <div className="flex items-start gap-3">
@@ -249,7 +249,6 @@ export default function DashboardWargaIuran() {
           </div>
         )}
 
-        {/* BANNER PENYEWA */}
         {isPenyewa && isPenyewaBelum && (
           <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
             <div className="flex items-start gap-3">
@@ -286,7 +285,6 @@ export default function DashboardWargaIuran() {
           </div>
         )}
 
-        {/* BANNER IURAN DITOLAK */}
         {adaDitolak && (
           <div className="bg-rose-950/40 border border-rose-500/50 rounded-2xl p-4 flex items-start gap-3">
             <span className="text-xl">❌</span>
@@ -344,27 +342,12 @@ export default function DashboardWargaIuran() {
       <ModalBayar show={showModalBayar} onClose={() => setShowModalBayar(false)} iuranList={iuranList} tarifBulanan={tarifBulanan} belumLunasList={belumLunasList} bulanDipilih={bulanDipilih} setBulanDipilih={setBulanDipilih} onSubmit={handleSubmitBayar} submitting={submitting} tahun={tahunTerpilih} />
       
       {showRekapModal && (
-        <ModalRekap 
-          show={showRekapModal} 
-          onClose={() => setShowRekapModal(false)} 
-          allWargaList={allWargaList} 
-          allIuranList={allIuranList} 
-          allPenghuniList={allPenghuniList}
-          tarifList={tarifList} 
-        />
+        <ModalRekap show={showRekapModal} onClose={() => setShowRekapModal(false)} allWargaList={allWargaList} allIuranList={allIuranList} allPenghuniList={allPenghuniList} tarifList={tarifList} />
       )}
       
       <ModalKasRT show={showKasRTModal} onClose={() => setShowKasRTModal(false)} iuranList={kasRTIuranList} pemasukanLainList={pemasukanLainList} pengeluaranList={pengeluaranList} />
       
-      <ModalLengkapiProfil 
-        show={showModalProfil} 
-        onClose={() => setShowModalProfil(false)} 
-        warga={warga} 
-        role={loginRole} 
-        dataPenyewaAktif={dataPenyewaAktif} 
-        alasanReject={isPenyewa ? alasanRejectPenyewa : alasanRejectWarga} 
-        onSuccess={() => refreshSession(warga.id)} 
-      />
+      <ModalLengkapiProfil show={showModalProfil} onClose={() => setShowModalProfil(false)} warga={warga} role={loginRole} dataPenyewaAktif={dataPenyewaAktif} alasanReject={isPenyewa ? alasanRejectPenyewa : alasanRejectWarga} onSuccess={() => refreshSession(warga.id)} />
     </>
   );
 }
