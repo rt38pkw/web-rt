@@ -189,13 +189,22 @@ export default function DashboardWargaIuran() {
     } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
   };
 
-  // PERBAIKAN: Memasukkan status 'rejected' sebagai syarat banner muncul
-  const isProfilBelumLengkap = warga.status_verifikasi_profil === 'belum' || warga.status_verifikasi_profil === 'rejected' || !warga.status_verifikasi_profil;
-  const isProfilPending = warga.status_verifikasi_profil === 'pending';
-  const isPenyewaBelumLengkap = isPenyewa && (penghuniList.length === 0 || penghuniList.some(p => p.status_verifikasi !== 'approved'));
-  
-  const alasanRejectWarga = warga.status_verifikasi_profil === 'rejected' ? warga.alasan_reject : null;
-  const alasanRejectPenyewa = isPenyewa && dataPenyewaAktif?.status_verifikasi === 'rejected' ? dataPenyewaAktif.alasan_reject : null;
+  // ═══ LOGIKA BANNER YANG SUDAH DISEMPURNAKAN ═══
+  const statusPemilik = warga.status_verifikasi_profil;
+  const statusPenyewa = dataPenyewaAktif?.status_verifikasi;
+
+  // Untuk Pemilik
+  const isPemilikBelum = statusPemilik === 'belum' || !statusPemilik;
+  const isPemilikPending = statusPemilik === 'pending';
+  const isPemilikRejected = statusPemilik === 'rejected';
+
+  // Untuk Penyewa
+  const isPenyewaBelum = !dataPenyewaAktif || statusPenyewa === 'belum';
+  const isPenyewaPending = statusPenyewa === 'pending';
+  const isPenyewaRejected = statusPenyewa === 'rejected';
+
+  const alasanRejectWarga = warga.alasan_reject;
+  const alasanRejectPenyewa = dataPenyewaAktif?.alasan_reject;
 
   return (
     <>
@@ -203,48 +212,81 @@ export default function DashboardWargaIuran() {
       <Layout warga={warga} onLogout={handleLogout}>
         <ProfileCard warga={warga} tarifBulanan={tarifBulanan} isUsaha={usaha} penyewaAktif={dataPenyewaAktif?.nama_lengkap || null} />
 
-        {!isPenyewa && isProfilBelumLengkap && (
+        {/* BANNER PEMILIK */}
+        {!isPenyewa && isPemilikBelum && (
           <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
             <div className="flex items-start gap-3">
               <span className="text-xl">⚠️</span>
               <div>
                 <h4 className="text-sm font-bold text-amber-300">Profil Pemilik Belum Lengkap</h4>
                 <p className="text-xs text-amber-400 mt-0.5">Silakan lengkapi data diri & upload KK agar data Anda tervalidasi oleh Sekretaris RT.</p>
-                {alasanRejectWarga && (
-                  <p className="text-xs text-rose-400 mt-1 font-semibold">Alasan Ditolak: {alasanRejectWarga}</p>
-                )}
               </div>
             </div>
             <button onClick={() => setShowModalProfil(true)} className="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-xs px-4 py-2.5 rounded-xl shrink-0 transition active:scale-95">Lengkapi Sekarang</button>
           </div>
         )}
 
-        {isPenyewa && isPenyewaBelumLengkap && (
+        {!isPenyewa && isPemilikRejected && (
+          <div className="bg-gradient-to-r from-rose-950/60 to-slate-900 border border-rose-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
+            <div className="flex items-start gap-3">
+              <span className="text-xl">❌</span>
+              <div>
+                <h4 className="text-sm font-bold text-rose-300">Profil Pemilik Ditolak</h4>
+                <p className="text-xs text-rose-400 mt-0.5">Alasan: {alasanRejectWarga}</p>
+              </div>
+            </div>
+            <button onClick={() => setShowModalProfil(true)} className="w-full sm:w-auto bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs px-4 py-2.5 rounded-xl shrink-0 transition active:scale-95">Perbaiki Sekarang</button>
+          </div>
+        )}
+
+        {!isPenyewa && isPemilikPending && (
+          <div className="bg-blue-950/40 border border-blue-500/30 rounded-2xl p-4 flex items-start gap-3">
+            <span className="text-xl">⏳</span>
+            <div>
+              <h4 className="text-sm font-bold text-blue-300">Menunggu Verifikasi Sekretaris</h4>
+              <p className="text-xs text-blue-400 mt-0.5">Data Pemilik sudah kami terima. Mohon tunggu Sekretaris memvalidasi data dan KK Anda.</p>
+            </div>
+          </div>
+        )}
+
+        {/* BANNER PENYEWA */}
+        {isPenyewa && isPenyewaBelum && (
           <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
             <div className="flex items-start gap-3">
               <span className="text-xl">⚠️</span>
               <div>
                 <h4 className="text-sm font-bold text-amber-300">Data Penghuni Belum Lengkap</h4>
                 <p className="text-xs text-amber-400 mt-0.5">Silakan lengkapi data keluarga & upload KK Anda agar tervalidasi oleh Sekretaris RT.</p>
-                {alasanRejectPenyewa && (
-                  <p className="text-xs text-rose-400 mt-1 font-semibold">Alasan Ditolak: {alasanRejectPenyewa}</p>
-                )}
               </div>
             </div>
             <button onClick={() => setShowModalProfil(true)} className="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-xs px-4 py-2.5 rounded-xl shrink-0 transition active:scale-95">Lengkapi Sekarang</button>
           </div>
         )}
 
-        {(isProfilPending || (isPenyewa && !isPenyewaBelumLengkap && isProfilPending)) && (
+        {isPenyewa && isPenyewaRejected && (
+          <div className="bg-gradient-to-r from-rose-950/60 to-slate-900 border border-rose-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
+            <div className="flex items-start gap-3">
+              <span className="text-xl">❌</span>
+              <div>
+                <h4 className="text-sm font-bold text-rose-300">Data Penghuni Ditolak</h4>
+                <p className="text-xs text-rose-400 mt-0.5">Alasan: {alasanRejectPenyewa}</p>
+              </div>
+            </div>
+            <button onClick={() => setShowModalProfil(true)} className="w-full sm:w-auto bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs px-4 py-2.5 rounded-xl shrink-0 transition active:scale-95">Perbaiki Sekarang</button>
+          </div>
+        )}
+
+        {isPenyewa && isPenyewaPending && (
           <div className="bg-blue-950/40 border border-blue-500/30 rounded-2xl p-4 flex items-start gap-3">
             <span className="text-xl">⏳</span>
             <div>
               <h4 className="text-sm font-bold text-blue-300">Menunggu Verifikasi Sekretaris</h4>
-              <p className="text-xs text-blue-400 mt-0.5">Data Anda sudah kami terima. Mohon tunggu Sekretaris memvalidasi data dan KK Anda.</p>
+              <p className="text-xs text-blue-400 mt-0.5">Data Penghuni sudah kami terima. Mohon tunggu Sekretaris memvalidasi data dan KK Anda.</p>
             </div>
           </div>
         )}
 
+        {/* BANNER IURAN DITOLAK */}
         {adaDitolak && (
           <div className="bg-rose-950/40 border border-rose-500/50 rounded-2xl p-4 flex items-start gap-3">
             <span className="text-xl">❌</span>
@@ -320,7 +362,7 @@ export default function DashboardWargaIuran() {
         warga={warga} 
         role={loginRole} 
         dataPenyewaAktif={dataPenyewaAktif} 
-        alasanReject={isPenyewa ? alasanRejectPenyewa : alasanRejectWarga} // <--- KIRIM ALASAN REJECT KE MODAL
+        alasanReject={isPenyewa ? alasanRejectPenyewa : alasanRejectWarga} 
         onSuccess={() => refreshSession(warga.id)} 
       />
     </>
