@@ -23,8 +23,11 @@ export default function DashboardWargaIuran() {
   const [iuranList, setIuranList] = useState([]);
   const [depositList, setDepositList] = useState([]);
   const [tarifList, setTarifList] = useState([]);
+  
   const [allWargaList, setAllWargaList] = useState([]);
   const [allIuranList, setAllIuranList] = useState([]);
+  const [allPenghuniList, setAllPenghuniList] = useState([]); // STATE BARU UNTUK REKAP PENYEWA
+  
   const [loading, setLoading] = useState(true);
   const [loadingRekap, setLoadingRekap] = useState(false);
   
@@ -114,8 +117,16 @@ export default function DashboardWargaIuran() {
     if (allWargaList.length > 0) { setShowRekapModal(true); return; }
     setLoadingRekap(true);
     try {
-      const [wargaData, iuranData] = await Promise.all([fetchAllWarga(), fetchAllIuran()]);
-      setAllWargaList(wargaData); setAllIuranList(iuranData); setShowRekapModal(true);
+      // Tambahkan fetch data penghuni (penyewa) untuk rekap
+      const [wargaData, iuranData, penghuniData] = await Promise.all([
+        fetchAllWarga(), 
+        fetchAllIuran(),
+        supabase.from('penghuni').select('*').eq('is_aktif', true)
+      ]);
+      setAllWargaList(wargaData); 
+      setAllIuranList(iuranData); 
+      setAllPenghuniList(penghuniData.data || []); // Simpan data penghuni
+      setShowRekapModal(true);
     } catch (err) { alert('Gagal memuat rekap.'); } finally { setLoadingRekap(false); }
   };
 
@@ -134,7 +145,6 @@ export default function DashboardWargaIuran() {
   const tarifBulanan = getTarifWarga(warga, tarifList, tahunTerpilih);
   const usaha = isWargaUsaha(warga);
   
-  // --- MENCARI OBJEK PENYEWA AKTIF ---
   const dataPenyewaAktif = penghuniList.find(p => p.hubungan === 'Kepala Keluarga') || null;
 
   const totalDisetor = iuranList.filter((i) => i.status === 'approved').reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
@@ -281,7 +291,19 @@ export default function DashboardWargaIuran() {
 
       <ModalDetailBulan detail={selectedBulanDetail} onClose={() => setSelectedBulanDetail(null)} />
       <ModalBayar show={showModalBayar} onClose={() => setShowModalBayar(false)} iuranList={iuranList} tarifBulanan={tarifBulanan} belumLunasList={belumLunasList} bulanDipilih={bulanDipilih} setBulanDipilih={setBulanDipilih} onSubmit={handleSubmitBayar} submitting={submitting} tahun={tahunTerpilih} />
-      {showRekapModal && (<ModalRekap show={showRekapModal} onClose={() => setShowRekapModal(false)} allWargaList={allWargaList} allIuranList={allIuranList} tarifList={tarifList} />)}
+      
+      {/* KIRIM DATA SEMUA PENGHUNI KE MODAL REKAP */}
+      {showRekapModal && (
+        <ModalRekap 
+          show={showRekapModal} 
+          onClose={() => setShowRekapModal(false)} 
+          allWargaList={allWargaList} 
+          allIuranList={allIuranList} 
+          allPenghuniList={allPenghuniList} // <--- PROP BARU
+          tarifList={tarifList} 
+        />
+      )}
+      
       <ModalKasRT show={showKasRTModal} onClose={() => setShowKasRTModal(false)} iuranList={kasRTIuranList} pemasukanLainList={pemasukanLainList} pengeluaranList={pengeluaranList} />
       
       <ModalLengkapiProfil 
@@ -289,7 +311,7 @@ export default function DashboardWargaIuran() {
         onClose={() => setShowModalProfil(false)} 
         warga={warga} 
         role={loginRole} 
-        dataPenyewaAktif={dataPenyewaAktif} // <--- KIRIM DATA PENYEWA
+        dataPenyewaAktif={dataPenyewaAktif} 
         onSuccess={() => refreshSession(warga.id)} 
       />
     </>
