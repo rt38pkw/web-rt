@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { uploadKK } from '../../lib/iuran/storage';
 
-export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPenyewaAktif, onSuccess }) {
+export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPenyewaAktif, alasanReject, onSuccess }) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const isPenyewa = role === 'penyewa';
@@ -24,16 +24,13 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
   const [fileKK, setFileKK] = useState(null);
   const [previewKK, setPreviewKK] = useState(null);
 
-  // ═══ FUNGSI SANITASI DATA DARI DATABASE ═══
   const sanitizeNik = (val) => {
     const str = String(val || '');
-    const numbersOnly = str.replace(/\D/g, ''); // Buang semua non-angka
-    return numbersOnly.length === 16 ? numbersOnly : ''; // Jika bukan 16 digit, kosongkan
+    const numbersOnly = str.replace(/\D/g, '');
+    return numbersOnly.length === 16 ? numbersOnly : '';
   };
 
-  const sanitizeWa = (val) => {
-    return String(val || '').replace(/\D/g, ''); // Buang semua non-angka
-  };
+  const sanitizeWa = (val) => String(val || '').replace(/\D/g, '');
 
   useEffect(() => {
     if (!show) return;
@@ -58,22 +55,10 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
 
   const handleNextStep = () => {
     if (step === 1) {
-      if (!namaLengkap.trim()) {
-        alert('Nama Lengkap wajib diisi sesuai KTP/KK!');
-        return;
-      }
-      if (!nik || nik.length !== 16) {
-        alert('NIK wajib diisi dan harus tepat 16 digit angka!');
-        return;
-      }
-      if (!noWa.trim()) {
-        alert('No WhatsApp wajib diisi!');
-        return;
-      }
-      if (!isPenyewa && password && password !== confirmPassword) {
-        alert('Password baru dan Konfirmasi Password tidak cocok!');
-        return;
-      }
+      if (!namaLengkap.trim()) { alert('Nama Lengkap wajib diisi sesuai KTP/KK!'); return; }
+      if (!nik || nik.length !== 16) { alert('NIK wajib diisi dan harus tepat 16 digit angka!'); return; }
+      if (!noWa.trim()) { alert('No WhatsApp wajib diisi!'); return; }
+      if (!isPenyewa && password && password !== confirmPassword) { alert('Password baru dan Konfirmasi Password tidak cocok!'); return; }
       setStep(2);
     } else if (step === 2) {
       if (newNama.trim() !== '' || newNik.trim() !== '') {
@@ -85,21 +70,13 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
   };
 
   const handleTambahAnggota = () => {
-    if (!newNama.trim()) {
-      alert('Nama lengkap wajib diisi!');
-      return;
-    }
-    if (!newNik || newNik.length !== 16) {
-      alert('NIK anggota keluarga wajib diisi dan harus 16 digit!');
-      return;
-    }
+    if (!newNama.trim()) { alert('Nama lengkap wajib diisi!'); return; }
+    if (!newNik || newNik.length !== 16) { alert('NIK anggota keluarga wajib diisi dan harus 16 digit!'); return; }
     setAnggotaKeluarga([...anggotaKeluarga, { nama: newNama, nik: newNik, hubungan: newHubungan }]);
     setNewNama(''); setNewNik(''); setNewHubungan('Istri');
   };
 
-  const handleHapusAnggota = (index) => {
-    setAnggotaKeluarga(anggotaKeluarga.filter((_, i) => i !== index));
-  };
+  const handleHapusAnggota = (index) => setAnggotaKeluarga(anggotaKeluarga.filter((_, i) => i !== index));
 
   const handleFileKKChange = (e) => {
     const file = e.target.files?.[0];
@@ -109,10 +86,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
   };
 
   const handleSubmit = async () => {
-    if (!fileKK) {
-      alert('Foto Kartu Keluarga wajib diunggah untuk validasi!');
-      return;
-    }
+    if (!fileKK) { alert('Foto Kartu Keluarga wajib diunggah untuk validasi!'); return; }
 
     setLoading(true);
     try {
@@ -128,44 +102,23 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
 
         if (existingPenghuni) {
           await supabase.from('penghuni').update({
-            nama_lengkap: namaLengkap.trim(), 
-            nik: nik.trim(),
-            no_hp: noWa.trim(),
-            url_kk: urlKK,
-            status_verifikasi: 'pending'
+            nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_hp: noWa.trim(), url_kk: urlKK, status_verifikasi: 'pending', alasan_reject: null
           }).eq('id', existingPenghuni.id);
         } else {
           await supabase.from('penghuni').insert([{
-            warga_id: warga.id,
-            nama_lengkap: namaLengkap.trim(),
-            nik: nik.trim(),
-            no_hp: noWa.trim(),
-            hubungan: 'Kepala Keluarga',
-            is_aktif: true,
-            url_kk: urlKK,
-            status_verifikasi: 'pending'
+            warga_id: warga.id, nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_hp: noWa.trim(), hubungan: 'Kepala Keluarga', is_aktif: true, url_kk: urlKK, status_verifikasi: 'pending'
           }]);
         }
 
         if (anggotaKeluarga.length > 0) {
           const records = anggotaKeluarga.map(a => ({
-            warga_id: warga.id,
-            nama_lengkap: a.nama,
-            nik: a.nik,
-            hubungan: a.hubungan,
-            is_aktif: true,
-            status_verifikasi: 'pending'
+            warga_id: warga.id, nama_lengkap: a.nama, nik: a.nik, hubungan: a.hubungan, is_aktif: true, status_verifikasi: 'pending'
           }));
           await supabase.from('penghuni').insert(records);
         }
-
       } else {
         const updateData = {
-          nama_lengkap: namaLengkap.trim(), 
-          nik: nik.trim(),
-          no_wa: noWa.trim(),
-          url_kk: urlKK,
-          status_verifikasi_profil: 'pending'
+          nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_wa: noWa.trim(), url_kk: urlKK, status_verifikasi_profil: 'pending', alasan_reject: null
         };
         if (password.trim()) updateData.password_pending = password.trim();
 
@@ -180,33 +133,17 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
 
         if (existingKK) {
           await supabase.from('penghuni').update({
-            nama_lengkap: namaLengkap.trim(), 
-            nik: nik.trim(),
-            no_hp: noWa.trim(),
-            url_kk: urlKK,
-            status_verifikasi: 'pending'
+            nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_hp: noWa.trim(), url_kk: urlKK, status_verifikasi: 'pending'
           }).eq('id', existingKK.id);
         } else {
           await supabase.from('penghuni').insert([{
-            warga_id: warga.id,
-            nama_lengkap: namaLengkap.trim(),
-            nik: nik.trim(),
-            no_hp: noWa.trim(),
-            hubungan: 'Kepala Keluarga',
-            is_aktif: true,
-            url_kk: urlKK,
-            status_verifikasi: 'pending'
+            warga_id: warga.id, nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_hp: noWa.trim(), hubungan: 'Kepala Keluarga', is_aktif: true, url_kk: urlKK, status_verifikasi: 'pending'
           }]);
         }
 
         if (anggotaKeluarga.length > 0) {
           const records = anggotaKeluarga.map(a => ({
-            warga_id: warga.id,
-            nama_lengkap: a.nama,
-            nik: a.nik,
-            hubungan: a.hubungan,
-            is_aktif: true,
-            status_verifikasi: 'pending'
+            warga_id: warga.id, nama_lengkap: a.nama, nik: a.nik, hubungan: a.hubungan, is_aktif: true, status_verifikasi: 'pending'
           }));
           await supabase.from('penghuni').insert(records);
         }
@@ -234,6 +171,17 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
           <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
         </div>
 
+        {/* TAMPILKAN ALASAN REJECT */}
+        {alasanReject && (
+          <div className="bg-rose-950/40 border border-rose-500/50 rounded-xl p-3 flex items-start gap-2">
+            <span className="text-sm mt-0.5">⚠️</span>
+            <div>
+              <h4 className="text-xs font-bold text-rose-300">Ditolak Sebelumnya:</h4>
+              <p className="text-[11px] text-rose-400 mt-0.5">{alasanReject}</p>
+            </div>
+          </div>
+        )}
+
         {step === 1 && (
           <div className="space-y-3 animate-in fade-in">
             <div className="mb-2">
@@ -243,15 +191,8 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
             
             <div>
               <label className="block text-xs text-slate-300 mb-1">Nama Lengkap (Sesuai KTP/KK) <span className="text-rose-400">*</span></label>
-              <input 
-                type="text" 
-                value={namaLengkap} 
-                onChange={(e) => setNamaLengkap(e.target.value)} 
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" 
-                placeholder="Masukkan nama lengkap" 
-              />
+              <input type="text" value={namaLengkap} onChange={(e) => setNamaLengkap(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="Masukkan nama lengkap" />
             </div>
-
             <div>
               <label className="block text-xs text-slate-300 mb-1">NIK (Wajib)</label>
               <input type="text" inputMode="numeric" value={nik} onChange={(e) => handleNikChange(e, setNik)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="Masukkan 16 digit NIK" />
