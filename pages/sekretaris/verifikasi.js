@@ -8,8 +8,9 @@ export default function SekretarisVerifikasi() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   
-  // STATE BARU UNTUK MODAL SPLIT-SCREEN (Data + Gambar)
+  // STATE UNTUK PRATINJAU
   const [previewData, setPreviewData] = useState(null); 
+  const [isZoomed, setIsZoomed] = useState(false); // STATE BARU UNTUK ZOOM
 
   useEffect(() => {
     fetchAntrean();
@@ -110,6 +111,11 @@ export default function SekretarisVerifikasi() {
     } catch (err) { alert('Gagal menolak: ' + err.message); } finally { setProcessing(false); }
   };
 
+  const openPreview = (data) => {
+    setPreviewData(data);
+    setIsZoomed(false); // Reset zoom setiap kali buka
+  };
+
   return (
     <Layout>
       <div className="max-w-5xl mx-auto space-y-4">
@@ -119,7 +125,7 @@ export default function SekretarisVerifikasi() {
           <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in">
             <div className="bg-slate-900 border border-slate-700 w-full max-w-6xl h-[95vh] rounded-3xl flex flex-col md:flex-row overflow-hidden shadow-2xl">
               
-              {/* Sisi Kiri: Data Teks untuk Dicocokkan */}
+              {/* Sisi Kiri: Data Teks */}
               <div className="w-full md:w-1/3 bg-slate-900 p-5 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-800 shrink-0">
                 <div>
                   <div className="flex items-center justify-between mb-6">
@@ -150,9 +156,28 @@ export default function SekretarisVerifikasi() {
                 </button>
               </div>
               
-              {/* Sisi Kanan: Gambar KK (Bisa di-scroll) */}
-              <div className="w-full md:w-2/3 bg-black/50 relative flex items-center justify-center overflow-auto p-2 sm:p-6">
-                <img src={previewData.imageUrl} alt="Preview KK" className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+              {/* Sisi Kanan: Gambar (Bisa di-zoom) */}
+              <div className="w-full md:w-2/3 bg-black/50 relative flex flex-col">
+                {/* Panduan Zoom */}
+                <div className="absolute top-4 right-4 z-10 bg-slate-900/80 border border-slate-700 text-white text-[10px] px-3 py-1.5 rounded-lg pointer-events-none">
+                  {isZoomed ? '🔍 Klik gambar untuk perkecil' : '🔍 Klik gambar untuk Zoom'}
+                </div>
+                
+                {/* Container Scrollable */}
+                <div 
+                  className={`flex-1 p-2 sm:p-6 overflow-auto flex ${isZoomed ? 'items-start justify-start' : 'items-center justify-center'} ${isZoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'}`}
+                  onClick={() => setIsZoomed(!isZoomed)}
+                >
+                  <img 
+                    src={previewData.imageUrl} 
+                    alt="Preview KK" 
+                    className={`rounded-lg shadow-lg transition-all duration-200 ${
+                      isZoomed 
+                        ? 'w-auto h-auto max-w-none max-h-none' // Ukuran asli (bisa scroll)
+                        : 'max-w-full max-h-full object-contain' // Fit to screen
+                    }`} 
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -218,7 +243,7 @@ export default function SekretarisVerifikasi() {
                           {/* Thumbnail KK */}
                           <div className="w-full sm:w-1/2 shrink-0">
                             {item.pemilik.url_kk ? (
-                              <div className="relative group cursor-pointer" onClick={() => setPreviewData({ imageUrl: item.pemilik.url_kk, nama: item.pemilik.nama_lengkap, nik: item.pemilik.nik, wa: item.pemilik.no_wa, tipe: 'Pemilik' })}>
+                              <div className="relative group cursor-pointer" onClick={() => openPreview({ imageUrl: item.pemilik.url_kk, nama: item.pemilik.nama_lengkap, nik: item.pemilik.nik, wa: item.pemilik.no_wa, tipe: 'Pemilik' })}>
                                 <img src={item.pemilik.url_kk} alt="KK Pemilik" className="w-full h-32 object-cover rounded-lg border border-slate-700" />
                                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition">
                                   <span className="text-white text-xs font-semibold">🔍 Cocokkan</span>
@@ -276,7 +301,7 @@ export default function SekretarisVerifikasi() {
                           {/* Thumbnail KK */}
                           <div className="w-full sm:w-1/2 shrink-0">
                             {item.penyewa.url_kk ? (
-                              <div className="relative group cursor-pointer" onClick={() => setPreviewData({ imageUrl: item.penyewa.url_kk, nama: item.penyewa.nama_lengkap, nik: item.penyewa.nik, wa: item.penyewa.no_hp, tipe: 'Penyewa' })}>
+                              <div className="relative group cursor-pointer" onClick={() => openPreview({ imageUrl: item.penyewa.url_kk, nama: item.penyewa.nama_lengkap, nik: item.penyewa.nik, wa: item.penyewa.no_hp, tipe: 'Penyewa' })}>
                                 <img src={item.penyewa.url_kk} alt="KK Penyewa" className="w-full h-32 object-cover rounded-lg border border-orange-500/30" />
                                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition">
                                   <span className="text-white text-xs font-semibold">🔍 Cocokkan</span>
