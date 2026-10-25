@@ -10,6 +10,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
   // State Step 1
   const [namaLengkap, setNamaLengkap] = useState('');
   const [nik, setNik] = useState('');
+  const [noKk, setNoKk] = useState(''); // <--- STATE BARU
   const [noWa, setNoWa] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -38,17 +39,19 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
     if (isPenyewa && dataPenyewaAktif) {
       setNamaLengkap(dataPenyewaAktif.nama_lengkap || '');
       setNik(sanitizeNik(dataPenyewaAktif.nik));
+      setNoKk(sanitizeNik(dataPenyewaAktif.no_kk)); // <--- AMBIL NO KK PENYEWA
       setNoWa(sanitizeWa(dataPenyewaAktif.no_hp));
     } else if (!isPenyewa && warga) {
       setNamaLengkap(warga.nama_lengkap === 'Belum Ada' ? '' : (warga.nama_lengkap || ''));
       setNik(sanitizeNik(warga.nik));
+      setNoKk(sanitizeNik(warga.no_kk)); // <--- AMBIL NO KK PEMILIK
       setNoWa(sanitizeWa(warga.no_wa));
     }
   }, [show, isPenyewa, dataPenyewaAktif, warga]);
 
   if (!show) return null;
 
-  const handleNikChange = (e, setter) => {
+  const handleNumberChange = (e, setter) => {
     const val = e.target.value.replace(/\D/g, '');
     if (val.length <= 16) setter(val);
   };
@@ -57,6 +60,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
     if (step === 1) {
       if (!namaLengkap.trim()) { alert('Nama Lengkap wajib diisi sesuai KTP/KK!'); return; }
       if (!nik || nik.length !== 16) { alert('NIK wajib diisi dan harus tepat 16 digit angka!'); return; }
+      if (!noKk || noKk.length !== 16) { alert('No. KK wajib diisi dan harus tepat 16 digit angka!'); return; }
       if (!noWa.trim()) { alert('No WhatsApp wajib diisi!'); return; }
       if (!isPenyewa && password && password !== confirmPassword) { alert('Password baru dan Konfirmasi Password tidak cocok!'); return; }
       setStep(2);
@@ -102,11 +106,11 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
 
         if (existingPenghuni) {
           await supabase.from('penghuni').update({
-            nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_hp: noWa.trim(), url_kk: urlKK, status_verifikasi: 'pending', alasan_reject: null
+            nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_kk: noKk.trim(), no_hp: noWa.trim(), url_kk: urlKK, status_verifikasi: 'pending', alasan_reject: null
           }).eq('id', existingPenghuni.id);
         } else {
           await supabase.from('penghuni').insert([{
-            warga_id: warga.id, nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_hp: noWa.trim(), hubungan: 'Kepala Keluarga', is_aktif: true, url_kk: urlKK, status_verifikasi: 'pending'
+            warga_id: warga.id, nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_kk: noKk.trim(), no_hp: noWa.trim(), hubungan: 'Kepala Keluarga', is_aktif: true, url_kk: urlKK, status_verifikasi: 'pending'
           }]);
         }
 
@@ -118,7 +122,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
         }
       } else {
         const updateData = {
-          nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_wa: noWa.trim(), url_kk: urlKK, status_verifikasi_profil: 'pending', alasan_reject: null
+          nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_kk: noKk.trim(), no_wa: noWa.trim(), url_kk: urlKK, status_verifikasi_profil: 'pending', alasan_reject: null
         };
         if (password.trim()) updateData.password_pending = password.trim();
 
@@ -133,11 +137,11 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
 
         if (existingKK) {
           await supabase.from('penghuni').update({
-            nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_hp: noWa.trim(), url_kk: urlKK, status_verifikasi: 'pending'
+            nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_kk: noKk.trim(), no_hp: noWa.trim(), url_kk: urlKK, status_verifikasi: 'pending'
           }).eq('id', existingKK.id);
         } else {
           await supabase.from('penghuni').insert([{
-            warga_id: warga.id, nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_hp: noWa.trim(), hubungan: 'Kepala Keluarga', is_aktif: true, url_kk: urlKK, status_verifikasi: 'pending'
+            warga_id: warga.id, nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_kk: noKk.trim(), no_hp: noWa.trim(), hubungan: 'Kepala Keluarga', is_aktif: true, url_kk: urlKK, status_verifikasi: 'pending'
           }]);
         }
 
@@ -171,7 +175,6 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
           <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
         </div>
 
-        {/* TAMPILKAN ALASAN REJECT */}
         {alasanReject && (
           <div className="bg-rose-950/40 border border-rose-500/50 rounded-xl p-3 flex items-start gap-2">
             <span className="text-sm mt-0.5">⚠️</span>
@@ -193,9 +196,15 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
               <label className="block text-xs text-slate-300 mb-1">Nama Lengkap (Sesuai KTP/KK) <span className="text-rose-400">*</span></label>
               <input type="text" value={namaLengkap} onChange={(e) => setNamaLengkap(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="Masukkan nama lengkap" />
             </div>
-            <div>
-              <label className="block text-xs text-slate-300 mb-1">NIK (Wajib)</label>
-              <input type="text" inputMode="numeric" value={nik} onChange={(e) => handleNikChange(e, setNik)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="Masukkan 16 digit NIK" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-slate-300 mb-1">NIK (Wajib)</label>
+                <input type="text" inputMode="numeric" value={nik} onChange={(e) => handleNumberChange(e, setNik)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="16 digit NIK" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-300 mb-1">No. KK (Wajib)</label>
+                <input type="text" inputMode="numeric" value={noKk} onChange={(e) => handleNumberChange(e, setNoKk)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="16 digit KK" />
+              </div>
             </div>
             <div>
               <label className="block text-xs text-slate-300 mb-1">No WhatsApp (Wajib)</label>
@@ -204,7 +213,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
             
             {!isPenyewa && (
               <>
-                <div>
+                <div className="pt-2 border-t border-slate-800">
                   <label className="block text-xs text-slate-300 mb-1">Password Baru (Opsional)</label>
                   <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="Kosongkan jika tidak diubah" />
                 </div>
@@ -217,25 +226,20 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
                 )}
               </>
             )}
-            {isPenyewa && (
-              <div className="p-3 bg-blue-950/30 rounded-xl border border-blue-500/20">
-                <p className="text-xs text-blue-400">ℹ️ Password login Anda dikelola oleh Pemilik/Sekretaris. Anda tidak dapat mengubahnya di sini.</p>
-              </div>
-            )}
           </div>
         )}
 
+        {/* Step 2 & 3 (Sama seperti sebelumnya) */}
         {step === 2 && (
           <div className="space-y-3 animate-in fade-in">
             <div className="mb-2">
               <h4 className="text-sm font-semibold text-white">2. Anggota Keluarga Lainnya</h4>
               <p className="text-xs text-slate-400 mt-0.5">Tambahkan anggota keluarga yang ikut tinggal (Istri, Anak, Saudara).</p>
             </div>
-            
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
               <input type="text" placeholder="Nama Lengkap" value={newNama} onChange={(e) => setNewNama(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" />
               <div className="flex gap-2">
-                <input type="text" inputMode="numeric" placeholder="16 digit NIK (Wajib)" value={newNik} onChange={(e) => handleNikChange(e, setNewNik)} className="w-1/2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" />
+                <input type="text" inputMode="numeric" placeholder="16 digit NIK (Wajib)" value={newNik} onChange={(e) => handleNumberChange(e, setNewNik)} className="w-1/2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" />
                 <select value={newHubungan} onChange={(e) => setNewHubungan(e.target.value)} className="w-1/2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white">
                   <option value="Istri">Istri</option>
                   <option value="Anak">Anak</option>
@@ -245,7 +249,6 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
               </div>
               <button type="button" onClick={handleTambahAnggota} className="w-full bg-slate-800 hover:bg-slate-700 text-white text-xs py-1.5 rounded-lg mt-1 font-semibold">+ Tambahkan</button>
             </div>
-
             <div className="space-y-2">
               {anggotaKeluarga.map((a, i) => (
                 <div key={i} className="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg border border-slate-700">
@@ -264,7 +267,6 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
           <div className="space-y-3 animate-in fade-in">
             <h4 className="text-sm font-semibold text-white mb-2">3. Upload Kartu Keluarga</h4>
             <p className="text-xs text-slate-400">Foto KK ini hanya digunakan untuk validasi data oleh Sekretaris RT.</p>
-            
             <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileKKChange} id="upload-kk" className="hidden" />
             <label htmlFor="upload-kk" className="border-2 border-dashed border-slate-700 rounded-2xl p-6 text-center hover:bg-slate-800/50 transition cursor-pointer flex flex-col items-center justify-center min-h-[150px]">
               {previewKK ? (
