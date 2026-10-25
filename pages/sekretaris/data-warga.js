@@ -44,9 +44,9 @@ export default function SekretarisDataWarga() {
   const [newNoHp, setNewNoHp] = useState('');
   const [newHubungan, setNewHubungan] = useState('Kepala Keluarga');
 
-  // STATE BARU: Form Tambah Anggota Keluarga (dari baris tabel)
+  // State Form Tambah Anggota Keluarga (dari baris tabel)
   const [showTambahAnggota, setShowTambahAnggota] = useState(false);
-  const [targetAnggotaKeluarga, setTargetAnggotaKeluarga] = useState(null); // Menyimpan data Kepala Keluarga
+  const [targetAnggotaKeluarga, setTargetAnggotaKeluarga] = useState(null); 
   const [anggotaNama, setAnggotaNama] = useState('');
   const [anggotaNik, setAnggotaNik] = useState('');
   const [anggotaHubungan, setAnggotaHubungan] = useState('Istri');
@@ -159,7 +159,6 @@ export default function SekretarisDataWarga() {
     }
   };
 
-  // FUNGSI UNTUK MENANGANI LUPA ARSIPKAN PENYEWA LAMA
   const handleTambahPenghuniSubmit = async (e) => {
     e.preventDefault();
     if (!targetRumahId) { alert('Pilih Nomor Rumah!'); return; }
@@ -168,7 +167,6 @@ export default function SekretarisDataWarga() {
 
     setProcessingId(targetRumahId);
     try {
-      // Cek apakah ada penyewa lama yang aktif
       if (selectedRumahInfo.status_huni === 'sewa' && newHubungan === 'Kepala Keluarga') {
         const { data: existingPenyewa } = await supabase.from('penghuni')
           .select('*').eq('warga_id', targetRumahId).eq('tipe_penghuni', 'penyewa').eq('is_aktif', true).maybeSingle();
@@ -183,7 +181,6 @@ export default function SekretarisDataWarga() {
 
       const tipe = selectedRumahInfo.status_huni === 'sewa' ? 'penyewa' : 'pemilik';
 
-      // Jika rumah kosong, dan input Kepala Keluarga, ubah status rumah otomatis
       if (selectedRumahInfo.status_huni === 'kosong' && newHubungan === 'Kepala Keluarga') {
         await supabase.from('warga').update({ status_huni: tipe === 'penyewa' ? 'sewa' : 'pemilik' }).eq('id', targetRumahId);
       }
@@ -201,7 +198,6 @@ export default function SekretarisDataWarga() {
     } catch (err) { alert('Gagal: ' + err.message); } finally { setProcessingId(null); }
   };
 
-  // FUNGSI BARU: TAMBAH ANGGOTA KELUARGA DARI BARIS TABEL
   const openTambahAnggota = (kepalaKeluarga) => {
     setTargetAnggotaKeluarga(kepalaKeluarga);
     setAnggotaNama('');
@@ -222,7 +218,7 @@ export default function SekretarisDataWarga() {
         nama_lengkap: anggotaNama.trim(),
         nik: anggotaNik.trim() || null,
         hubungan: anggotaHubungan,
-        tipe_penghuni: targetAnggotaKeluarga.tipe_penghuni, // Ikut tipe Kepala Keluarga
+        tipe_penghuni: targetAnggotaKeluarga.tipe_penghuni, 
         is_aktif: true, 
         status_verifikasi: 'approved'
       }]);
@@ -242,19 +238,26 @@ export default function SekretarisDataWarga() {
     setProcessingId(null);
   };
 
-  // Mengelompokkan Penghuni berdasarkan warga_id (No Rumah)
+  // ═══ PERBAIKAN: DEFINE filteredWarga DAN groupedPenghuni ═══
+  const filteredWarga = wargaList.filter(w => 
+    w.nama_lengkap?.toLowerCase().includes(search.toLowerCase()) || 
+    w.no_rumah?.toLowerCase().includes(search.toLowerCase())
+  );
+
   const groupedPenghuni = {};
   if (activeTab === 'penghuni') {
-    const filtered = penghuniList.filter(p => p.nama_lengkap?.toLowerCase().includes(search.toLowerCase()) || p.warga?.no_rumah?.toLowerCase().includes(search.toLowerCase()));
-    filtered.forEach(p => {
+    const filteredPenghuni = penghuniList.filter(p => 
+      p.nama_lengkap?.toLowerCase().includes(search.toLowerCase()) || 
+      p.warga?.no_rumah?.toLowerCase().includes(search.toLowerCase())
+    );
+    
+    filteredPenghuni.forEach(p => {
       const key = p.warga_id;
       if (!groupedPenghuni[key]) groupedPenghuni[key] = { no_rumah: p.warga?.no_rumah, kepalaKeluarga: null, anggota: [] };
       
       if (p.hubungan === 'Kepala Keluarga') groupedPenghuni[key].kepalaKeluarga = p;
       else groupedPenghuni[key].anggota.push(p);
     });
-    // Jika pencarian hanya menemukan anggota keluarga, pastikan KK-nya juga muncul di grup
-    // (Logika filter di atas sudah mengikutkan KK jika serach by No Rumah)
   }
 
   return (
@@ -324,7 +327,7 @@ export default function SekretarisDataWarga() {
             <div className="flex gap-3">
               <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex-1"><input type="text" placeholder="Cari nama penghuni atau no. rumah..." className="w-full bg-transparent text-xs text-white focus:outline-none" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
               <button onClick={() => setShowTambahPenghuni(!showTambahPenghuni)} className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg shrink-0">
-                {showTambahPenghuni ? '✕ Tutup Form' : '+ Tambah Kepala Keluarga Baru'}
+                {showTambahPenghuni ? '✕ Tutup Form' : '+ Tambah Kepala Keluarga'}
               </button>
             </div>
 
@@ -365,7 +368,6 @@ export default function SekretarisDataWarga() {
               </form>
             )}
 
-            {/* TABEL DATA PENGHUNI (Dikelompokkan per Rumah) */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-950 text-slate-400">
@@ -377,13 +379,11 @@ export default function SekretarisDataWarga() {
                    Object.values(groupedPenghuni).map((grup, idx) => (
                     <tr key={idx} className="hover:bg-slate-800/40">
                       <td className="p-4 align-top">
-                        {/* Tampilkan Kepala Keluarga */}
                         {grup.kepalaKeluarga ? (
                           <>
                             <div className="font-bold text-white text-sm">{grup.kepalaKeluarga.nama_lengkap}</div>
                             <div className="text-[11px] text-teal-400 font-mono mt-0.5">{grup.no_rumah}</div>
                             
-                            {/* Tampilkan Anggota Keluarga di bawahnya (Nested List) */}
                             {grup.anggota.length > 0 && (
                               <div className="mt-2 pl-2 border-l-2 border-slate-700 space-y-1">
                                 {grup.anggota.map((a, i) => (
@@ -457,7 +457,7 @@ export default function SekretarisDataWarga() {
         </div>
       )}
 
-      {/* MODAL TAMBAH ANGGOTA KELUARGA (DARI BARIS TABEL) */}
+      {/* MODAL TAMBAH ANGGOTA KELUARGA */}
       {showTambahAnggota && targetAnggotaKeluarga && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4">
