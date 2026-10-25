@@ -18,8 +18,10 @@ import { uploadBukti } from '../../lib/iuran/storage';
 import { fetchTarifList, getTarifWarga } from '../../lib/iuran/tarif';
 
 export default function DashboardWargaIuran() {
-  const [warga, setWarga] = useState(null);
-  const [penghuniList, setPenghuniList] = useState([]); 
+  const [sessionData, setSessionData] = useState(null); // Menyimpan session lengkap
+  const [warga, setWarga] = useState(null); // Data Rumah (Tabel Warga)
+  const [penghuniData, setPenghuniData] = useState(null); // Data Penghuni (Tabel Penghuni)
+  
   const [iuranList, setIuranList] = useState([]);
   const [depositList, setDepositList] = useState([]);
   const [tarifList, setTarifList] = useState([]);
@@ -50,63 +52,76 @@ export default function DashboardWargaIuran() {
 
   useEffect(() => { showKasRTModalRef.current = showKasRTModal; }, [showKasRTModal]);
 
+  // ═══ INISIALISASI SESSION BARU ═══
   useEffect(() => {
     const savedSession = localStorage.getItem('warga_session');
     if (!savedSession) { router.push('/'); return; }
-    const userData = JSON.parse(savedSession);
-    setWarga(userData);
-    loadIuran(userData.id);
-    loadDeposit(userData.id);
+    
+    const parsed = JSON.parse(savedSession);
+    setSessionData(parsed);
+    setWarga(parsed); // Data rumah ada di root session
+    setPenghuniData(parsed.penghuni_data); // Data penghuni ada di dalam properti ini
+
+    loadIuran(parsed.id);
+    loadDeposit(parsed.id);
     loadTarif();
-    loadPenghuni(userData.id); 
-    refreshSession(userData.id);
+    refreshDataRumah(parsed.id);
   }, []);
 
+  // ═══ REALTIME LISTENER ═══
   useEffect(() => {
     if (!warga?.id) return;
-    const channelName = `realtime-warga-profil-${warga.id}-${Math.random()}`;
+    const channelName = `realtime-dashboard-warga-${warga.id}-${Math.random()}`;
+    
     const channel = supabase.channel(channelName)
-      // ═══ FITUR REALTIME BARU: DENGARKAN PERUBAHAN PROFIL ═══
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'warga', filter: `id=eq.${warga.id}` }, () => {
-        refreshSession(warga.id); // Jika sekretaris approve/reject pemilik, refresh data warga
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'penghuni', filter: `warga_id=eq.${warga.id}` }, () => {
-        loadPenghuni(warga.id); // Jika sekretaris approve/reject penyewa, refresh data penghuni
-      })
-      // Listener Iuran & Kas yang sudah ada
+      // Dengarkan perubahan pada tabel warga (misal: ganti password)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'warga', filter: `id=eq.${warga.id}` }, () => refreshDataRumah(warga.id))
+      // Dengarkan perubahan pada tabel penghuni (misal: verifikasi di-approve/reject)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'penghuni', filter: `warga_id=eq.${warga.id}` }, () => refreshDataRumah(warga.id))
+      // Dengarkan perubahan iuran
       .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran' }, () => loadIuran(warga.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deposit_warga' }, () => loadDeposit(warga.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pengeluaran' }, () => { if (showKasRTModalRef.current) loadKasRT(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pemasukan_lain' }, () => { if (showKasRTModalRef.current) loadKasRT(); })
       .subscribe();
+
     return () => { supabase.removeChannel(channel); };
   }, [warga?.id]); 
 
-  const refreshSession = async (wargaId) => {
+  // Fungsi untuk update data dari database & sinkronkan ke LocalStorage
+  const refreshDataRumah = async (wargaId) => {
     try {
-      const data = await fetchWargaById(wargaId);
-      const currentRole = warga?.role_login || JSON.parse(localStorage.getItem('warga_session'))?.role_login || 'pemilik';
-      const dataWithRole = { ...data, role_login: currentRole };
-      setWarga(dataWithRole);
-      const { password: _, ...profilAman } = dataWithRole;
-      localStorage.setItem('warga_session', JSON.stringify(profilAman));
+      const { data: w } = await supabase.from('warga').select('*').eq('id', wargaId).single();
+      const { data: p } = await supabase.from('penghuni').select('*').eq('warga_id', wargaId).eq('is_aktif', true).maybeSingle();
+      
+      if (w) {
+        // Ambil role_login dan mode_akses dari session lama agar tidak hilang
+        const currentSession = JSON.parse(localStorage.getItem('warga_session'));
+        
+        const newSessionData = {
+          ...w,
+          role_login: currentSession.role_login,
+          mode_akses: currentSession.mode_akses,
+          penghuni_data: p || null
+        };
+        
+        setWarga(w);
+        setPenghuniData(p || null);
+        setSessionData(newSessionData);
+        
+        // Update localStorage agar saat direfresh tidak hilang
+        const { password: _, password_pending: __, ...profilAman } = newSessionData;
+        localStorage.setItem('warga_session', JSON.stringify(profilAman));
+      }
     } catch (err) {}
   };
 
-  // ... (Sisa fungsi lainnya tetap sama: loadIuran, loadDeposit, loadPenghuni, dll) ...
   const loadIuran = async (wargaId) => {
     try { const data = await fetchIuranByWarga(wargaId); setIuranList(data); } catch (err) {} finally { setLoading(false); }
   };
 
   const loadDeposit = async (wargaId) => {
     try { const { data, error } = await supabase.from('deposit_warga').select('*').eq('warga_id', wargaId).order('tanggal', { ascending: false }); if (!error && data) setDepositList(data); } catch (err) {}
-  };
-
-  const loadPenghuni = async (wargaId) => {
-    try {
-      const { data, error } = await supabase.from('penghuni').select('*').eq('warga_id', wargaId).eq('is_aktif', true);
-      if (!error && data) setPenghuniList(data);
-    } catch (err) {}
   };
 
   const loadTarif = async () => {
@@ -126,10 +141,10 @@ export default function DashboardWargaIuran() {
     if (allWargaList.length > 0) { setShowRekapModal(true); return; }
     setLoadingRekap(true);
     try {
-      const [wargaData, iuranData, penghuniData] = await Promise.all([
+      const [wargaData, iuranData, penghuniDataRes] = await Promise.all([
         fetchAllWarga(), fetchAllIuran(), supabase.from('penghuni').select('*').eq('is_aktif', true)
       ]);
-      setAllWargaList(wargaData); setAllIuranList(iuranData); setAllPenghuniList(penghuniData.data || []); setShowRekapModal(true);
+      setAllWargaList(wargaData); setAllIuranList(iuranData); setAllPenghuniList(penghuniDataRes.data || []); setShowRekapModal(true);
     } catch (err) { alert('Gagal memuat rekap.'); } finally { setLoadingRekap(false); }
   };
 
@@ -138,17 +153,14 @@ export default function DashboardWargaIuran() {
     localStorage.removeItem('warga_session'); router.replace('/');
   };
 
-  if (!warga) return null;
+  if (!warga || !sessionData) return null;
 
-  const loginRole = warga.role_login || 'pemilik';
-  const isPenyewa = loginRole === 'penyewa';
-  const isModePantau = loginRole === 'pemilik' && warga.status_huni === 'sewa';
+  const isPenyewa = sessionData.role_login === 'penyewa';
+  const isModePantau = sessionData.mode_akses === 'pantau';
 
   const periodeBulanAktif = getPeriodeBulan(tahunTerpilih);
   const tarifBulanan = getTarifWarga(warga, tarifList, tahunTerpilih);
   const usaha = isWargaUsaha(warga);
-  
-  const dataPenyewaAktif = penghuniList.find(p => p.hubungan === 'Kepala Keluarga') || null;
 
   const totalDisetor = iuranList.filter((i) => i.status === 'approved').reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
   const saldoDeposit = depositList.reduce((s, d) => s + (d.tipe === 'masuk' ? Number(d.jumlah) : -Number(d.jumlah)), 0);
@@ -193,98 +205,67 @@ export default function DashboardWargaIuran() {
     } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
   };
 
-  const statusPemilik = warga.status_verifikasi_profil;
-  const statusPenyewa = dataPenyewaAktif?.status_verifikasi;
+  // ═══ LOGIKA BANNER VERIFIKASI ═══
+  const statusPenghuni = penghuniData?.status_verifikasi;
+  const alasanReject = penghuniData?.alasan_reject;
 
-  const isPemilikBelum = statusPemilik === 'belum' || !statusPemilik;
-  const isPemilikPending = statusPemilik === 'pending';
-  const isPemilikRejected = statusPemilik === 'rejected';
-
-  const isPenyewaBelum = !dataPenyewaAktif || statusPenyewa === 'belum';
-  const isPenyewaPending = statusPenyewa === 'pending';
-  const isPenyewaRejected = statusPenyewa === 'rejected';
-
-  const alasanRejectWarga = warga.alasan_reject;
-  const alasanRejectPenyewa = dataPenyewaAktif?.alasan_reject;
+  const isBelumLengkap = !penghuniData || statusPenghuni === 'belum';
+  const isPending = statusPenghuni === 'pending';
+  const isRejected = statusPenghuni === 'rejected';
 
   return (
     <>
       <Head><title>Status Iuran - Portal Warga RT 38</title></Head>
       <Layout warga={warga} onLogout={handleLogout}>
-        <ProfileCard warga={warga} tarifBulanan={tarifBulanan} isUsaha={usaha} penyewaAktif={dataPenyewaAktif?.nama_lengkap || null} />
+        <ProfileCard 
+          warga={warga} 
+          penghuniData={penghuniData} 
+          roleLogin={sessionData.role_login} 
+          modeAkses={sessionData.mode_akses} 
+          tarifBulanan={tarifBulanan} 
+          isUsaha={usaha} 
+        />
 
-        {!isPenyewa && isPemilikBelum && (
+        {/* BANNER: BELUM LENGKAP */}
+        {isBelumLengkap && (
           <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
             <div className="flex items-start gap-3">
               <span className="text-xl">⚠️</span>
               <div>
-                <h4 className="text-sm font-bold text-amber-300">Profil Pemilik Belum Lengkap</h4>
-                <p className="text-xs text-amber-400 mt-0.5">Silakan lengkapi data diri & upload KK agar data Anda tervalidasi oleh Sekretaris RT.</p>
+                <h4 className="text-sm font-bold text-amber-300">Profil Penghuni Belum Lengkap</h4>
+                <p className="text-xs text-amber-400 mt-0.5">Silakan lengkapi data diri, keluarga & upload KK agar tervalidasi oleh Sekretaris RT.</p>
               </div>
             </div>
             <button onClick={() => setShowModalProfil(true)} className="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-xs px-4 py-2.5 rounded-xl shrink-0 transition active:scale-95">Lengkapi Sekarang</button>
           </div>
         )}
 
-        {!isPenyewa && isPemilikRejected && (
-          <div className="bg-gradient-to-r from-rose-950/60 to-slate-900 border border-rose-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
-            <div className="flex items-start gap-3">
-              <span className="text-xl">❌</span>
-              <div>
-                <h4 className="text-sm font-bold text-rose-300">Profil Pemilik Ditolak</h4>
-                <p className="text-xs text-rose-400 mt-0.5">Alasan: {alasanRejectWarga}</p>
-              </div>
-            </div>
-            <button onClick={() => setShowModalProfil(true)} className="w-full sm:w-auto bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs px-4 py-2.5 rounded-xl shrink-0 transition active:scale-95">Perbaiki Sekarang</button>
-          </div>
-        )}
-
-        {!isPenyewa && isPemilikPending && (
+        {/* BANNER: PENDING */}
+        {isPending && (
           <div className="bg-blue-950/40 border border-blue-500/30 rounded-2xl p-4 flex items-start gap-3">
             <span className="text-xl">⏳</span>
             <div>
               <h4 className="text-sm font-bold text-blue-300">Menunggu Verifikasi Sekretaris</h4>
-              <p className="text-xs text-blue-400 mt-0.5">Data Pemilik sudah kami terima. Mohon tunggu Sekretaris memvalidasi data dan KK Anda.</p>
+              <p className="text-xs text-blue-400 mt-0.5">Data Anda sudah kami terima. Mohon tunggu Sekretaris memvalidasi data dan KK Anda.</p>
             </div>
           </div>
         )}
 
-        {isPenyewa && isPenyewaBelum && (
-          <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
-            <div className="flex items-start gap-3">
-              <span className="text-xl">⚠️</span>
-              <div>
-                <h4 className="text-sm font-bold text-amber-300">Data Penghuni Belum Lengkap</h4>
-                <p className="text-xs text-amber-400 mt-0.5">Silakan lengkapi data keluarga & upload KK Anda agar tervalidasi oleh Sekretaris RT.</p>
-              </div>
-            </div>
-            <button onClick={() => setShowModalProfil(true)} className="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-xs px-4 py-2.5 rounded-xl shrink-0 transition active:scale-95">Lengkapi Sekarang</button>
-          </div>
-        )}
-
-        {isPenyewa && isPenyewaRejected && (
+        {/* BANNER: REJECTED */}
+        {isRejected && (
           <div className="bg-gradient-to-r from-rose-950/60 to-slate-900 border border-rose-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
             <div className="flex items-start gap-3">
               <span className="text-xl">❌</span>
               <div>
                 <h4 className="text-sm font-bold text-rose-300">Data Penghuni Ditolak</h4>
-                <p className="text-xs text-rose-400 mt-0.5">Alasan: {alasanRejectPenyewa}</p>
+                <p className="text-xs text-rose-400 mt-0.5">Alasan: {alasanReject}</p>
               </div>
             </div>
             <button onClick={() => setShowModalProfil(true)} className="w-full sm:w-auto bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs px-4 py-2.5 rounded-xl shrink-0 transition active:scale-95">Perbaiki Sekarang</button>
           </div>
         )}
 
-        {isPenyewa && isPenyewaPending && (
-          <div className="bg-blue-950/40 border border-blue-500/30 rounded-2xl p-4 flex items-start gap-3">
-            <span className="text-xl">⏳</span>
-            <div>
-              <h4 className="text-sm font-bold text-blue-300">Menunggu Verifikasi Sekretaris</h4>
-              <p className="text-xs text-blue-400 mt-0.5">Data Penghuni sudah kami terima. Mohon tunggu Sekretaris memvalidasi data dan KK Anda.</p>
-            </div>
-          </div>
-        )}
-
+        {/* BANNER: IURAN DITOLAK */}
         {adaDitolak && (
           <div className="bg-rose-950/40 border border-rose-500/50 rounded-2xl p-4 flex items-start gap-3">
             <span className="text-xl">❌</span>
@@ -347,7 +328,15 @@ export default function DashboardWargaIuran() {
       
       <ModalKasRT show={showKasRTModal} onClose={() => setShowKasRTModal(false)} iuranList={kasRTIuranList} pemasukanLainList={pemasukanLainList} pengeluaranList={pengeluaranList} />
       
-      <ModalLengkapiProfil show={showModalProfil} onClose={() => setShowModalProfil(false)} warga={warga} role={loginRole} dataPenyewaAktif={dataPenyewaAktif} alasanReject={isPenyewa ? alasanRejectPenyewa : alasanRejectWarga} onSuccess={() => refreshSession(warga.id)} />
+      <ModalLengkapiProfil 
+        show={showModalProfil} 
+        onClose={() => setShowModalProfil(false)} 
+        warga={warga} 
+        role={sessionData.role_login} 
+        dataPenyewaAktif={penghuniData} // Gunakan penghuniData sebagai data awal
+        alasanReject={alasanReject} 
+        onSuccess={() => refreshDataRumah(warga.id)} 
+      />
     </>
   );
 }
