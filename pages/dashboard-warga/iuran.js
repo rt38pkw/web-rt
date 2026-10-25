@@ -26,7 +26,7 @@ export default function DashboardWargaIuran() {
   
   const [allWargaList, setAllWargaList] = useState([]);
   const [allIuranList, setAllIuranList] = useState([]);
-  const [allPenghuniList, setAllPenghuniList] = useState([]); // STATE BARU UNTUK REKAP PENYEWA
+  const [allPenghuniList, setAllPenghuniList] = useState([]); 
   
   const [loading, setLoading] = useState(true);
   const [loadingRekap, setLoadingRekap] = useState(false);
@@ -117,7 +117,6 @@ export default function DashboardWargaIuran() {
     if (allWargaList.length > 0) { setShowRekapModal(true); return; }
     setLoadingRekap(true);
     try {
-      // Tambahkan fetch data penghuni (penyewa) untuk rekap
       const [wargaData, iuranData, penghuniData] = await Promise.all([
         fetchAllWarga(), 
         fetchAllIuran(),
@@ -125,7 +124,7 @@ export default function DashboardWargaIuran() {
       ]);
       setAllWargaList(wargaData); 
       setAllIuranList(iuranData); 
-      setAllPenghuniList(penghuniData.data || []); // Simpan data penghuni
+      setAllPenghuniList(penghuniData.data || []); 
       setShowRekapModal(true);
     } catch (err) { alert('Gagal memuat rekap.'); } finally { setLoadingRekap(false); }
   };
@@ -190,9 +189,13 @@ export default function DashboardWargaIuran() {
     } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
   };
 
-  const isProfilBelumLengkap = warga.status_verifikasi_profil === 'belum' || !warga.status_verifikasi_profil;
+  // PERBAIKAN: Memasukkan status 'rejected' sebagai syarat banner muncul
+  const isProfilBelumLengkap = warga.status_verifikasi_profil === 'belum' || warga.status_verifikasi_profil === 'rejected' || !warga.status_verifikasi_profil;
   const isProfilPending = warga.status_verifikasi_profil === 'pending';
   const isPenyewaBelumLengkap = isPenyewa && (penghuniList.length === 0 || penghuniList.some(p => p.status_verifikasi !== 'approved'));
+  
+  const alasanRejectWarga = warga.status_verifikasi_profil === 'rejected' ? warga.alasan_reject : null;
+  const alasanRejectPenyewa = isPenyewa && dataPenyewaAktif?.status_verifikasi === 'rejected' ? dataPenyewaAktif.alasan_reject : null;
 
   return (
     <>
@@ -207,6 +210,9 @@ export default function DashboardWargaIuran() {
               <div>
                 <h4 className="text-sm font-bold text-amber-300">Profil Pemilik Belum Lengkap</h4>
                 <p className="text-xs text-amber-400 mt-0.5">Silakan lengkapi data diri & upload KK agar data Anda tervalidasi oleh Sekretaris RT.</p>
+                {alasanRejectWarga && (
+                  <p className="text-xs text-rose-400 mt-1 font-semibold">Alasan Ditolak: {alasanRejectWarga}</p>
+                )}
               </div>
             </div>
             <button onClick={() => setShowModalProfil(true)} className="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-xs px-4 py-2.5 rounded-xl shrink-0 transition active:scale-95">Lengkapi Sekarang</button>
@@ -220,6 +226,9 @@ export default function DashboardWargaIuran() {
               <div>
                 <h4 className="text-sm font-bold text-amber-300">Data Penghuni Belum Lengkap</h4>
                 <p className="text-xs text-amber-400 mt-0.5">Silakan lengkapi data keluarga & upload KK Anda agar tervalidasi oleh Sekretaris RT.</p>
+                {alasanRejectPenyewa && (
+                  <p className="text-xs text-rose-400 mt-1 font-semibold">Alasan Ditolak: {alasanRejectPenyewa}</p>
+                )}
               </div>
             </div>
             <button onClick={() => setShowModalProfil(true)} className="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-xs px-4 py-2.5 rounded-xl shrink-0 transition active:scale-95">Lengkapi Sekarang</button>
@@ -292,14 +301,13 @@ export default function DashboardWargaIuran() {
       <ModalDetailBulan detail={selectedBulanDetail} onClose={() => setSelectedBulanDetail(null)} />
       <ModalBayar show={showModalBayar} onClose={() => setShowModalBayar(false)} iuranList={iuranList} tarifBulanan={tarifBulanan} belumLunasList={belumLunasList} bulanDipilih={bulanDipilih} setBulanDipilih={setBulanDipilih} onSubmit={handleSubmitBayar} submitting={submitting} tahun={tahunTerpilih} />
       
-      {/* KIRIM DATA SEMUA PENGHUNI KE MODAL REKAP */}
       {showRekapModal && (
         <ModalRekap 
           show={showRekapModal} 
           onClose={() => setShowRekapModal(false)} 
           allWargaList={allWargaList} 
           allIuranList={allIuranList} 
-          allPenghuniList={allPenghuniList} // <--- PROP BARU
+          allPenghuniList={allPenghuniList}
           tarifList={tarifList} 
         />
       )}
@@ -312,6 +320,7 @@ export default function DashboardWargaIuran() {
         warga={warga} 
         role={loginRole} 
         dataPenyewaAktif={dataPenyewaAktif} 
+        alasanReject={isPenyewa ? alasanRejectPenyewa : alasanRejectWarga} // <--- KIRIM ALASAN REJECT KE MODAL
         onSuccess={() => refreshSession(warga.id)} 
       />
     </>
