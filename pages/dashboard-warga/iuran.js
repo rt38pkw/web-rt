@@ -55,13 +55,12 @@ export default function DashboardWargaIuran() {
     loadIuran(userData.id);
     loadDeposit(userData.id);
     loadTarif();
-    loadPenghuni(userData.id); // PANGGIL FUNGSI INI
+    loadPenghuni(userData.id); // PANGGIL FUNGSI PENGHUNI
     refreshSession(userData.id);
   }, []);
 
   useEffect(() => {
     if (!warga?.id) return;
-    console.log("🚀 KODE BARU BERJALAN! Realtime aman.");
     
     const channelName = `realtime-iuran-warga-${warga.id}-${Math.random()}`;
     const channel = supabase.channel(channelName)
@@ -91,7 +90,7 @@ export default function DashboardWargaIuran() {
     try { const { data, error } = await supabase.from('deposit_warga').select('*').eq('warga_id', wargaId).order('tanggal', { ascending: false }); if (!error && data) setDepositList(data); } catch (err) {}
   };
 
-  // FUNGSI BARU: Ambil data penghuni (untuk nampilin nama penyewa)
+  // FUNGSI BARU: Ambil data penghuni
   const loadPenghuni = async (wargaId) => {
     try {
       const { data, error } = await supabase.from('penghuni').select('*').eq('warga_id', wargaId).eq('is_aktif', true);
@@ -132,7 +131,7 @@ export default function DashboardWargaIuran() {
   const tarifBulanan = getTarifWarga(warga, tarifList, tahunTerpilih);
   const usaha = isWargaUsaha(warga);
 
-  // CARI DATA PENYEWA DARI LIST UNTUK DIKIRIM KE PROFIL CARD
+  // CARI DATA PENYEWA UNTUK DIKIRIM KE PROFIL CARD
   const penyewaAktif = penghuniList.find(p => p.hubungan === 'Kepala Keluarga')?.nama_lengkap || null;
 
   const totalDisetor = iuranList.filter((i) => i.status === 'approved').reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
@@ -265,7 +264,7 @@ export default function DashboardWargaIuran() {
       <ModalKasRT show={showKasRTModal} onClose={() => setShowKasRTModal(false)} iuranList={kasRTIuranList} pemasukanLainList={pemasukanLainList} pengeluaranList={pengeluaranList} />
       
       {/* MODAL WIZARD LENGKAPI PROFIL */}
-      <ModalLengkapiProfil show={showModalProfil} onClose={() => setShowModalProfil(false)} warga={warga} />
+      <ModalLengkapiProfil show={showModalProfil} onClose={() => setShowModalProfil(false)} warga={warga} onSuccess={() => refreshSession(warga.id)} />
     </>
   );
 }
