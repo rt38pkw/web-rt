@@ -8,7 +8,6 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
   const isPenyewa = role === 'penyewa';
 
   // State Step 1
-  // Pastikan NIK awal kosong jika bukan 16 digit angka
   const [nik, setNik] = useState(warga?.nik && warga.nik.length === 16 ? warga.nik : '');
   const [noWa, setNoWa] = useState(warga?.no_wa || '');
   const [password, setPassword] = useState('');
@@ -26,9 +25,8 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
 
   if (!show) return null;
 
-  // Handler input NIK (Hanya Angka & Maks 16)
   const handleNikChange = (e, setter) => {
-    const val = e.target.value.replace(/\D/g, ''); // Hapus semua karakter non-angka
+    const val = e.target.value.replace(/\D/g, '');
     if (val.length <= 16) setter(val);
   };
 
@@ -48,6 +46,10 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
       }
       setStep(2);
     } else if (step === 2) {
+      if (newNama.trim() !== '' || newNik.trim() !== '') {
+        alert('Anda sudah mengetik data penghuni, tapi belum menekan tombol "+ Tambahkan".\n\nSilakan klik "+ Tambahkan" terlebih dahulu, atau kosongkan kolom tersebut jika batal menambahkan.');
+        return;
+      }
       setStep(3);
     }
   };
@@ -116,6 +118,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
           }]);
         }
 
+        // Insert anggota keluarga
         if (anggotaKeluarga.length > 0) {
           const records = anggotaKeluarga.map(a => ({
             warga_id: warga.id,
@@ -138,8 +141,41 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
         };
         if (password.trim()) updateData.password_pending = password.trim();
 
+        // 1. Update data Profil Pemilik
         await supabase.from('warga').update(updateData).eq('id', warga.id);
 
+        // 2. AUTO-FILL KEPALA KELUARGA DI TABEL PENGHUNI
+        const { data: existingKK } = await supabase
+          .from('penghuni')
+          .select('id')
+          .eq('warga_id', warga.id)
+          .eq('hubungan', 'Kepala Keluarga')
+          .maybeSingle();
+
+        if (existingKK) {
+          // Jika sudah ada, update (jaga-jaga jika ada perubahan nama)
+          await supabase.from('penghuni').update({
+            nama_lengkap: warga.nama_lengkap, // Ambil dari nama asli pemilik
+            nik: nik.trim(),
+            no_hp: noWa.trim(),
+            url_kk: urlKK,
+            status_verifikasi: 'pending'
+          }).eq('id', existingKK.id);
+        } else {
+          // Jika belum ada, insert baru
+          await supabase.from('penghuni').insert([{
+            warga_id: warga.id,
+            nama_lengkap: warga.nama_lengkap,
+            nik: nik.trim(),
+            no_hp: noWa.trim(),
+            hubungan: 'Kepala Keluarga',
+            is_aktif: true,
+            url_kk: urlKK,
+            status_verifikasi: 'pending'
+          }]);
+        }
+
+        // 3. Insert Anggota Keluarga Lainnya
         if (anggotaKeluarga.length > 0) {
           const records = anggotaKeluarga.map(a => ({
             warga_id: warga.id,
@@ -180,14 +216,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
             <h4 className="text-sm font-semibold text-white mb-2">1. Identitas & Keamanan</h4>
             <div>
               <label className="block text-xs text-slate-300 mb-1">NIK (Wajib)</label>
-              <input 
-                type="text" 
-                inputMode="numeric"
-                value={nik} 
-                onChange={(e) => handleNikChange(e, setNik)} 
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" 
-                placeholder="Masukkan 16 digit NIK" 
-              />
+              <input type="text" inputMode="numeric" value={nik} onChange={(e) => handleNikChange(e, setNik)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="Masukkan 16 digit NIK" />
             </div>
             <div>
               <label className="block text-xs text-slate-300 mb-1">No WhatsApp (Wajib)</label>
@@ -225,14 +254,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
               <input type="text" placeholder="Nama Lengkap" value={newNama} onChange={(e) => setNewNama(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" />
               <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  inputMode="numeric"
-                  placeholder="16 digit NIK (Wajib)" 
-                  value={newNik} 
-                  onChange={(e) => handleNikChange(e, setNewNik)} 
-                  className="w-1/2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" 
-                />
+                <input type="text" inputMode="numeric" placeholder="16 digit NIK (Wajib)" value={newNik} onChange={(e) => handleNikChange(e, setNewNik)} className="w-1/2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" />
                 <select value={newHubungan} onChange={(e) => setNewHubungan(e.target.value)} className="w-1/2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white">
                   <option value="Istri">Istri</option>
                   <option value="Anak">Anak</option>
