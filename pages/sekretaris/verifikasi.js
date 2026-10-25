@@ -8,8 +8,8 @@ export default function SekretarisVerifikasi() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   
-  // STATE BARU UNTUK ZOOM GAMBAR
-  const [previewImage, setPreviewImage] = useState(null);
+  // STATE BARU UNTUK MODAL SPLIT-SCREEN (Data + Gambar)
+  const [previewData, setPreviewData] = useState(null); 
 
   useEffect(() => {
     fetchAntrean();
@@ -114,19 +114,57 @@ export default function SekretarisVerifikasi() {
     <Layout>
       <div className="max-w-5xl mx-auto space-y-4">
         
-        {/* MODAL PREVIEW GAMBAR (ZOOM) */}
-        {previewImage && (
-          <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setPreviewImage(null)}>
-            <button className="absolute top-4 right-4 text-white text-3xl font-bold hover:text-rose-500 transition" onClick={() => setPreviewImage(null)}>✕</button>
-            <img src={previewImage} alt="Zoom KK" className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
+        {/* MODAL SPLIT-SCREEN: KIRI DATA, KANAN GAMBAR */}
+        {previewData && (
+          <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in">
+            <div className="bg-slate-900 border border-slate-700 w-full max-w-6xl h-[95vh] rounded-3xl flex flex-col md:flex-row overflow-hidden shadow-2xl">
+              
+              {/* Sisi Kiri: Data Teks untuk Dicocokkan */}
+              <div className="w-full md:w-1/3 bg-slate-900 p-5 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-800 shrink-0">
+                <div>
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Pencocokan Data</h3>
+                    <span className={`text-[10px] px-2 py-1 rounded font-bold border ${previewData.tipe === 'Pemilik' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>
+                      {previewData.tipe}
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-5">
+                    <div>
+                      <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">Nama Lengkap</div>
+                      <div className="text-lg font-bold text-white leading-tight">{previewData.nama}</div>
+                    </div>
+                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                      <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">NIK (Cocokkan dengan KK)</div>
+                      <div className="text-xl font-mono font-bold text-amber-400 tracking-wider">{previewData.nik || '-'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">No WhatsApp</div>
+                      <div className="text-sm text-slate-300">{previewData.wa || '-'}</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <button onClick={() => setPreviewData(null)} className="mt-6 w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl transition">
+                  ✕ Tutup Pratinjau
+                </button>
+              </div>
+              
+              {/* Sisi Kanan: Gambar KK (Bisa di-scroll) */}
+              <div className="w-full md:w-2/3 bg-black/50 relative flex items-center justify-center overflow-auto p-2 sm:p-6">
+                <img src={previewData.imageUrl} alt="Preview KK" className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+              </div>
+            </div>
           </div>
         )}
 
+        {/* HEADER TAB */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-2 flex gap-2">
           <button onClick={() => setActiveTab('pending')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'pending' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>⏳ Menunggu Verifikasi</button>
           <button onClick={() => setActiveTab('rejected')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'rejected' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>✗ Riwayat Ditolak</button>
         </div>
 
+        {/* LIST ANTREAN */}
         {loading ? (
           <div className="py-10 text-center text-slate-500 text-xs animate-pulse">Memuat data antrean...</div>
         ) : antrean.length === 0 ? (
@@ -162,7 +200,6 @@ export default function SekretarisVerifikasi() {
                         <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 border-b border-slate-800 pb-2">Data Pemilik</h4>
                         
                         <div className="flex flex-col sm:flex-row gap-4">
-                          {/* KOLOM TEKS DATA */}
                           <div className="flex-1 space-y-2">
                             <div>
                               <div className="text-[10px] text-slate-500">Nama Lengkap</div>
@@ -178,13 +215,13 @@ export default function SekretarisVerifikasi() {
                             </div>
                           </div>
 
-                          {/* KOLOM GAMBAR KK */}
+                          {/* Thumbnail KK */}
                           <div className="w-full sm:w-1/2 shrink-0">
                             {item.pemilik.url_kk ? (
-                              <div className="relative group cursor-pointer" onClick={() => setPreviewImage(item.pemilik.url_kk)}>
+                              <div className="relative group cursor-pointer" onClick={() => setPreviewData({ imageUrl: item.pemilik.url_kk, nama: item.pemilik.nama_lengkap, nik: item.pemilik.nik, wa: item.pemilik.no_wa, tipe: 'Pemilik' })}>
                                 <img src={item.pemilik.url_kk} alt="KK Pemilik" className="w-full h-32 object-cover rounded-lg border border-slate-700" />
                                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition">
-                                  <span className="text-white text-xs font-semibold">🔍 Zoom KK</span>
+                                  <span className="text-white text-xs font-semibold">🔍 Cocokkan</span>
                                 </div>
                               </div>
                             ) : (
@@ -221,7 +258,6 @@ export default function SekretarisVerifikasi() {
                         <h4 className="text-xs font-semibold text-orange-400 uppercase tracking-wider mb-1 border-b border-orange-500/20 pb-2">Data Penyewa</h4>
                         
                         <div className="flex flex-col sm:flex-row gap-4">
-                          {/* KOLOM TEKS DATA */}
                           <div className="flex-1 space-y-2">
                             <div>
                               <div className="text-[10px] text-slate-500">Nama Lengkap</div>
@@ -237,13 +273,13 @@ export default function SekretarisVerifikasi() {
                             </div>
                           </div>
 
-                          {/* KOLOM GAMBAR KK */}
+                          {/* Thumbnail KK */}
                           <div className="w-full sm:w-1/2 shrink-0">
                             {item.penyewa.url_kk ? (
-                              <div className="relative group cursor-pointer" onClick={() => setPreviewImage(item.penyewa.url_kk)}>
+                              <div className="relative group cursor-pointer" onClick={() => setPreviewData({ imageUrl: item.penyewa.url_kk, nama: item.penyewa.nama_lengkap, nik: item.penyewa.nik, wa: item.penyewa.no_hp, tipe: 'Penyewa' })}>
                                 <img src={item.penyewa.url_kk} alt="KK Penyewa" className="w-full h-32 object-cover rounded-lg border border-orange-500/30" />
                                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition">
-                                  <span className="text-white text-xs font-semibold">🔍 Zoom KK</span>
+                                  <span className="text-white text-xs font-semibold">🔍 Cocokkan</span>
                                 </div>
                               </div>
                             ) : (
