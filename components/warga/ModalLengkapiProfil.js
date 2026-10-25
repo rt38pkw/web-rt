@@ -8,7 +8,8 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
   const isPenyewa = role === 'penyewa';
 
   // State Step 1
-  const [nik, setNik] = useState(warga?.nik || '');
+  // Pastikan NIK awal kosong jika bukan 16 digit angka
+  const [nik, setNik] = useState(warga?.nik && warga.nik.length === 16 ? warga.nik : '');
   const [noWa, setNoWa] = useState(warga?.no_wa || '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -25,14 +26,24 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
 
   if (!show) return null;
 
+  // Handler input NIK (Hanya Angka & Maks 16)
+  const handleNikChange = (e, setter) => {
+    const val = e.target.value.replace(/\D/g, ''); // Hapus semua karakter non-angka
+    if (val.length <= 16) setter(val);
+  };
+
   const handleNextStep = () => {
     if (step === 1) {
-      if (!isPenyewa && password && password !== confirmPassword) {
-        alert('Password baru dan Konfirmasi Password tidak cocok!');
+      if (!nik || nik.length !== 16) {
+        alert('NIK wajib diisi dan harus tepat 16 digit angka!');
         return;
       }
-      if (!nik || !noWa) {
-        alert('NIK dan No WhatsApp wajib diisi!');
+      if (!noWa.trim()) {
+        alert('No WhatsApp wajib diisi!');
+        return;
+      }
+      if (!isPenyewa && password && password !== confirmPassword) {
+        alert('Password baru dan Konfirmasi Password tidak cocok!');
         return;
       }
       setStep(2);
@@ -42,7 +53,14 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
   };
 
   const handleTambahAnggota = () => {
-    if (!newNama.trim()) return;
+    if (!newNama.trim()) {
+      alert('Nama lengkap wajib diisi!');
+      return;
+    }
+    if (!newNik || newNik.length !== 16) {
+      alert('NIK anggota keluarga wajib diisi dan harus 16 digit!');
+      return;
+    }
     setAnggotaKeluarga([...anggotaKeluarga, { nama: newNama, nik: newNik, hubungan: newHubungan }]);
     setNewNama(''); setNewNik(''); setNewHubungan('Istri');
   };
@@ -70,7 +88,6 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
 
       if (isPenyewa) {
         // === LOGIKA SIMPAN PENYEWA ===
-        // 1. Cari data penghuni Kepala Keluarga yang sudah ada
         const { data: existingPenghuni } = await supabase
           .from('penghuni')
           .select('id')
@@ -79,16 +96,14 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
           .maybeSingle();
 
         if (existingPenghuni) {
-          // Jika sudah ada (data injeksi), UPDATE
           await supabase.from('penghuni').update({
-            nama_lengkap: warga.nama_lengkap === 'Belum Ada' ? 'Penyewa' : warga.nama_lengkap, // Fallback nama
+            nama_lengkap: warga.nama_lengkap === 'Belum Ada' ? 'Penyewa' : warga.nama_lengkap,
             nik: nik.trim(),
             no_hp: noWa.trim(),
             url_kk: urlKK,
             status_verifikasi: 'pending'
           }).eq('id', existingPenghuni.id);
         } else {
-          // Jika belum ada, INSERT
           await supabase.from('penghuni').insert([{
             warga_id: warga.id,
             nama_lengkap: 'Penyewa',
@@ -101,7 +116,6 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
           }]);
         }
 
-        // Simpan anggota keluarga (selalu INSERT jika baru ditambahkan)
         if (anggotaKeluarga.length > 0) {
           const records = anggotaKeluarga.map(a => ({
             warga_id: warga.id,
@@ -126,7 +140,6 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
 
         await supabase.from('warga').update(updateData).eq('id', warga.id);
 
-        // Simpan anggota keluarga Pemilik (jika ada)
         if (anggotaKeluarga.length > 0) {
           const records = anggotaKeluarga.map(a => ({
             warga_id: warga.id,
@@ -134,7 +147,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
             nik: a.nik,
             hubungan: a.hubungan,
             is_aktif: true,
-            status_verifikasi: 'pending' // Nanti di-approve massal bareng pemilik
+            status_verifikasi: 'pending'
           }));
           await supabase.from('penghuni').insert(records);
         }
@@ -167,14 +180,20 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
             <h4 className="text-sm font-semibold text-white mb-2">1. Identitas & Keamanan</h4>
             <div>
               <label className="block text-xs text-slate-300 mb-1">NIK (Wajib)</label>
-              <input type="text" value={nik} onChange={(e) => setNik(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="16 digit NIK" />
+              <input 
+                type="text" 
+                inputMode="numeric"
+                value={nik} 
+                onChange={(e) => handleNikChange(e, setNik)} 
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" 
+                placeholder="Masukkan 16 digit NIK" 
+              />
             </div>
             <div>
               <label className="block text-xs text-slate-300 mb-1">No WhatsApp (Wajib)</label>
-              <input type="text" value={noWa} onChange={(e) => setNoWa(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="08123..." />
+              <input type="text" inputMode="tel" value={noWa} onChange={(e) => setNoWa(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="08123..." />
             </div>
             
-            {/* INPUT PASSWORD HANYA UNTUK PEMILIK */}
             {!isPenyewa && (
               <>
                 <div>
@@ -200,13 +219,20 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
 
         {step === 2 && (
           <div className="space-y-3 animate-in fade-in">
-            <h4 className="text-sm font-semibold text-white mb-2">2. Daftar Penghuni (Opsional)</h4>
+            <h4 className="text-sm font-semibold text-white mb-2">2. Daftar Penghuni</h4>
             <p className="text-xs text-slate-400 mb-2">Tambahkan anggota keluarga yang tinggal serumah (Istri, Anak, Saudara).</p>
             
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
               <input type="text" placeholder="Nama Lengkap" value={newNama} onChange={(e) => setNewNama(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" />
               <div className="flex gap-2">
-                <input type="text" placeholder="NIK (opsional)" value={newNik} onChange={(e) => setNewNik(e.target.value)} className="w-1/2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" />
+                <input 
+                  type="text" 
+                  inputMode="numeric"
+                  placeholder="16 digit NIK (Wajib)" 
+                  value={newNik} 
+                  onChange={(e) => handleNikChange(e, setNewNik)} 
+                  className="w-1/2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" 
+                />
                 <select value={newHubungan} onChange={(e) => setNewHubungan(e.target.value)} className="w-1/2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white">
                   <option value="Istri">Istri</option>
                   <option value="Anak">Anak</option>
@@ -222,7 +248,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, onSucc
                 <div key={i} className="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg border border-slate-700">
                   <div>
                     <div className="text-xs text-white font-semibold">{a.nama} <span className="text-[10px] text-slate-400">({a.hubungan})</span></div>
-                    {a.nik && <div className="text-[9px] text-slate-400">NIK: {a.nik}</div>}
+                    <div className="text-[9px] text-slate-400">NIK: {a.nik}</div>
                   </div>
                   <button onClick={() => handleHapusAnggota(i)} className="text-rose-400 hover:text-rose-300 text-xs">Hapus</button>
                 </div>
