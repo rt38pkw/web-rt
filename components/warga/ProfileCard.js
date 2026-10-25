@@ -14,7 +14,7 @@ export default function ProfileCard({ warga, tarifBulanan, isUsaha, penyewaAktif
   if (!warga) return null;
 
   const isPenyewa = loginRole === 'penyewa';
-  const isSewa = warga.status_huni === 'sewa'; // CEK STATUS HUNI
+  const isSewa = warga.status_huni === 'sewa';
   const isPemilikTidakDiketahui = warga.nama_lengkap === 'Belum Ada' || !warga.nama_lengkap;
   
   let namaTampil = warga.nama_lengkap || 'Belum Ada';
@@ -31,7 +31,6 @@ export default function ProfileCard({ warga, tarifBulanan, isUsaha, penyewaAktif
     }
   }
 
-  // LOGIKA BADGE BARU
   let badgeText = '👑 Pemilik';
   let badgeClass = 'bg-blue-500/10 text-blue-400 border-blue-500/30';
 
@@ -40,7 +39,6 @@ export default function ProfileCard({ warga, tarifBulanan, isUsaha, penyewaAktif
     badgeClass = 'bg-orange-500/10 text-orange-400 border-orange-500/30';
   } else if (isSewa) {
     badgeText = '👑 Pemilik (Mode Pantau)';
-    // Warna tetap biru untuk pemilik
   }
 
   return (
@@ -53,7 +51,6 @@ export default function ProfileCard({ warga, tarifBulanan, isUsaha, penyewaAktif
               {isPenyewa ? 'Akun Penyewa' : 'Akun Pemilik'}
             </span>
           </div>
-          
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
             {namaTampil}
             {subNama && <span className="text-sm font-normal text-orange-400">{subNama}</span>}
@@ -62,7 +59,6 @@ export default function ProfileCard({ warga, tarifBulanan, isUsaha, penyewaAktif
              <p className="text-xs text-slate-500 italic mt-1">*Nama pemilik belum didata</p>
           )}
         </div>
-
         <div className="flex flex-wrap gap-2 text-xs">
           <div className="bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
             <span className="text-slate-400">Rumah:</span>
@@ -70,20 +66,10 @@ export default function ProfileCard({ warga, tarifBulanan, isUsaha, penyewaAktif
           </div>
           <div className="bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
             <span className="text-slate-400">Tarif:</span>
-            <strong className="text-blue-400 font-semibold">
-              Rp {tarifBulanan?.toLocaleString('id-ID') || 0}/bln
-            </strong>
+            <strong className="text-blue-400 font-semibold">Rp {tarifBulanan?.toLocaleString('id-ID') || 0}/bln</strong>
           </div>
-          {isUsaha && (
-            <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-xl font-medium">
-              Tempat Usaha
-            </div>
-          )}
-          
-          {/* BADGE STATUS DINAMIS */}
-          <div className={`px-3 py-1.5 rounded-xl font-bold border ${badgeClass}`}>
-            {badgeText}
-          </div>
+          {isUsaha && <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-xl font-medium">Tempat Usaha</div>}
+          <div className={`px-3 py-1.5 rounded-xl font-bold border ${badgeClass}`}>{badgeText}</div>
         </div>
       </div>
     </section>
