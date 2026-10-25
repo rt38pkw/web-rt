@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import InstallButton from '../InstallButton';
+import NotifToggle from '../NotifToggle'; // <--- IMPORT INI
 
-// MENU PENGUMUMAN DAN SURAT SUDAH DIHAPUS
 const MENU = [
   { key: 'iuran', label: 'Status Iuran', icon: '💰', path: '/dashboard-warga/iuran' },
   { key: 'projek', label: 'Projek', icon: '🏗️', path: '/dashboard-warga/projek' },
@@ -17,11 +17,7 @@ export default function Layout({ children, warga, onLogout }) {
       <header className="px-5 py-3.5 border-b border-slate-800/60 flex justify-between items-center bg-slate-900/40 backdrop-blur-md sticky top-0 z-50">
         <Link href="/dashboard-warga/iuran" className="flex items-center space-x-3">
           <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700/80 flex items-center justify-center overflow-hidden shrink-0">
-            <img
-              src="/logo-rt38.png"
-              alt="Logo RT 38"
-              className="w-full h-full object-cover"
-            />
+            <img src="/logo-rt38.png" alt="Logo RT 38" className="w-full h-full object-cover" />
           </div>
           <div>
             <h1 className="font-bold text-xs sm:text-sm text-white tracking-wide">PORTAL WARGA</h1>
@@ -30,6 +26,9 @@ export default function Layout({ children, warga, onLogout }) {
         </Link>
 
         <div className="flex items-center gap-2">
+          {/* TOMBOL NOTIFIKASI DIPASANG DI SINI */}
+          {warga && <NotifToggle userId={warga.id} userType="warga" />}
+          
           <InstallButton />
           <button
             onClick={onLogout}
@@ -41,7 +40,6 @@ export default function Layout({ children, warga, onLogout }) {
       </header>
 
       <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-4 my-1">
-        {/* Menu Navigasi di Atas */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
           {MENU.map((t) => (
             <Link
