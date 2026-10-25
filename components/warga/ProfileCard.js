@@ -1,34 +1,27 @@
-import { useState, useEffect } from 'react';
-
-export default function ProfileCard({ warga, tarifBulanan, isUsaha, penyewaAktif }) {
-  const [loginRole, setLoginRole] = useState('pemilik');
-
-  useEffect(() => {
-    const savedSession = localStorage.getItem('warga_session');
-    if (savedSession) {
-      const parsed = JSON.parse(savedSession);
-      setLoginRole(parsed.role_login || 'pemilik');
-    }
-  }, []);
-
+export default function ProfileCard({ warga, penghuniData, roleLogin, modeAkses, tarifBulanan, isUsaha }) {
   if (!warga) return null;
 
-  const isPenyewa = loginRole === 'penyewa';
-  const isSewa = warga.status_huni === 'sewa';
-  const isPemilikTidakDiketahui = warga.nama_lengkap === 'Belum Ada' || !warga.nama_lengkap;
+  const isPenyewa = roleLogin === 'penyewa';
+  const isModePantau = modeAkses === 'pantau';
   
-  let namaTampil = warga.nama_lengkap || 'Belum Ada';
+  // Tentukan nama yang ditampilkan
+  let namaTampil = warga.nama_lengkap; // Default nama pemilik
   let subNama = null;
 
-  if (isPenyewa) {
-    const namaPenyewa = penyewaAktif || 'Penyewa';
-    if (isPemilikTidakDiketahui) {
-      namaTampil = namaPenyewa;
-      subNama = '(Penyewa)';
-    } else {
+  if (penghuniData) {
+    // Jika ada data penghuni aktif
+    if (isPenyewa) {
+      // Jika penyewa, tampilkan: Pemilik / Penyewa
       namaTampil = warga.nama_lengkap;
-      subNama = ` / ${namaPenyewa} (Penyewa)`;
+      subNama = ` / ${penghuniData.nama_lengkap} (Penyewa)`;
+    } else {
+      // Jika pemilik yang menghuni, cukup tampilkan nama pemilik (dari penghuni_data)
+      namaTampil = penghuniData.nama_lengkap;
     }
+  } else if (isPenyewa) {
+    // Kasus edge: status sewa tapi data penghuni tidak ada
+    namaTampil = warga.nama_lengkap;
+    subNama = ` / Penyewa`;
   }
 
   let badgeText = '👑 Pemilik';
@@ -37,7 +30,7 @@ export default function ProfileCard({ warga, tarifBulanan, isUsaha, penyewaAktif
   if (isPenyewa) {
     badgeText = '🔑 Penyewa';
     badgeClass = 'bg-orange-500/10 text-orange-400 border-orange-500/30';
-  } else if (isSewa) {
+  } else if (isModePantau) {
     badgeText = '👑 Pemilik (Mode Pantau)';
   }
 
@@ -51,14 +44,16 @@ export default function ProfileCard({ warga, tarifBulanan, isUsaha, penyewaAktif
               {isPenyewa ? 'Akun Penyewa' : 'Akun Pemilik'}
             </span>
           </div>
+          
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
             {namaTampil}
             {subNama && <span className="text-sm font-normal text-orange-400">{subNama}</span>}
           </h2>
-          {isPemilikTidakDiketahui && !isPenyewa && (
+          {warga.nama_lengkap === 'Belum Ada' && !isPenyewa && (
              <p className="text-xs text-slate-500 italic mt-1">*Nama pemilik belum didata</p>
           )}
         </div>
+
         <div className="flex flex-wrap gap-2 text-xs">
           <div className="bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
             <span className="text-slate-400">Rumah:</span>
@@ -66,10 +61,19 @@ export default function ProfileCard({ warga, tarifBulanan, isUsaha, penyewaAktif
           </div>
           <div className="bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
             <span className="text-slate-400">Tarif:</span>
-            <strong className="text-blue-400 font-semibold">Rp {tarifBulanan?.toLocaleString('id-ID') || 0}/bln</strong>
+            <strong className="text-blue-400 font-semibold">
+              Rp {tarifBulanan?.toLocaleString('id-ID') || 0}/bln
+            </strong>
           </div>
-          {isUsaha && <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-xl font-medium">Tempat Usaha</div>}
-          <div className={`px-3 py-1.5 rounded-xl font-bold border ${badgeClass}`}>{badgeText}</div>
+          {isUsaha && (
+            <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-xl font-medium">
+              Tempat Usaha
+            </div>
+          )}
+          
+          <div className={`px-3 py-1.5 rounded-xl font-bold border ${badgeClass}`}>
+            {badgeText}
+          </div>
         </div>
       </div>
     </section>
