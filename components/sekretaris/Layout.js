@@ -41,20 +41,17 @@ export default function Layout({ children }) {
     
     const fetchPendingCount = async () => {
       try {
-        // Ambil ID Warga yang Pemiliknya pending
         const { data: wPending } = await supabase
           .from('warga')
           .select('id')
           .eq('status_verifikasi_profil', 'pending');
         
-        // Ambil warga_id yang Penyewanya pending
         const { data: pPending } = await supabase
           .from('penghuni')
           .select('warga_id')
           .eq('status_verifikasi', 'pending')
           .eq('is_aktif', true);
         
-        // Gabungkan ID unik (menghitung jumlah RUMAH, bukan jumlah orang)
         const uniqueRumahIds = new Set([
           ...(wPending || []).map(w => w.id),
           ...(pPending || []).map(p => p.warga_id)
@@ -63,7 +60,6 @@ export default function Layout({ children }) {
         const total = uniqueRumahIds.size;
         setPendingCount(total);
 
-        // Set Badge di Icon PWA (jika didukung)
         if ('setAppBadge' in navigator) {
           if (total > 0) {
             await navigator.setAppBadge(total);
@@ -78,7 +74,6 @@ export default function Layout({ children }) {
     
     fetchPendingCount();
     
-    // Realtime: update badge saat ada perubahan data
     const channel = supabase
       .channel('realtime-badge-sekretaris')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'warga' }, () => fetchPendingCount())
@@ -87,7 +82,6 @@ export default function Layout({ children }) {
     
     return () => {
       supabase.removeChannel(channel);
-      // Clear badge saat unmount/logout
       if ('clearAppBadge' in navigator) {
         navigator.clearAppBadge().catch(() => {});
       }
@@ -96,7 +90,6 @@ export default function Layout({ children }) {
 
   const handleLogout = () => {
     if (!confirm('Keluar dari akun pengurus?')) return;
-    // Hapus badge dari icon PWA sebelum logout
     if ('clearAppBadge' in navigator) {
       navigator.clearAppBadge().catch(() => {});
     }
@@ -118,7 +111,7 @@ export default function Layout({ children }) {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {user && <NotifToggle userId={user.id} userType="pengurus" />}
-            <Link href="/admin" className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg text-slate-300 border border-slate-700 hidden sm:block">← Admin</Link>
+            {/* TOMBOL ADMIN SUDAH DIHAPUS */}
             <button onClick={handleLogout} className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-2 rounded-lg border border-rose-500/20 font-medium">🚪 Keluar</button>
           </div>
         </div>
@@ -134,7 +127,6 @@ export default function Layout({ children }) {
               <span className="text-base sm:text-sm leading-none">{t.i}</span>
               <span className="leading-tight">{t.l}</span>
               
-              {/* ═══ BADGE NOTIFIKASI DI MENU VERIFIKASI ═══ */}
               {t.key === 'verifikasi' && pendingCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-lg animate-pulse">
                   {pendingCount}
