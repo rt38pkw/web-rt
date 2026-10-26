@@ -4,7 +4,6 @@ import { uploadKK } from '../../lib/iuran/storage';
 import Layout from '../../components/sekretaris/Layout';
 
 export default function SekretarisDataWarga() {
-  // Default tab sekarang adalah 'penghuni'
   const [activeTab, setActiveTab] = useState('penghuni'); 
   
   // State Data
@@ -52,9 +51,9 @@ export default function SekretarisDataWarga() {
   const [newNik, setNewNik] = useState('');
   const [newNoKk, setNewNoKk] = useState('');
   const [newNoHp, setNewNoHp] = useState('');
-  const [newTglLahir, setNewTglLahir] = useState(''); // BARU
-  const [newJenisKelamin, setNewJenisKelamin] = useState('L'); // BARU
-  const [newPekerjaan, setNewPekerjaan] = useState(''); // BARU
+  const [newTglLahir, setNewTglLahir] = useState('');
+  const [newJenisKelamin, setNewJenisKelamin] = useState('L');
+  const [newPekerjaan, setNewPekerjaan] = useState('');
   const [newHubungan, setNewHubungan] = useState('Kepala Keluarga');
   const [newFileKK, setNewFileKK] = useState(null);
   const [previewKK, setPreviewKK] = useState(null);
@@ -81,7 +80,6 @@ export default function SekretarisDataWarga() {
     setLoading(true);
     const [wargaData, penghuniData] = await Promise.all([
       supabase.from('warga').select('*').order('no_rumah', { ascending: true }),
-      // Hanya ambil yang approved
       supabase.from('penghuni').select('*').eq('is_aktif', true).eq('status_verifikasi', 'approved')
     ]);
     if (wargaData.data) setWargaList(wargaData.data);
@@ -121,7 +119,7 @@ export default function SekretarisDataWarga() {
   };
 
   const openEditModal = (w) => {
-    setShowDetailRumah(false); // Tutup modal detail dulu
+    setShowDetailRumah(false); 
     setEditId(w.id); setEditNama(w.nama_lengkap || ''); setEditNoRumah(w.no_rumah || '');
     setEditNik(w.nik?.length === 16 ? w.nik : ''); setEditNoKk(w.no_kk?.length === 16 ? w.no_kk : ''); 
     setEditNoWa(w.no_wa || ''); setEditKategori(w.kategori || 'Warga'); setEditStatusHuni(w.status_huni || 'pemilik');
@@ -202,7 +200,7 @@ export default function SekretarisDataWarga() {
     setIsKelolaMode(false);
     
     setNewNama(''); setNewNik(''); setNewNoKk(''); setNewNoHp(''); 
-    setNewTglLahir(''); setNewJenisKelamin('L'); setNewPekerjaan(''); // RESET FIELD BARU
+    setNewTglLahir(''); setNewJenisKelamin('L'); setNewPekerjaan('');
     setNewHubungan('Kepala Keluarga'); setNewFileKK(null); setPreviewKK(null);
     setShowKKModal(true);
   };
@@ -232,9 +230,9 @@ export default function SekretarisDataWarga() {
         nik: newNik.trim() || null, 
         no_kk: newNoKk.trim() || null,
         no_hp: newNoHp.trim() || null, 
-        tanggal_lahir: newTglLahir || null, // FIELD BARU
-        jenis_kelamin: newJenisKelamin, // FIELD BARU
-        pekerjaan: newPekerjaan.trim() || null, // FIELD BARU
+        tanggal_lahir: newTglLahir || null,
+        jenis_kelamin: newJenisKelamin,
+        pekerjaan: newPekerjaan.trim() || null,
         hubungan: newHubungan, 
         tipe_penghuni: 'penyewa', 
         is_aktif: true, 
@@ -266,9 +264,9 @@ export default function SekretarisDataWarga() {
         warga_id: selectedKKWarga.id,
         nama_lengkap: newNama.trim(),
         nik: newNik.trim() || null,
-        tanggal_lahir: newTglLahir || null, // FIELD BARU
-        jenis_kelamin: newJenisKelamin, // FIELD BARU
-        pekerjaan: newPekerjaan.trim() || null, // FIELD BARU
+        tanggal_lahir: newTglLahir || null,
+        jenis_kelamin: newJenisKelamin,
+        pekerjaan: newPekerjaan.trim() || null,
         hubungan: newHubungan,
         tipe_penghuni: 'penyewa', 
         is_aktif: true, 
@@ -510,7 +508,6 @@ export default function SekretarisDataWarga() {
               </div>
             </div>
 
-            {/* TOMBOL AKSI DI DALAM MODAL DETAIL */}
             <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-800">
               <button onClick={() => openEditModal(detailRumah)} className="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1">
                 ✏️ Edit Data
@@ -585,24 +582,49 @@ export default function SekretarisDataWarga() {
                 {isAddingNewKK ? (
                   <form onSubmit={handleTambahKKSubmit} className="space-y-3">
                     <h4 className="text-sm font-bold text-indigo-400">Tambah Kepala Keluarga Baru</h4>
-                    <input type="text" required placeholder="Nama Lengkap KK *" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNama} onChange={(e) => setNewNama(e.target.value)} />
-                    <input type="text" inputMode="numeric" placeholder="NIK KK (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNik} onChange={(e) => handleAngkaChange(e, setNewNik)} />
-                    <input type="text" inputMode="numeric" placeholder="No. KK (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNoKk} onChange={(e) => handleAngkaChange(e, setNewNoKk)} />
-                    <input type="text" placeholder="No. WhatsApp" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNoHp} onChange={(e) => setNewNoHp(e.target.value)} />
-                    
-                    {/* FIELD BARU */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <input type="date" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newTglLahir} onChange={(e) => setNewTglLahir(e.target.value)} />
-                      <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newJenisKelamin} onChange={(e) => setNewJenisKelamin(e.target.value)}>
-                        <option value="L">Laki-laki</option>
-                        <option value="P">Perempuan</option>
-                      </select>
-                    </div>
-                    <input type="text" placeholder="Pekerjaan (Opsional)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newPekerjaan} onChange={(e) => setNewPekerjaan(e.target.value)} />
-                    {/* END FIELD BARU */}
 
-                    <div className="pt-2">
-                      <label className="block text-xs text-slate-300 mb-1">Upload Foto KK *</label>
+                    <div>
+                      <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Nama Lengkap *</label>
+                      <input type="text" required placeholder="Contoh: Budi Santoso" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNama} onChange={(e) => setNewNama(e.target.value)} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">NIK (Wajib)</label>
+                        <input type="text" inputMode="numeric" placeholder="16 digit" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNik} onChange={(e) => handleAngkaChange(e, setNewNik)} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">No. KK (Wajib)</label>
+                        <input type="text" inputMode="numeric" placeholder="16 digit" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNoKk} onChange={(e) => handleAngkaChange(e, setNewNoKk)} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">No. WhatsApp</label>
+                      <input type="text" placeholder="08123456xxx" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNoHp} onChange={(e) => setNewNoHp(e.target.value)} />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Tanggal Lahir</label>
+                        <input type="date" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white [color-scheme:dark]" value={newTglLahir} onChange={(e) => setNewTglLahir(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Jenis Kelamin</label>
+                        <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newJenisKelamin} onChange={(e) => setNewJenisKelamin(e.target.value)}>
+                          <option value="L">Laki-laki</option>
+                          <option value="P">Perempuan</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Pekerjaan (Opsional)</label>
+                      <input type="text" placeholder="Karyawan / Wiraswasta" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newPekerjaan} onChange={(e) => setNewPekerjaan(e.target.value)} />
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-800">
+                      <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Upload Foto KK *</label>
                       <input type="file" accept="image/*" onChange={handleFileKKChange} className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-600/20 file:text-indigo-400 hover:file:bg-indigo-600/30" />
                     </div>
 
@@ -643,33 +665,51 @@ export default function SekretarisDataWarga() {
                         <h5 className="text-xs font-bold text-indigo-300">+ Tambah Anggota / Update KK</h5>
                         
                         <div className="pt-1 pb-2 border-b border-slate-800">
-                          <label className="block text-[10px] text-slate-400 mb-1">Ganti Foto KK (Opsional)</label>
+                          <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Ganti Foto KK (Opsional)</label>
                           <input type="file" accept="image/*" onChange={handleFileKKChange} className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-blue-600/20 file:text-blue-400 hover:file:bg-blue-600/30" />
                           {previewKK && <p className="text-[9px] text-emerald-400 mt-1">✓ Foto baru siap disimpan</p>}
                         </div>
 
-                        <input type="text" required placeholder="Nama Lengkap Anggota *" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newNama} onChange={(e) => setNewNama(e.target.value)} />
-                        <input type="text" inputMode="numeric" placeholder="NIK Anggota (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newNik} onChange={(e) => handleAngkaChange(e, setNewNik)} />
+                        <div>
+                          <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Nama Lengkap Anggota *</label>
+                          <input type="text" required placeholder="Contoh: Siti Aminah" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newNama} onChange={(e) => setNewNama(e.target.value)} />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">NIK Anggota</label>
+                          <input type="text" inputMode="numeric" placeholder="16 digit" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newNik} onChange={(e) => handleAngkaChange(e, setNewNik)} />
+                        </div>
                         
-                        {/* FIELD BARU */}
                         <div className="grid grid-cols-2 gap-2">
-                          <input type="date" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newTglLahir} onChange={(e) => setNewTglLahir(e.target.value)} />
-                          <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newJenisKelamin} onChange={(e) => setNewJenisKelamin(e.target.value)}>
-                            <option value="L">Laki-laki</option>
-                            <option value="P">Perempuan</option>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Tanggal Lahir</label>
+                            <input type="date" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white [color-scheme:dark]" value={newTglLahir} onChange={(e) => setNewTglLahir(e.target.value)} />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Jenis Kelamin</label>
+                            <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newJenisKelamin} onChange={(e) => setNewJenisKelamin(e.target.value)}>
+                              <option value="L">Laki-laki</option>
+                              <option value="P">Perempuan</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Pekerjaan (Opsional)</label>
+                          <input type="text" placeholder="Pelajar / Karyawan" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newPekerjaan} onChange={(e) => setNewPekerjaan(e.target.value)} />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Hubungan Keluarga</label>
+                          <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newHubungan} onChange={(e) => setNewHubungan(e.target.value)}>
+                            <option value="Istri">Istri</option>
+                            <option value="Anak">Anak</option>
+                            <option value="Saudara">Saudara</option>
+                            <option value="Lainnya">Lainnya</option>
                           </select>
                         </div>
-                        <input type="text" placeholder="Pekerjaan (Opsional)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newPekerjaan} onChange={(e) => setNewPekerjaan(e.target.value)} />
-                        {/* END FIELD BARU */}
-
-                        <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newHubungan} onChange={(e) => setNewHubungan(e.target.value)}>
-                          <option value="Istri">Istri</option>
-                          <option value="Anak">Anak</option>
-                          <option value="Saudara">Saudara</option>
-                          <option value="Lainnya">Lainnya</option>
-                        </select>
                         
-                        <button type="submit" disabled={processingId === selectedKKWarga.id} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 rounded-xl text-xs transition mt-2">Simpan Perubahan</button>
+                        <button type="submit" disabled={processingId === selectedKKWarga.id} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 rounded-xl text-xs transition mt-2">Simpan Anggota</button>
                       </form>
                     )}
                   </>
