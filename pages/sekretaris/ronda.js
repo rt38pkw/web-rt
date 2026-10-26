@@ -124,7 +124,7 @@ export default function SekretarisRonda() {
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  // ═══ FUNGSI GENERATE (STRICT SLOT + SWAP) ═══
+  // ═══ FUNGSI GENERATE (STRICT SLOT + SWAP + JARAK MINIMAL 14 HARI) ═══
   const handleGenerateDraft = async () => {
     if (isPublished) return alert('Jadwal sudah di-publish. Tidak bisa generate ulang.');
     if (!confirm('Generate ulang akan menimpa draft saat ini. Lanjutkan?')) return;
@@ -196,25 +196,44 @@ export default function SekretarisRonda() {
         });
       }
 
-      // 3. SWAP ALGORITMA (FAIR SWAP UNTUK HARI KHUSUS)
+      // 3. SWAP ALGORITMA (DENGAN JARAK MINIMAL 14 HARI UNTUK HARI KHUSUS)
       let anyConflict = false;
+      const lastSpecialSchedule = {}; // Menyimpan { penghuni_id: DateObject }
+
       for (let i = 0; i < draft.length; i++) {
         const day = draft[i];
+        const currentDateObj = new Date(day.tanggal);
         
         for (let j = 0; j < day.petugas.length; j++) {
           const p = day.petugas[j];
           
           if (p.hari_ronda_khusus) {
             const allowed = p.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
-            if (!allowed.includes(day.hari.toLowerCase())) {
-              
+            
+            if (allowed.includes(day.hari.toLowerCase())) {
+              // Hari ini cocok, catat jadwal
+              lastSpecialSchedule[p.id] = currentDateObj;
+            } else {
+              // Hari tidak cocok, butuh swap
               let swapped = false;
-              // Cari hari lain (k) yang bisa menerima p
+              
+              // Cari target hari lain (k)
               for (let k = 0; k < draft.length; k++) {
                 if (i === k) continue;
                 const targetDay = draft[k];
-                
+                const targetDateObj = new Date(targetDay.tanggal);
+
                 if (allowed.includes(targetDay.hari.toLowerCase())) {
+                  
+                  // CEK JARAK MINIMAL 14 HARI
+                  let isIntervalValid = true;
+                  if (lastSpecialSchedule[p.id]) {
+                    const diffTime = Math.abs(targetDateObj - lastSpecialSchedule[p.id]);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    if (diffDays < 14) isIntervalValid = false; // Jarak terlalu dekat
+                  }
+                  if (!isIntervalValid) continue; // Lanjut ke hari berikutnya
+
                   // Cari orang di targetDay yang bisa dipindah ke 'day'
                   for (let l = 0; l < targetDay.petugas.length; l++) {
                     const q = targetDay.petugas[l];
@@ -231,6 +250,7 @@ export default function SekretarisRonda() {
                       day.petugas[j] = q;
                       targetDay.petugas[l] = p;
                       swapped = true;
+                      lastSpecialSchedule[p.id] = targetDateObj; // Catat jadwal barunya
                       break;
                     }
                   }
@@ -238,7 +258,33 @@ export default function SekretarisRonda() {
                 if (swapped) break;
               }
 
-              // Jika tidak bisa swap, tandai bentrok
+              // Jika tidak bisa swap dengan jarak ideal, coba longgarkan (paksa swap terdekat)
+              if (!swapped) {
+                for (let k = 0; k < draft.length; k++) {
+                  if (i === k) continue;
+                  const targetDay = draft[k];
+                  if (allowed.includes(targetDay.hari.toLowerCase())) {
+                    for (let l = 0; l < targetDay.petugas.length; l++) {
+                      const q = targetDay.petugas[l];
+                      let qAllowedHere = true;
+                      if (q.hari_ronda_khusus) {
+                        const qAllowed = q.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
+                        if (!qAllowed.includes(day.hari.toLowerCase())) qAllowedHere = false;
+                      }
+                      if (qAllowedHere && !day.petugas.some(x => x.id === q.id)) {
+                        day.petugas[j] = q;
+                        targetDay.petugas[l] = p;
+                        swapped = true;
+                        lastSpecialSchedule[p.id] = new Date(targetDay.tanggal);
+                        break;
+                      }
+                    }
+                  }
+                  if (swapped) break;
+                }
+              }
+
+              // Jika benar-benar tidak bisa swap, tandai bentrok
               if (!swapped) {
                 day.has_conflict = true;
                 day.catatan = `${p.nama_lengkap} hanya bisa ${p.hari_ronda_khusus}`;
@@ -394,7 +440,8 @@ export default function SekretarisRonda() {
                   </thead>
                   <tbody className="divide-y divide-slate-800">
                     {draftData.map((item, idx) => {
-                      // Render 3 kolom. Backend menjamin array length = N
+                      // Pastikan unik saat render
+                      const uniquePetugas = Array.from(new Map(item.petugas.map(p => [p.id, p])).values());
                       return (
                         <tr key={idx} className={`hover:bg-slate-800/40 ${item.is_libur ? 'opacity-50 grayscale bg-slate-900' : ''}`}>
                           <td className="p-3 border-r border-slate-800 text-center text-slate-500">{idx + 1}</td>
@@ -405,7 +452,7 @@ export default function SekretarisRonda() {
                             <td colSpan={selectedPeriode.jumlah_per_grup || 3} className="p-3 border-r border-slate-800 text-center text-rose-400 font-bold italic">LIBUR</td>
                           ) : (
                             <>
-                              {item.petugas.map((p, pIdx) => (
+                              {uniquePetugas.map((p, pIdx) => (
                                 <td key={pIdx} className="p-3 border-r border-slate-800">
                                   <div className={`font-semibold ${item.has_conflict && p.hari_ronda_khusus ? 'text-rose-400' : 'text-slate-200'}`}>
                                     {p.nama_lengkap.split(' ')[0]}
@@ -413,8 +460,8 @@ export default function SekretarisRonda() {
                                   <div className="text-[10px] text-slate-500 font-mono">{p.warga?.no_rumah || '-'}</div>
                                 </td>
                               ))}
-                              {/* Render kolom kosong jika ada sisa bagi (meskipun jarang terjadi dengan 36 orang) */}
-                              {Array.from({ length: (selectedPeriode.jumlah_per_grup || 3) - item.petugas.length }).map((_, emptyIdx) => (
+                              {/* Render kolom kosong jika sisa bagi */}
+                              {Array.from({ length: (selectedPeriode.jumlah_per_grup || 3) - uniquePetugas.length }).map((_, emptyIdx) => (
                                 <td key={`empty-${emptyIdx}`} className="p-3 border-r border-slate-800 text-slate-600">-</td>
                               ))}
                             </>
