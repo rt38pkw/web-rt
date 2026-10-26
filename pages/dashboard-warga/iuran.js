@@ -18,9 +18,9 @@ import { uploadBukti } from '../../lib/iuran/storage';
 import { fetchTarifList, getTarifWarga } from '../../lib/iuran/tarif';
 
 export default function DashboardWargaIuran() {
-  const [sessionData, setSessionData] = useState(null); // Menyimpan session lengkap
-  const [warga, setWarga] = useState(null); // Data Rumah (Tabel Warga)
-  const [penghuniData, setPenghuniData] = useState(null); // Data Penghuni (Tabel Penghuni)
+  const [sessionData, setSessionData] = useState(null); 
+  const [warga, setWarga] = useState(null); 
+  const [penghuniData, setPenghuniData] = useState(null); 
   
   const [iuranList, setIuranList] = useState([]);
   const [depositList, setDepositList] = useState([]);
@@ -52,15 +52,14 @@ export default function DashboardWargaIuran() {
 
   useEffect(() => { showKasRTModalRef.current = showKasRTModal; }, [showKasRTModal]);
 
-  // ═══ INISIALISASI SESSION BARU ═══
   useEffect(() => {
     const savedSession = localStorage.getItem('warga_session');
     if (!savedSession) { router.push('/'); return; }
     
     const parsed = JSON.parse(savedSession);
     setSessionData(parsed);
-    setWarga(parsed); // Data rumah ada di root session
-    setPenghuniData(parsed.penghuni_data); // Data penghuni ada di dalam properti ini
+    setWarga(parsed); 
+    setPenghuniData(parsed.penghuni_data); 
 
     loadIuran(parsed.id);
     loadDeposit(parsed.id);
@@ -68,17 +67,13 @@ export default function DashboardWargaIuran() {
     refreshDataRumah(parsed.id);
   }, []);
 
-  // ═══ REALTIME LISTENER ═══
   useEffect(() => {
     if (!warga?.id) return;
     const channelName = `realtime-dashboard-warga-${warga.id}-${Math.random()}`;
     
     const channel = supabase.channel(channelName)
-      // Dengarkan perubahan pada tabel warga (misal: ganti password)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'warga', filter: `id=eq.${warga.id}` }, () => refreshDataRumah(warga.id))
-      // Dengarkan perubahan pada tabel penghuni (misal: verifikasi di-approve/reject)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'penghuni', filter: `warga_id=eq.${warga.id}` }, () => refreshDataRumah(warga.id))
-      // Dengarkan perubahan iuran
       .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran' }, () => loadIuran(warga.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deposit_warga' }, () => loadDeposit(warga.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pengeluaran' }, () => { if (showKasRTModalRef.current) loadKasRT(); })
@@ -88,14 +83,12 @@ export default function DashboardWargaIuran() {
     return () => { supabase.removeChannel(channel); };
   }, [warga?.id]); 
 
-  // Fungsi untuk update data dari database & sinkronkan ke LocalStorage
   const refreshDataRumah = async (wargaId) => {
     try {
       const { data: w } = await supabase.from('warga').select('*').eq('id', wargaId).single();
       const { data: p } = await supabase.from('penghuni').select('*').eq('warga_id', wargaId).eq('is_aktif', true).maybeSingle();
       
       if (w) {
-        // Ambil role_login dan mode_akses dari session lama agar tidak hilang
         const currentSession = JSON.parse(localStorage.getItem('warga_session'));
         
         const newSessionData = {
@@ -109,7 +102,6 @@ export default function DashboardWargaIuran() {
         setPenghuniData(p || null);
         setSessionData(newSessionData);
         
-        // Update localStorage agar saat direfresh tidak hilang
         const { password: _, password_pending: __, ...profilAman } = newSessionData;
         localStorage.setItem('warga_session', JSON.stringify(profilAman));
       }
@@ -205,11 +197,17 @@ export default function DashboardWargaIuran() {
     } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
   };
 
-  // ═══ LOGIKA BANNER VERIFIKASI ═══
+  // ═══ LOGIKA BANNER YANG DISEMPURNAKAN ═══
   const statusPenghuni = penghuniData?.status_verifikasi;
   const alasanReject = penghuniData?.alasan_reject;
-
-  const isBelumLengkap = !penghuniData || statusPenghuni === 'belum';
+  
+  // Cek apakah NIK dan Foto KK sudah terisi
+  const punyaNik = !!penghuniData?.nik && penghuniData.nik !== '0';
+  const punyaKK = !!penghuniData?.url_kk;
+  
+  // Banner Kuning: Muncul jika 'belum' ATAU (status 'approved' tapi data NIK/KK kosong)
+  const isBelumLengkap = !penghuniData || statusPenghuni === 'belum' || (statusPenghuni === 'approved' && (!punyaNik || !punyaKK));
+  
   const isPending = statusPenghuni === 'pending';
   const isRejected = statusPenghuni === 'rejected';
 
@@ -226,14 +224,14 @@ export default function DashboardWargaIuran() {
           isUsaha={usaha} 
         />
 
-        {/* BANNER: BELUM LENGKAP */}
+        {/* BANNER: BELUM LENGKAP / DATA KOSONG */}
         {isBelumLengkap && (
           <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
             <div className="flex items-start gap-3">
               <span className="text-xl">⚠️</span>
               <div>
-                <h4 className="text-sm font-bold text-amber-300">Profil Penghuni Belum Lengkap</h4>
-                <p className="text-xs text-amber-400 mt-0.5">Silakan lengkapi data diri, keluarga & upload KK agar tervalidasi oleh Sekretaris RT.</p>
+                <h4 className="text-sm font-bold text-amber-300">Lengkapi Data Diri & KK</h4>
+                <p className="text-xs text-amber-400 mt-0.5">Silakan lengkapi NIK dan upload Kartu Keluarga agar data Anda tervalidasi oleh Sekretaris RT.</p>
               </div>
             </div>
             <button onClick={() => setShowModalProfil(true)} className="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-xs px-4 py-2.5 rounded-xl shrink-0 transition active:scale-95">Lengkapi Sekarang</button>
@@ -257,7 +255,7 @@ export default function DashboardWargaIuran() {
             <div className="flex items-start gap-3">
               <span className="text-xl">❌</span>
               <div>
-                <h4 className="text-sm font-bold text-rose-300">Data Penghuni Ditolak</h4>
+                <h4 className="text-sm font-bold text-rose-300">Data Ditolak Sekretaris</h4>
                 <p className="text-xs text-rose-400 mt-0.5">Alasan: {alasanReject}</p>
               </div>
             </div>
@@ -265,7 +263,6 @@ export default function DashboardWargaIuran() {
           </div>
         )}
 
-        {/* BANNER: IURAN DITOLAK */}
         {adaDitolak && (
           <div className="bg-rose-950/40 border border-rose-500/50 rounded-2xl p-4 flex items-start gap-3">
             <span className="text-xl">❌</span>
@@ -333,7 +330,7 @@ export default function DashboardWargaIuran() {
         onClose={() => setShowModalProfil(false)} 
         warga={warga} 
         role={sessionData.role_login} 
-        dataPenyewaAktif={penghuniData} // Gunakan penghuniData sebagai data awal
+        dataPenyewaAktif={penghuniData} 
         alasanReject={alasanReject} 
         onSuccess={() => refreshDataRumah(warga.id)} 
       />
