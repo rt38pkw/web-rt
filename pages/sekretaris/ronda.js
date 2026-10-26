@@ -3,9 +3,14 @@ import { supabase } from '../../lib/supabase';
 import Layout from '../../components/sekretaris/Layout';
 
 export default function SekretarisRonda() {
+  // State Data Utama
   const [periodeList, setPeriodeList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+
+  // State Navigasi Halaman
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'detail'
+  const [selectedPeriode, setSelectedPeriode] = useState(null);
 
   // State Modal Buat Periode
   const [showModal, setShowModal] = useState(false);
@@ -15,6 +20,7 @@ export default function SekretarisRonda() {
   const [jamMulai, setJamMulai] = useState('23:00');
   const [jamSelesai, setJamSelesai] = useState('02:00');
   const [jamReminder, setJamReminder] = useState('07:00');
+  const [jumlahPerGrup, setJumlahPerGrup] = useState(3); // STATE BARU
 
   useEffect(() => {
     fetchPeriode();
@@ -47,6 +53,7 @@ export default function SekretarisRonda() {
         jam_mulai: jamMulai,
         jam_selesai: jamSelesai,
         jam_reminder: jamReminder,
+        jumlah_per_grup: Number(jumlahPerGrup), // FIELD BARU
         status: 'draft'
       }]);
 
@@ -56,6 +63,7 @@ export default function SekretarisRonda() {
       setShowModal(false);
       setNamaPeriode(''); setTglMulai(''); setTglSelesai('');
       setJamMulai('23:00'); setJamSelesai('02:00'); setJamReminder('07:00');
+      setJumlahPerGrup(3);
       fetchPeriode();
     } catch (err) {
       alert('Gagal membuat periode: ' + err.message);
@@ -77,147 +85,167 @@ export default function SekretarisRonda() {
     }
   };
 
-  const formatJam = (timeStr) => {
-    if (!timeStr) return '-';
-    // timeStr format: "23:00:00"
-    return timeStr.substring(0, 5);
+  const handleLihatDetail = (periode) => {
+    setSelectedPeriode(periode);
+    setViewMode('detail');
   };
 
-  const formatTanggal = (dateStr) => {
-    if (!dateStr) return '-';
-    return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(dateStr));
+  const handleKembali = () => {
+    setViewMode('list');
+    setSelectedPeriode(null);
   };
 
-  return (
-    <Layout>
-      <div className="max-w-5xl mx-auto space-y-4">
-        
-        <div className="flex justify-between items-center bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg">
-          <div>
-            <h2 className="text-lg font-bold text-white">Jadwal Ronda Warga</h2>
-            <p className="text-xs text-slate-400">Buat periode, atur jadwal, dan publikasikan ke warga.</p>
+  const handleGenerateDraft = () => {
+    alert('Fitur Generate Otomatis akan kita buat di Tahap 3.\n\nSistem akan menghitung otomatis berdasarkan jumlah per grup.');
+  };
+
+  const formatJam = (timeStr) => timeStr ? timeStr.substring(0, 5) : '-';
+  const formatTanggal = (dateStr) => dateStr ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(dateStr)) : '-';
+
+  // ═══ TAMPILAN 1: DAFTAR PERIODE ═══
+  if (viewMode === 'list') {
+    return (
+      <Layout>
+        <div className="max-w-5xl mx-auto space-y-4">
+          <div className="flex justify-between items-center bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg">
+            <div>
+              <h2 className="text-lg font-bold text-white">Jadwal Ronda Warga</h2>
+              <p className="text-xs text-slate-400">Buat periode, atur jadwal, dan publikasikan ke warga.</p>
+            </div>
+            <button onClick={() => setShowModal(true)} className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg shrink-0">
+              + Buat Periode Baru
+            </button>
           </div>
-          <button 
-            onClick={() => setShowModal(true)} 
-            className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg shrink-0"
-          >
-            + Buat Periode Baru
-          </button>
+
+          {loading ? (
+            <div className="py-12 text-center text-slate-500 text-xs animate-pulse">Memuat data periode...</div>
+          ) : periodeList.length === 0 ? (
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-10 text-center flex flex-col items-center justify-center">
+              <div className="text-5xl mb-3">🛡️</div>
+              <h3 className="text-base font-bold text-white mb-1">Belum Ada Periode Ronda</h3>
+              <p className="text-xs text-slate-400 mb-4">Silakan buat periode baru untuk mulai menyusun jadwal.</p>
+              <button onClick={() => setShowModal(true)} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition">Buat Periode Sekarang</button>
+            </div>
+          ) : (
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-950 text-slate-400">
+                  <tr>
+                    <th className="p-4">Nama Periode</th>
+                    <th className="p-4">Tanggal</th>
+                    <th className="p-4">Jam / Grup</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {periodeList.map((p) => (
+                    <tr key={p.id} className="hover:bg-slate-800/40">
+                      <td className="p-4"><div className="font-bold text-white text-sm">{p.nama_periode}</div></td>
+                      <td className="p-4 text-slate-300">
+                        {formatTanggal(p.tanggal_mulai)} {p.tanggal_selesai ? ` - ${formatTanggal(p.tanggal_selesai)}` : '(Fleksibel)'}
+                      </td>
+                      <td className="p-4 text-slate-300">
+                        {formatJam(p.jam_mulai)} - {formatJam(p.jam_selesai)} WIB
+                        <div className="text-[10px] text-indigo-400 mt-0.5">{p.jumlah_per_grup || 3} Orang / Grup</div>
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${p.status === 'published' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>
+                          {p.status}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => handleLihatDetail(p)} className="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-semibold transition">👁️ Lihat Detail</button>
+                          <button onClick={() => handleHapusPeriode(p.id, p.nama_periode)} className="bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-semibold transition">🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        {loading ? (
-          <div className="py-12 text-center text-slate-500 text-xs animate-pulse">Memuat data periode...</div>
-        ) : periodeList.length === 0 ? (
-          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-10 text-center flex flex-col items-center justify-center">
-            <div className="text-5xl mb-3">🛡️</div>
-            <h3 className="text-base font-bold text-white mb-1">Belum Ada Periode Ronda</h3>
-            <p className="text-xs text-slate-400 mb-4">Silakan buat periode baru untuk mulai menyusun jadwal.</p>
-            <button onClick={() => setShowModal(true)} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition">Buat Periode Sekarang</button>
-          </div>
-        ) : (
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950 text-slate-400">
-                <tr>
-                  <th className="p-4">Nama Periode</th>
-                  <th className="p-4">Tanggal</th>
-                  <th className="p-4">Jam Ronda</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {periodeList.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-800/40">
-                    <td className="p-4">
-                      <div className="font-bold text-white text-sm">{p.nama_periode}</div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">Dibuat: {formatTanggal(p.created_at)}</div>
-                    </td>
-                    <td className="p-4 text-slate-300">
-                      {formatTanggal(p.tanggal_mulai)} {p.tanggal_selesai ? ` - ${formatTanggal(p.tanggal_selesai)}` : '(3 Putaran)'}
-                    </td>
-                    <td className="p-4 text-slate-300">
-                      {formatJam(p.jam_mulai)} - {formatJam(p.jam_selesai)} WIB
-                      <div className="text-[10px] text-amber-400 mt-0.5">Reminder: {formatJam(p.jam_reminder)}</div>
-                    </td>
-                    <td className="p-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${p.status === 'published' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>
-                        {p.status}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button 
-                          onClick={() => alert('Fitur Detail Draft akan dibuat pada tahap selanjutnya!')} 
-                          className="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-semibold transition"
-                        >
-                          👁️ Lihat Detail
-                        </button>
-                        <button 
-                          onClick={() => handleHapusPeriode(p.id, p.nama_periode)} 
-                          className="bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-semibold transition"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* MODAL BUAT PERIODE */}
+        {showModal && (
+          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 className="text-base font-bold text-white">➕ Buat Periode Ronda</h3>
+                <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white">✕</button>
+              </div>
+              <form onSubmit={handleBuatPeriode} className="space-y-3">
+                <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Nama Periode *</label><input type="text" required placeholder="Contoh: Desember 2026 - Januari 2027" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={namaPeriode} onChange={(e) => setNamaPeriode(e.target.value)} /></div>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Tanggal Mulai *</label><input type="date" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white [color-scheme:dark]" value={tglMulai} onChange={(e) => setTglMulai(e.target.value)} /></div>
+                  <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Tanggal Selesai (Opsional)</label><input type="date" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white [color-scheme:dark]" value={tglSelesai} onChange={(e) => setTglSelesai(e.target.value)} /></div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Jumlah Personil / Grup *</label>
+                  <input type="number" min="2" max="10" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={jumlahPerGrup} onChange={(e) => setJumlahPerGrup(e.target.value)} />
+                  <p className="text-[9px] text-slate-500 mt-1">*Menentukan berapa orang per malam. Sistem akan membagi otomatis.</p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Jam Mulai</label><input type="time" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2.5 text-xs text-white [color-scheme:dark]" value={jamMulai} onChange={(e) => setJamMulai(e.target.value)} /></div>
+                  <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Jam Selesai</label><input type="time" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2.5 text-xs text-white [color-scheme:dark]" value={jamSelesai} onChange={(e) => setJamSelesai(e.target.value)} /></div>
+                  <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Reminder</label><input type="time" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2.5 text-xs text-white [color-scheme:dark]" value={jamReminder} onChange={(e) => setJamReminder(e.target.value)} /></div>
+                </div>
+
+                <div className="flex gap-2 pt-3 border-t border-slate-800 mt-4">
+                  <button type="button" onClick={() => setShowModal(false)} className="w-1/3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs">Batal</button>
+                  <button type="submit" disabled={processing} className="w-2/3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl text-xs transition">{processing ? 'Menyimpan...' : 'Simpan Periode'}</button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
-      </div>
+      </Layout>
+    );
+  }
 
-      {/* MODAL BUAT PERIODE BARU */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white">➕ Buat Periode Ronda</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white">✕</button>
-            </div>
-            
-            <form onSubmit={handleBuatPeriode} className="space-y-3">
+  // ═══ TAMPILAN 2: DETAIL PERIODE ═══
+  if (viewMode === 'detail' && selectedPeriode) {
+    return (
+      <Layout>
+        <div className="max-w-6xl mx-auto space-y-4">
+          
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div className="flex items-center gap-3">
+              <button onClick={handleKembali} className="bg-slate-800 hover:bg-slate-700 text-white p-2.5 rounded-xl transition">← Kembali</button>
               <div>
-                <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Nama Periode *</label>
-                <input type="text" required placeholder="Contoh: Desember 2026 - Januari 2027" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={namaPeriode} onChange={(e) => setNamaPeriode(e.target.value)} />
+                <h2 className="text-lg font-bold text-white">{selectedPeriode.nama_periode}</h2>
+                <p className="text-xs text-slate-400">
+                  {formatTanggal(selectedPeriode.tanggal_mulai)} {selectedPeriode.tanggal_selesai ? ` - ${formatTanggal(selectedPeriode.tanggal_selesai)}` : '(Fleksibel)'} 
+                  • {formatJam(selectedPeriode.jam_mulai)} - {formatJam(selectedPeriode.jam_selesai)} WIB
+                  • {selectedPeriode.jumlah_per_grup || 3} Orang/Grup
+                </p>
               </div>
-              
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Tanggal Mulai *</label>
-                  <input type="date" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white [color-scheme:dark]" value={tglMulai} onChange={(e) => setTglMulai(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Tanggal Selesai (Opsional)</label>
-                  <input type="date" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white [color-scheme:dark]" value={tglSelesai} onChange={(e) => setTglSelesai(e.target.value)} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Jam Mulai</label>
-                  <input type="time" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2.5 text-xs text-white [color-scheme:dark]" value={jamMulai} onChange={(e) => setJamMulai(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Jam Selesai</label>
-                  <input type="time" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2.5 text-xs text-white [color-scheme:dark]" value={jamSelesai} onChange={(e) => setJamSelesai(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Jam Reminder</label>
-                  <input type="time" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2.5 text-xs text-white [color-scheme:dark]" value={jamReminder} onChange={(e) => setJamReminder(e.target.value)} />
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-3 border-t border-slate-800 mt-4">
-                <button type="button" onClick={() => setShowModal(false)} className="w-1/3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs">Batal</button>
-                <button type="submit" disabled={processing} className="w-2/3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl text-xs transition">{processing ? 'Menyimpan...' : 'Simpan Periode'}</button>
-              </div>
-            </form>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={handleGenerateDraft} className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg">
+                ⚡ Generate Draft
+              </button>
+              <button onClick={() => alert('Fitur Import Excel segera hadir!')} className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg">
+                📥 Import Excel
+              </button>
+            </div>
           </div>
+
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl p-6 text-center">
+            <div className="text-4xl mb-3">📝</div>
+            <h3 className="text-base font-bold text-white mb-1">Draft Jadwal Belum Ada</h3>
+            <p className="text-xs text-slate-400 mb-4">Silakan klik "Generate Draft" untuk membagi jadwal secara otomatis.</p>
+          </div>
+
         </div>
-      )}
-    </Layout>
-  );
+      </Layout>
+    );
+  }
+
+  return null;
 }
