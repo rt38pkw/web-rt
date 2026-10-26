@@ -34,17 +34,15 @@ export default function SekretarisDataWarga() {
   const [editKategori, setEditKategori] = useState('Warga');
   const [editStatusHuni, setEditStatusHuni] = useState('pemilik');
 
-  // State Form Tambah Kepala Keluarga Baru
-  const [showTambahPenghuni, setShowTambahPenghuni] = useState(false);
-  const [targetRumahId, setTargetRumahId] = useState('');
-  const [selectedRumahInfo, setSelectedRumahInfo] = useState(null);
+  // State Form Tambah KK (Penyewa Baru)
+  const [showTambahKKModal, setShowTambahKKModal] = useState(false);
+  const [targetTambahKKWarga, setTargetTambahKKWarga] = useState(null);
   const [newNama, setNewNama] = useState('');
   const [newNik, setNewNik] = useState('');
   const [newNoKk, setNewNoKk] = useState('');
   const [newNoHp, setNewNoHp] = useState('');
-  const [newHubungan, setNewHubungan] = useState('Kepala Keluarga');
 
-  // STATE MODAL KELOLA KELUARGA (GABUNGAN EDIT KK & ANGGOTA)
+  // State Modal Kelola Keluarga (Edit Anggota)
   const [showKelolaModal, setShowKelolaModal] = useState(false);
   const [targetKepalaKeluarga, setTargetKepalaKeluarga] = useState(null); 
   const [anggotaNama, setAnggotaNama] = useState('');
@@ -70,8 +68,12 @@ export default function SekretarisDataWarga() {
 
   async function fetchPenghuni() {
     setLoading(true);
-    const { data } = await supabase.from('penghuni').select('*, warga: warga_id (no_rumah)').eq('is_aktif', true).order('nama_lengkap');
-    if (data) setPenghuniList(data);
+    const [wargaData, penghuniData] = await Promise.all([
+      supabase.from('warga').select('*').order('no_rumah', { ascending: true }),
+      supabase.from('penghuni').select('*').eq('is_aktif', true)
+    ]);
+    if (wargaData.data) setWargaList(wargaData.data);
+    if (penghuniData.data) setPenghuniList(penghuniData.data);
     setLoading(false);
   }
 
@@ -120,26 +122,20 @@ export default function SekretarisDataWarga() {
     else { setShowEditModal(false); fetchWarga(); }
   };
 
-  // ═══ LOGIKA SELESAIKAN SEWA (ARSIP PENYEWA, AKTIFKAN PEMILIK) ═══
   const handleSelesaikanSewa = async (w) => {
     if (!confirm(`Selesaikan masa sewa rumah ${w.no_rumah}?\n\nStatus akan menjadi KOSONG, penyewa diarsipkan, dan data Pemilik akan diaktifkan kembali.`)) return;
     
     setProcessingId(w.id);
     try {
-      // 1. Ubah status rumah jadi kosong
       await supabase.from('warga').update({ status_huni: 'kosong' }).eq('id', w.id);
-      
-      // 2. Arsipkan Penyewa
       await supabase.from('penghuni').update({ is_aktif: false }).eq('warga_id', w.id).eq('tipe_penghuni', 'penyewa').eq('is_aktif', true);
       
-      // 3. Aktifkan kembali Pemilik yang ada di arsip
       const { data: pemilikArsip } = await supabase.from('penghuni')
         .select('*').eq('warga_id', w.id).eq('tipe_penghuni', 'pemilik').eq('is_aktif', false).maybeSingle();
       
       if (pemilikArsip) {
         await supabase.from('penghuni').update({ is_aktif: true }).eq('id', pemilikArsip.id);
       } else {
-        // Jika Pemilik belum pernah masuk tabel penghuni, masukkan sekarang
         await supabase.from('penghuni').insert([{
           warga_id: w.id, nama_lengkap: w.nama_lengkap, nik: w.nik, no_kk: w.no_kk, no_hp: w.no_wa,
           hubungan: 'Kepala Keluarga', tipe_penghuni: 'pemilik', is_aktif: true, status_verifikasi: 'approved'
@@ -162,57 +158,43 @@ export default function SekretarisDataWarga() {
   };
 
   // ═══ LOGIKA TAB PENGHUNI ═══
-  const handlePilihRumah = (e) => {
-    const rId = e.target.value;
-    setTargetRumahId(rId);
-    if (!rId) { setSelectedRumahInfo(null); return; }
-    
-    const rumah = wargaList.find(w => w.id === rId);
-    setSelectedRumahInfo(rumah);
-    
-    if (rumah && rumah.status_huni === 'pemilik') {
-      setNewNama(rumah.nama_lengkap || '');
-      setNewNik(rumah.nik || '');
-      setNewNoKk(rumah.no_kk || '');
-      setNewNoHp(rumah.no_wa || '');
-    } else {
-      setNewNama(''); setNewNik(''); setNewNoKk(''); setNewNoHp('');
-    }
+  const openTambahKK = (warga) => {
+    setTargetTambahKKWarga(warga);
+    setNewNama('');
+    setNewNik('');
+    setNewNoKk('');
+    setNewNoHp('');
+    setShowTambahKKModal(true);
   };
 
-  const handleTambahPenghuniSubmit = async (e) => {
+  const handleTambahKKSubmit = async (e) => {
     e.preventDefault();
-    if (!targetRumahId) { alert('Pilih Nomor Rumah!'); return; }
+    if (!targetTambahKKWarga) return;
     if (newNik.length > 0 && newNik.length < 16) { alert('NIK harus 16 digit!'); return; }
     if (newNoKk.length > 0 && newNoKk.length < 16) { alert('No. KK harus 16 digit!'); return; }
+    if (!newNama.trim()) { alert('Nama wajib diisi!'); return; }
 
-    setProcessingId(targetRumahId);
+    setProcessingId(targetTambahKKWarga.id);
     try {
-      // CEK PROTEKSI: Apakah rumah sudah punya KK aktif?
-      const { data: existingKK } = await supabase.from('penghuni')
-        .select('*').eq('warga_id', targetRumahId).eq('hubungan', 'Kepala Keluarga').eq('is_aktif', true).maybeSingle();
-      
-      if (existingKK) {
-        alert(`❌ GAGAL.\n\nRumah ini sudah memiliki Kepala Keluarga aktif (${existingKK.nama_lengkap}).\n\nJika ingin mengganti penyewa, silakan ke Tab "Data Rumah" dan klik tombol "Selesaikan Sewa" (ikon 🚪) terlebih dahulu.`);
-        setProcessingId(null); return;
-      }
-
-      const tipe = selectedRumahInfo.status_huni === 'sewa' ? 'penyewa' : 'pemilik';
-
       const { error } = await supabase.from('penghuni').insert([{
-        warga_id: targetRumahId, nama_lengkap: newNama.trim(), nik: newNik.trim() || null, no_kk: newNoKk.trim() || null,
-        no_hp: newNoHp.trim() || null, hubungan: newHubungan, tipe_penghuni: tipe, is_aktif: true, status_verifikasi: 'approved'
+        warga_id: targetTambahKKWarga.id, 
+        nama_lengkap: newNama.trim(), 
+        nik: newNik.trim() || null, 
+        no_kk: newNoKk.trim() || null,
+        no_hp: newNoHp.trim() || null, 
+        hubungan: 'Kepala Keluarga', 
+        tipe_penghuni: 'penyewa', 
+        is_aktif: true, 
+        status_verifikasi: 'approved'
       }]);
       if (error) throw error;
 
-      alert('✅ Kepala Keluarga baru berhasil ditambahkan!');
-      setShowTambahPenghuni(false);
-      setTargetRumahId(''); setSelectedRumahInfo(null); setNewNama(''); setNewNik(''); setNewNoKk(''); setNewNoHp('');
-      fetchPenghuni(); fetchWarga();
+      alert('✅ Penyewa baru berhasil ditambahkan!');
+      setShowTambahKKModal(false);
+      fetchPenghuni(); 
     } catch (err) { alert('Gagal: ' + err.message); } finally { setProcessingId(null); }
   };
 
-  // FUNGSI KELOLA KELUARGA (MODAL EDIT ANGGOTA)
   const openKelolaModal = (kepalaKeluarga) => {
     setTargetKepalaKeluarga(kepalaKeluarga);
     setAnggotaNama('');
@@ -253,27 +235,28 @@ export default function SekretarisDataWarga() {
     setProcessingId(null);
   };
 
-  // ═══ PERBAIKAN: DEFINE filteredWarga DAN groupedPenghuni ═══
+  // ═══ DEFINISI FILTER & GROUPING ═══
   const filteredWarga = wargaList.filter(w => 
     w.nama_lengkap?.toLowerCase().includes(search.toLowerCase()) || 
     w.no_rumah?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const groupedPenghuni = {};
-  if (activeTab === 'penghuni') {
-    const filteredPenghuni = penghuniList.filter(p => 
-      p.nama_lengkap?.toLowerCase().includes(search.toLowerCase()) || 
-      p.warga?.no_rumah?.toLowerCase().includes(search.toLowerCase())
-    );
-    
-    filteredPenghuni.forEach(p => {
-      const key = p.warga_id;
-      if (!groupedPenghuni[key]) groupedPenghuni[key] = { no_rumah: p.warga?.no_rumah, kepalaKeluarga: null, anggota: [] };
-      
-      if (p.hubungan === 'Kepala Keluarga') groupedPenghuni[key].kepalaKeluarga = p;
-      else groupedPenghuni[key].anggota.push(p);
-    });
-  }
+  const listRumahPenghuni = wargaList.map(w => {
+    const penghuniRumah = penghuniList.filter(p => p.warga_id === w.id);
+    const kk = penghuniRumah.find(p => p.hubungan === 'Kepala Keluarga');
+    const anggota = penghuniRumah.filter(p => p.hubungan !== 'Kepala Keluarga');
+    return {
+      warga: w,
+      kepalaKeluarga: kk || null,
+      anggota: anggota
+    };
+  }).filter(item => {
+    const searchLower = search.toLowerCase();
+    const matchRumah = item.warga.no_rumah?.toLowerCase().includes(searchLower);
+    const matchNama = item.kepalaKeluarga?.nama_lengkap?.toLowerCase().includes(searchLower) || 
+                      item.anggota.some(a => a.nama_lengkap?.toLowerCase().includes(searchLower));
+    return matchRumah || matchNama;
+  });
 
   return (
     <Layout>
@@ -341,47 +324,7 @@ export default function SekretarisDataWarga() {
           <div className="space-y-3 animate-in fade-in">
             <div className="flex gap-3">
               <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex-1"><input type="text" placeholder="Cari nama penghuni atau no. rumah..." className="w-full bg-transparent text-xs text-white focus:outline-none" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-              <button onClick={() => setShowTambahPenghuni(!showTambahPenghuni)} className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg shrink-0">
-                {showTambahPenghuni ? '✕ Tutup Form' : '+ Tambah Kepala Keluarga'}
-              </button>
             </div>
-
-            {showTambahPenghuni && (
-              <form onSubmit={handleTambahPenghuniSubmit} className="bg-slate-900 border border-indigo-500/30 p-4 rounded-2xl space-y-3 shadow-xl animate-in slide-in-from-top-2">
-                <h4 className="text-sm font-bold text-white">Tambah Kepala Keluarga Baru</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <select required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={targetRumahId} onChange={handlePilihRumah}>
-                    <option value="">-- Pilih Nomor Rumah --</option>
-                    {wargaList.map(w => <option key={w.id} value={w.id}>{w.no_rumah} ({w.status_huni})</option>)}
-                  </select>
-                  <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newHubungan} onChange={(e) => {
-                    setNewHubungan(e.target.value);
-                    if (e.target.value !== 'Kepala Keluarga') { setNewNama(''); setNewNik(''); setNewNoKk(''); setNewNoHp(''); }
-                    else if (selectedRumahInfo) handlePilihRumah({ target: { value: targetRumahId } });
-                  }}>
-                    <option value="Kepala Keluarga">Kepala Keluarga</option>
-                    <option value="Istri">Istri</option>
-                    <option value="Anak">Anak</option>
-                    <option value="Saudara">Saudara</option>
-                    <option value="Lainnya">Lainnya</option>
-                  </select>
-                </div>
-                
-                {selectedRumahInfo && selectedRumahInfo.status_huni === 'pemilik' && newHubungan === 'Kepala Keluarga' ? (
-                  <div className="bg-blue-950/30 border border-blue-500/20 p-3 rounded-xl">
-                    <p className="text-[11px] text-blue-300">ℹ️ Data Pemilik otomatis terisi. Anda tidak perlu mengetik ulang.</p>
-                  </div>
-                ) : null}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <input type="text" required placeholder="Nama Lengkap *" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNama} onChange={(e) => setNewNama(e.target.value)} readOnly={selectedRumahInfo?.status_huni === 'pemilik' && newHubungan === 'Kepala Keluarga'} />
-                  <input type="text" placeholder="No. WhatsApp" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNoHp} onChange={(e) => setNewNoHp(e.target.value)} readOnly={selectedRumahInfo?.status_huni === 'pemilik' && newHubungan === 'Kepala Keluarga'} />
-                  <input type="text" inputMode="numeric" placeholder="NIK (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNik} onChange={(e) => handleAngkaChange(e, setNewNik)} readOnly={selectedRumahInfo?.status_huni === 'pemilik' && newHubungan === 'Kepala Keluarga'} />
-                  <input type="text" inputMode="numeric" placeholder="No. KK (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNoKk} onChange={(e) => handleAngkaChange(e, setNewNoKk)} readOnly={selectedRumahInfo?.status_huni === 'pemilik' && newHubungan === 'Kepala Keluarga'} />
-                </div>
-                <button type="submit" disabled={processingId !== null} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl text-xs transition mt-2">Simpan Kepala Keluarga</button>
-              </form>
-            )}
 
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
               <table className="w-full text-left text-xs">
@@ -390,47 +333,74 @@ export default function SekretarisDataWarga() {
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                   {loading ? <tr><td colSpan="4" className="text-center py-8 text-slate-500">Memuat...</td></tr> : 
-                   Object.values(groupedPenghuni).length === 0 ? <tr><td colSpan="4" className="text-center py-8 text-slate-500">Data tidak ditemukan.</td></tr> :
-                   Object.values(groupedPenghuni).map((grup, idx) => (
-                    <tr key={idx} className="hover:bg-slate-800/40">
-                      <td className="p-4 align-top">
-                        {grup.kepalaKeluarga ? (
-                          <>
-                            <div className="font-bold text-white text-sm">{grup.kepalaKeluarga.nama_lengkap}</div>
-                            <div className="text-[11px] text-teal-400 font-mono mt-0.5">{grup.no_rumah}</div>
-                            
-                            {/* List Anggota Keluarga (Read-Only di sini) */}
-                            {grup.anggota.length > 0 && (
-                              <div className="mt-3 pl-3 border-l-2 border-slate-700 space-y-1">
-                                {grup.anggota.map((a, i) => (
-                                  <div key={i} className="text-[11px] text-slate-300">
-                                    <span className="text-slate-500 mr-1">↳</span> 
-                                    {a.nama_lengkap} <span className="text-[9px] text-slate-500">({a.hubungan})</span>
-                                  </div>
-                                ))}
+                   listRumahPenghuni.length === 0 ? <tr><td colSpan="4" className="text-center py-8 text-slate-500">Data tidak ditemukan.</td></tr> :
+                   listRumahPenghuni.map((item, idx) => {
+                     const { warga, kepalaKeluarga, anggota } = item;
+                     const bisaTambahKK = warga.status_huni === 'sewa' && !kepalaKeluarga;
+
+                     return (
+                      <tr key={idx} className="hover:bg-slate-800/40">
+                        <td className="p-4 align-top">
+                          {kepalaKeluarga ? (
+                            <>
+                              <div className="font-bold text-white text-sm">{kepalaKeluarga.nama_lengkap}</div>
+                              <div className="text-[11px] text-teal-400 font-mono mt-0.5">{warga.no_rumah}</div>
+                              
+                              {anggota.length > 0 && (
+                                <div className="mt-3 pl-3 border-l-2 border-slate-700 space-y-1">
+                                  {anggota.map((a, i) => (
+                                    <div key={i} className="text-[11px] text-slate-300">
+                                      <span className="text-slate-500 mr-1">↳</span> 
+                                      {a.nama_lengkap} <span className="text-[9px] text-slate-500">({a.hubungan})</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div>
+                              <div className="text-slate-500 italic text-sm">
+                                {warga.status_huni === 'sewa' ? 'Belum ada Penyewa' : 'Tidak ada data penghuni'}
                               </div>
+                              <div className="text-[11px] text-teal-400 font-mono mt-0.5">{warga.no_rumah}</div>
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-4 align-top">
+                          {kepalaKeluarga ? (
+                            <span className="text-slate-300">Kepala Keluarga</span>
+                          ) : (
+                            <span className="text-slate-500">-</span>
+                          )}
+                        </td>
+                        <td className="p-4 align-top">
+                          {kepalaKeluarga ? (
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${kepalaKeluarga.tipe_penghuni === 'penyewa' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
+                              {kepalaKeluarga.tipe_penghuni === 'penyewa' ? '🔑 Penyewa' : '👑 Pemilik'}
+                            </span>
+                          ) : (
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${warga.status_huni === 'sewa' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
+                              {warga.status_huni === 'sewa' ? 'Sewa (Kosong)' : warga.status_huni}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4 text-right align-top">
+                          <div className="flex justify-end gap-2">
+                            {kepalaKeluarga && (
+                              <button onClick={() => openKelolaModal(kepalaKeluarga)} className="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] whitespace-nowrap transition flex items-center gap-1">
+                                ✏️ Kelola
+                              </button>
                             )}
-                          </>
-                        ) : (
-                          <div className="text-slate-500 italic">Data KK tidak ditemukan</div>
-                        )}
-                      </td>
-                      <td className="p-4 align-top">
-                        <span className="text-slate-300">Kepala Keluarga</span>
-                      </td>
-                      <td className="p-4 align-top">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${grup.kepalaKeluarga?.tipe_penghuni === 'penyewa' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
-                          {grup.kepalaKeluarga?.tipe_penghuni === 'penyewa' ? '🔑 Penyewa' : '👑 Pemilik'}
-                        </span>
-                      </td>
-                      <td className="p-4 text-right align-top">
-                         {/* HANYA ADA TOMBOL EDIT (KELOLA KELUARGA) */}
-                         <button onClick={() => openKelolaModal(grup.kepalaKeluarga)} className="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] whitespace-nowrap transition flex items-center gap-1 ml-auto">
-                           ✏️ Kelola
-                         </button>
-                      </td>
-                    </tr>
-                  ))}
+                            {bisaTambahKK && (
+                              <button onClick={() => openTambahKK(warga)} className="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] whitespace-nowrap transition flex items-center gap-1">
+                                + Tambah Penyewa
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -473,6 +443,31 @@ export default function SekretarisDataWarga() {
         </div>
       )}
 
+      {/* MODAL TAMBAH KK (PENYEWA BARU) */}
+      {showTambahKKModal && targetTambahKKWarga && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-white">🔑 Tambah Penyewa Baru</h3>
+                <p className="text-xs text-slate-400">Rumah: {targetTambahKKWarga.no_rumah}</p>
+              </div>
+              <button onClick={() => setShowTambahKKModal(false)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <form onSubmit={handleTambahKKSubmit} className="space-y-3">
+              <input type="text" required placeholder="Nama Lengkap Penyewa *" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNama} onChange={(e) => setNewNama(e.target.value)} />
+              <input type="text" inputMode="numeric" placeholder="NIK (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNik} onChange={(e) => handleAngkaChange(e, setNewNik)} />
+              <input type="text" inputMode="numeric" placeholder="No. KK (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNoKk} onChange={(e) => handleAngkaChange(e, setNewNoKk)} />
+              <input type="text" placeholder="No. WhatsApp" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNoHp} onChange={(e) => setNewNoHp(e.target.value)} />
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setShowTambahKKModal(false)} className="w-1/3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs">Batal</button>
+                <button type="submit" disabled={processingId === targetTambahKKWarga.id} className="w-2/3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-xl text-xs">{processingId === targetTambahKKWarga.id ? 'Menyimpan...' : 'Simpan Penyewa'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL KELOLA KELUARGA (EDIT ANGGOTA) */}
       {showKelolaModal && targetKepalaKeluarga && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -480,12 +475,11 @@ export default function SekretarisDataWarga() {
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <div>
                 <h3 className="text-base font-bold text-white">👥 Kelola Keluarga</h3>
-                <p className="text-xs text-slate-400">KK: {targetKepalaKeluarga.nama_lengkap} ({targetKepalaKeluarga.warga?.no_rumah})</p>
+                <p className="text-xs text-slate-400">KK: {targetKepalaKeluarga.nama_lengkap} ({targetKepalaKeluarga.warga?.no_rumah || targetKepalaKeluarga.warga?.no_rumah === undefined ? targetKepalaKeluarga.warga?.no_rumah : '...'})</p>
               </div>
               <button onClick={() => setShowKelolaModal(false)} className="text-slate-400 hover:text-white">✕</button>
             </div>
 
-            {/* List Anggota Keluarga Aktif */}
             <div className="space-y-2">
               <h4 className="text-sm font-semibold text-slate-300">Anggota Keluarga Aktif</h4>
               {penghuniList.filter(p => p.warga_id === targetKepalaKeluarga.warga_id && p.hubungan !== 'Kepala Keluarga').length === 0 ? (
@@ -513,7 +507,6 @@ export default function SekretarisDataWarga() {
               )}
             </div>
 
-            {/* Form Tambah Anggota Baru */}
             <div className="border-t border-slate-800 pt-4">
               <h4 className="text-sm font-semibold text-slate-300 mb-3">➕ Tambah Anggota Keluarga Baru</h4>
               <form onSubmit={handleTambahAnggotaSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
