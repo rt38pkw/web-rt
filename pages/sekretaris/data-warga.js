@@ -4,7 +4,8 @@ import { uploadKK } from '../../lib/iuran/storage';
 import Layout from '../../components/sekretaris/Layout';
 
 export default function SekretarisDataWarga() {
-  const [activeTab, setActiveTab] = useState('pemilik'); // 'pemilik' | 'penghuni'
+  // Default tab sekarang adalah 'penghuni'
+  const [activeTab, setActiveTab] = useState('penghuni'); 
   
   // State Data
   const [wargaList, setWargaList] = useState([]);
@@ -24,6 +25,10 @@ export default function SekretarisDataWarga() {
   const [password, setPassword] = useState('123456');
   const [statusHuni, setStatusHuni] = useState('pemilik');
 
+  // State Modal Detail Rumah (BARU)
+  const [showDetailRumah, setShowDetailRumah] = useState(false);
+  const [detailRumah, setDetailRumah] = useState(null);
+
   // State Modal Edit Data Rumah
   const [showEditModal, setShowEditModal] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -35,7 +40,7 @@ export default function SekretarisDataWarga() {
   const [editKategori, setEditKategori] = useState('Warga');
   const [editStatusHuni, setEditStatusHuni] = useState('pemilik');
 
-  // State Modal Kartu Keluarga (View & Add)
+  // State Modal Kartu Keluarga
   const [showKKModal, setShowKKModal] = useState(false);
   const [selectedKKWarga, setSelectedKKWarga] = useState(null);
   const [kkData, setKKData] = useState([]); 
@@ -73,7 +78,6 @@ export default function SekretarisDataWarga() {
     setLoading(true);
     const [wargaData, penghuniData] = await Promise.all([
       supabase.from('warga').select('*').order('no_rumah', { ascending: true }),
-      // ═══ PERBAIKAN: Hanya ambil yang approved ═══
       supabase.from('penghuni').select('*').eq('is_aktif', true).eq('status_verifikasi', 'approved')
     ]);
     if (wargaData.data) setWargaList(wargaData.data);
@@ -107,7 +111,13 @@ export default function SekretarisDataWarga() {
     }
   };
 
+  const openDetailRumah = (w) => {
+    setDetailRumah(w);
+    setShowDetailRumah(true);
+  };
+
   const openEditModal = (w) => {
+    setShowDetailRumah(false); // Tutup modal detail dulu
     setEditId(w.id); setEditNama(w.nama_lengkap || ''); setEditNoRumah(w.no_rumah || '');
     setEditNik(w.nik?.length === 16 ? w.nik : ''); setEditNoKk(w.no_kk?.length === 16 ? w.no_kk : ''); 
     setEditNoWa(w.no_wa || ''); setEditKategori(w.kategori || 'Warga'); setEditStatusHuni(w.status_huni || 'pemilik');
@@ -124,6 +134,15 @@ export default function SekretarisDataWarga() {
     setProcessingId(null);
     if (error) alert('Gagal: ' + error.message);
     else { setShowEditModal(false); fetchWarga(); }
+  };
+
+  const handleResetPassword = async (w) => {
+    if (!confirm(`Reset password untuk rumah ${w.no_rumah} menjadi "123456"?`)) return;
+    setProcessingId(w.id);
+    const { error } = await supabase.from('warga').update({ password: '123456', password_pending: null }).eq('id', w.id);
+    setProcessingId(null);
+    if (error) alert('Gagal: ' + error.message);
+    else { alert('✅ Password berhasil direset ke 123456.'); setShowDetailRumah(false); }
   };
 
   const handleSelesaikanSewa = async (w) => {
@@ -146,6 +165,7 @@ export default function SekretarisDataWarga() {
         }]);
       }
       alert('✅ Sewa selesai. Rumah kosong, penyewa diarsipkan, Pemilik diaktifkan.');
+      setShowDetailRumah(false);
       fetchWarga(); fetchPenghuni();
     } catch (err) { alert('Gagal: ' + err.message); } finally { setProcessingId(null); }
   };
@@ -155,6 +175,7 @@ export default function SekretarisDataWarga() {
     setProcessingId(w.id);
     try {
       await supabase.from('warga').delete().eq('id', w.id);
+      setShowDetailRumah(false);
       fetchWarga();
     } catch (err) { alert('Gagal: ' + err.message); } finally { setProcessingId(null); }
   };
@@ -209,7 +230,7 @@ export default function SekretarisDataWarga() {
         hubungan: newHubungan, 
         tipe_penghuni: 'penyewa', 
         is_aktif: true, 
-        status_verifikasi: 'approved', // Inputan sekretaris langsung approved
+        status_verifikasi: 'approved',
         url_kk: urlKK
       }]);
       if (error) throw error;
@@ -240,7 +261,7 @@ export default function SekretarisDataWarga() {
         hubungan: newHubungan,
         tipe_penghuni: 'penyewa', 
         is_aktif: true, 
-        status_verifikasi: 'approved' // Inputan sekretaris langsung approved
+        status_verifikasi: 'approved'
       }]);
       if (error) throw error;
 
@@ -297,62 +318,11 @@ export default function SekretarisDataWarga() {
         
         {/* HEADER TABS */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-2 flex gap-2">
-          <button onClick={() => setActiveTab('pemilik')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'pemilik' ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>🏠 Data Rumah</button>
           <button onClick={() => setActiveTab('penghuni')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'penghuni' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>👥 Data Penghuni (Aktif)</button>
+          <button onClick={() => setActiveTab('pemilik')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'pemilik' ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>🏠 Data Rumah</button>
         </div>
 
-        {/* ═══ TAB 1: DATA RUMAH ═══ */}
-        {activeTab === 'pemilik' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in">
-            <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4 h-fit">
-              <h2 className="text-base font-bold text-white">➕ Tambah Data Rumah</h2>
-              <form onSubmit={handleTambahWarga} className="space-y-3">
-                <input type="text" required placeholder="Nama Lengkap Pemilik *" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={namaLengkap} onChange={(e) => setNamaLengkap(e.target.value)} />
-                <input type="text" required placeholder="No. Rumah (Cth: A1 - 06) *" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={noRumah} onChange={(e) => setNoRumah(e.target.value)} />
-                <div className="grid grid-cols-2 gap-2">
-                  <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={statusHuni} onChange={(e) => setStatusHuni(e.target.value)}>
-                    <option value="pemilik">Dihuni Pemilik</option>
-                    <option value="sewa">Disewakan</option>
-                    <option value="kosong">Kosong</option>
-                  </select>
-                  <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={kategori} onChange={(e) => setKategori(e.target.value)}>
-                    <option value="Warga">Warga</option>
-                    <option value="Usaha">Usaha</option>
-                  </select>
-                </div>
-                <input type="text" inputMode="numeric" placeholder="NIK (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={nik} onChange={(e) => handleAngkaChange(e, setNik)} />
-                <input type="text" inputMode="numeric" placeholder="No. KK (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={noKk} onChange={(e) => handleAngkaChange(e, setNoKk)} />
-                <input type="text" placeholder="No. WhatsApp" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={noWa} onChange={(e) => setNoWa(e.target.value)} />
-                <button type="submit" disabled={isSubmitting} className="w-full bg-teal-600 hover:bg-teal-500 text-white font-semibold py-2.5 rounded-xl text-xs transition">{isSubmitting ? 'Menyimpan...' : 'Simpan Data Rumah'}</button>
-              </form>
-            </div>
-
-            <div className="lg:col-span-2 space-y-3">
-              <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl"><input type="text" placeholder="Cari nama pemilik atau no. rumah..." className="w-full bg-transparent text-xs text-white focus:outline-none" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-950 text-slate-400"><tr><th className="p-4">Pemilik / Rumah</th><th className="p-4">Status</th><th className="p-4 text-right">Aksi</th></tr></thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {filteredWarga.map(w => (
-                      <tr key={w.id} className="hover:bg-slate-800/40">
-                        <td className="p-4"><div className="font-semibold text-white">{w.nama_lengkap}</div><div className="text-[10px] text-teal-400 font-mono">{w.no_rumah}</div></td>
-                        <td className="p-4"><span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${w.status_huni === 'sewa' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>{w.status_huni}</span></td>
-                        <td className="p-4 text-right flex justify-end gap-1.5">
-                          <button onClick={() => openEditModal(w)} className="bg-blue-600/20 text-blue-400 p-2 rounded-lg" title="Edit Data Rumah">✏️</button>
-                          <button onClick={() => { if(confirm('Reset password ke 123456?')) supabase.from('warga').update({password:'123456'}).eq('id',w.id).then(()=>alert('Password direset!')) }} className="bg-amber-600/20 text-amber-400 p-2 rounded-lg" title="Reset Password">🔑</button>
-                          {w.status_huni === 'sewa' && <button onClick={() => handleSelesaikanSewa(w)} className="bg-purple-600/20 text-purple-400 p-2 rounded-lg" title="Selesaikan Sewa">🚪</button>}
-                          <button onClick={() => handleHapusWarga(w)} className="bg-rose-600/20 text-rose-400 p-2 rounded-lg" title="Hapus Data Rumah">🗑️</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ═══ TAB 2: PENGHUNI ═══ */}
+        {/* ═══ TAB 1: DATA PENGHUNI (DEFAULT) ═══ */}
         {activeTab === 'penghuni' && (
           <div className="space-y-3 animate-in fade-in">
             <div className="flex gap-3">
@@ -437,7 +407,119 @@ export default function SekretarisDataWarga() {
           </div>
         )}
 
+        {/* ═══ TAB 2: DATA RUMAH ═══ */}
+        {activeTab === 'pemilik' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in">
+            <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4 h-fit">
+              <h2 className="text-base font-bold text-white">➕ Tambah Data Rumah</h2>
+              <form onSubmit={handleTambahWarga} className="space-y-3">
+                <input type="text" required placeholder="Nama Lengkap Pemilik *" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={namaLengkap} onChange={(e) => setNamaLengkap(e.target.value)} />
+                <input type="text" required placeholder="No. Rumah (Cth: A1 - 06) *" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={noRumah} onChange={(e) => setNoRumah(e.target.value)} />
+                <div className="grid grid-cols-2 gap-2">
+                  <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={statusHuni} onChange={(e) => setStatusHuni(e.target.value)}>
+                    <option value="pemilik">Dihuni Pemilik</option>
+                    <option value="sewa">Disewakan</option>
+                    <option value="kosong">Kosong</option>
+                  </select>
+                  <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={kategori} onChange={(e) => setKategori(e.target.value)}>
+                    <option value="Warga">Warga</option>
+                    <option value="Usaha">Usaha</option>
+                  </select>
+                </div>
+                <input type="text" inputMode="numeric" placeholder="NIK (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={nik} onChange={(e) => handleAngkaChange(e, setNik)} />
+                <input type="text" inputMode="numeric" placeholder="No. KK (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={noKk} onChange={(e) => handleAngkaChange(e, setNoKk)} />
+                <input type="text" placeholder="No. WhatsApp" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={noWa} onChange={(e) => setNoWa(e.target.value)} />
+                <button type="submit" disabled={isSubmitting} className="w-full bg-teal-600 hover:bg-teal-500 text-white font-semibold py-2.5 rounded-xl text-xs transition">{isSubmitting ? 'Menyimpan...' : 'Simpan Data Rumah'}</button>
+              </form>
+            </div>
+
+            <div className="lg:col-span-2 space-y-3">
+              <div className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl"><input type="text" placeholder="Cari nama pemilik atau no. rumah..." className="w-full bg-transparent text-xs text-white focus:outline-none" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-950 text-slate-400"><tr><th className="p-4">Pemilik / Rumah</th><th className="p-4">Status</th><th className="p-4 text-right">Aksi</th></tr></thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {filteredWarga.map(w => (
+                      <tr key={w.id} className="hover:bg-slate-800/40">
+                        <td className="p-4"><div className="font-semibold text-white">{w.nama_lengkap}</div><div className="text-[10px] text-teal-400 font-mono">{w.no_rumah}</div></td>
+                        <td className="p-4"><span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${w.status_huni === 'sewa' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>{w.status_huni}</span></td>
+                        <td className="p-4 text-right">
+                          {/* HANYA ADA TOMBOL LIHAT DETAIL */}
+                          <button onClick={() => openDetailRumah(w)} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-[10px] whitespace-nowrap transition flex items-center gap-1 ml-auto">
+                            👁️ Lihat Detail
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
+
+      {/* MODAL DETAIL RUMAH (POP-UP BARU) */}
+      {showDetailRumah && detailRumah && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white">🏠 Detail Data Rumah</h3>
+              <button onClick={() => setShowDetailRumah(false)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+            
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between border-b border-slate-800/50 pb-2">
+                <span className="text-slate-400">No. Rumah</span>
+                <span className="text-teal-400 font-bold font-mono">{detailRumah.no_rumah}</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-800/50 pb-2">
+                <span className="text-slate-400">Nama Pemilik</span>
+                <span className="text-white font-bold">{detailRumah.nama_lengkap}</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-800/50 pb-2">
+                <span className="text-slate-400">NIK</span>
+                <span className="text-white font-mono">{detailRumah.nik || '-'}</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-800/50 pb-2">
+                <span className="text-slate-400">No. KK</span>
+                <span className="text-white font-mono">{detailRumah.no_kk || '-'}</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-800/50 pb-2">
+                <span className="text-slate-400">WhatsApp</span>
+                <span className="text-white">{detailRumah.no_wa || '-'}</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-800/50 pb-2">
+                <span className="text-slate-400">Kategori</span>
+                <span className="text-white">{detailRumah.kategori}</span>
+              </div>
+              <div className="flex justify-between pb-2">
+                <span className="text-slate-400">Status Huni</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${detailRumah.status_huni === 'sewa' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>{detailRumah.status_huni}</span>
+              </div>
+            </div>
+
+            {/* TOMBOL AKSI DI DALAM MODAL DETAIL */}
+            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-800">
+              <button onClick={() => openEditModal(detailRumah)} className="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1">
+                ✏️ Edit Data
+              </button>
+              <button onClick={() => handleResetPassword(detailRumah)} disabled={processingId === detailRumah.id} className="bg-amber-600/20 hover:bg-amber-600 text-amber-400 hover:text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1">
+                🔑 Reset Sandi
+              </button>
+              {detailRumah.status_huni === 'sewa' && (
+                <button onClick={() => handleSelesaikanSewa(detailRumah)} disabled={processingId === detailRumah.id} className="col-span-2 bg-purple-600/20 hover:bg-purple-600 text-purple-400 hover:text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1">
+                  🚪 Selesaikan Sewa
+                </button>
+              )}
+              <button onClick={() => handleHapusWarga(detailRumah)} disabled={processingId === detailRumah.id} className="col-span-2 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1">
+                🗑️ Hapus Data Rumah
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL EDIT RUMAH */}
       {showEditModal && (
@@ -532,7 +614,7 @@ export default function SekretarisDataWarga() {
                       ))}
                     </div>
 
-                    {/* Form Tambah Anggota & Update KK (Hanya muncul saat Kelola Mode) */}
+                    {/* Form Tambah Anggota & Update KK */}
                     {isKelolaMode && (
                       <form onSubmit={handleTambahAnggotaSubmit} className="bg-indigo-950/20 border border-indigo-500/30 p-3 rounded-xl space-y-3 mt-4">
                         <h5 className="text-xs font-bold text-indigo-300">+ Tambah Anggota / Update KK</h5>
