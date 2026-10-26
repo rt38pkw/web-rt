@@ -16,6 +16,7 @@ export default function SekretarisRonda() {
   const [showModal, setShowModal] = useState(false);
   const [namaPeriode, setNamaPeriode] = useState('');
   const [tglMulai, setTglMulai] = useState('');
+  const [tipePeriode, setTipePeriode] = useState('auto'); // 'auto' | 'custom'
   const [tglSelesai, setTglSelesai] = useState('');
   const [jamMulai, setJamMulai] = useState('23:00');
   const [jamSelesai, setJamSelesai] = useState('02:00');
@@ -51,12 +52,23 @@ export default function SekretarisRonda() {
     e.preventDefault();
     if (!namaPeriode.trim() || !tglMulai) return alert('Nama & Tanggal Wajib diisi!');
 
+    let finalTglSelesai = null;
+    if (tipePeriode === 'custom' && tglSelesai) {
+      finalTglSelesai = tglSelesai;
+    }
+
     setProcessing(true);
     try {
       const { error } = await supabase.from('periode_ronda').insert([{
-        nama_periode: namaPeriode.trim(), tanggal_mulai: tglMulai, tanggal_selesai: tglSelesai || null,
-        jam_mulai: jamMulai, jam_selesai: jamSelesai, jam_reminder: jamReminder,
-        jumlah_per_grup: Number(jumlahPerGrup), status: 'draft'
+        nama_periode: namaPeriode.trim(), 
+        tanggal_mulai: tglMulai, 
+        tanggal_selesai: finalTglSelesai,
+        tipe_periode: tipePeriode,
+        jam_mulai: jamMulai, 
+        jam_selesai: jamSelesai, 
+        jam_reminder: jamReminder,
+        jumlah_per_grup: Number(jumlahPerGrup), 
+        status: 'draft'
       }]);
       if (error) throw error;
       
@@ -112,7 +124,7 @@ export default function SekretarisRonda() {
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  // ═══ FUNGSI GENERATE (ANTREAN MURNI / QUEUE) ═══
+  // ═══ FUNGSI GENERATE (STRICT SLOT + SWAP) ═══
   const handleGenerateDraft = async () => {
     if (isPublished) return alert('Jadwal sudah di-publish. Tidak bisa generate ulang.');
     if (!confirm('Generate ulang akan menimpa draft saat ini. Lanjutkan?')) return;
@@ -130,81 +142,115 @@ export default function SekretarisRonda() {
       if (penghuni.length < 2) throw new Error('Peserta ronda terlalu sedikit.');
 
       const N = Number(selectedPeriode.jumlah_per_grup) || 3;
-      const totalDays = Math.ceil(penghuni.length / N) * 3; // 3 siklus penuh, tanpa label putaran
+      const totalPeople = penghuni.length;
+      const numGroups = Math.ceil(totalPeople / N);
       
-      // Buat Antrean (Acak awal biar tidak monoton)
-      let queue = [...penghuni].sort(() => 0.5 - Math.random());
-      
+      // Tentukan total hari berdasarkan tipe periode
+      let totalDays = 0;
+      if (selectedPeriode.tipe_periode === 'custom' && selectedPeriode.tanggal_selesai) {
+        const start = new Date(selectedPeriode.tanggal_mulai);
+        const end = new Date(selectedPeriode.tanggal_selesai);
+        const diffTime = Math.abs(end - start);
+        totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      } else {
+        totalDays = numGroups * 3; // 3 putaran
+      }
+
+      // 1. Bagi Peserta ke dalam Grup
+      const shuffled = [...penghuni].sort(() => 0.5 - Math.random());
+      let grupArr = [];
+      let currentIdx = 0;
+      for (let i = 0; i < numGroups; i++) {
+        let ukuran = N;
+        if (i === numGroups - 1) ukuran = totalPeople - currentIdx;
+        grupArr.push({ 
+          id: i + 1, 
+          anggota: shuffled.slice(currentIdx, currentIdx + ukuran).map(p => ({...p})) 
+        });
+        currentIdx += ukuran;
+      }
+
+      // 2. Tempel ke Tanggal (Strict Slot)
       const hariArr = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-      const startDate = new Date(selectedPeriode.tanggal_mulai);
-      const draft = [];
-      let anyConflict = false;
+      let startDate = new Date(selectedPeriode.tanggal_mulai);
+      let draft = [];
 
       for (let d = 0; d < totalDays; d++) {
         const date = new Date(startDate);
         date.setDate(date.getDate() + d);
         const dateStr = date.toISOString().split('T')[0];
         const dayName = hariArr[date.getDay()];
-
-        const chosen = [];
-        let attempts = 0;
         
-        // Ambil N orang dari antrean
-        while (chosen.length < N && attempts < queue.length) {
-          const candidate = queue.shift(); // Ambil dari depan
-          
-          // Cek apakah boleh ronda hari ini
-          let allowed = true;
-          if (candidate.hari_ronda_khusus) {
-            const arr = candidate.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
-            if (!arr.includes(dayName.toLowerCase())) allowed = false;
-          }
-
-          if (allowed) {
-            chosen.push(candidate);
-            attempts = 0; // Reset attempts jika dapat orang
-          } else {
-            queue.push(candidate); // Taruh di belakang antrean
-            attempts++;
-          }
-        }
-
-        // Jika antrean habis tapi belum dapat N orang, paksa ambil dari sisa
-        if (chosen.length < N) {
-          while (chosen.length < N && queue.length > 0) {
-            chosen.push(queue.shift());
-          }
-        }
-
-        // Cek konflik (jika ada yang terpaksa masuk)
-        const conflict = chosen.some(p => {
-          if (!p.hari_ronda_khusus) return false;
-          const allowed = p.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
-          return !allowed.includes(dayName.toLowerCase());
-        });
-
-        if (conflict) anyConflict = true;
-
+        const grupIdx = d % numGroups;
+        const grup = grupArr[grupIdx];
+        
         draft.push({
           id: `d-${d}`,
           tanggal: dateStr,
           hari: dayName,
-          grup_id: (d % Math.ceil(penghuni.length / N)) + 1,
-          petugas: chosen,
+          grup_id: grup.id,
+          petugas: [...grup.anggota], // Copy array
           is_libur: false,
-          has_conflict: conflict,
-          catatan: conflict ? 'Bentrok aturan hari khusus' : ''
+          has_conflict: false,
+          catatan: ''
         });
+      }
 
-        // Jika antrean kosong (semua orang sudah dapat), isi ulang antrean untuk siklus berikutnya
-        if (queue.length === 0 && d < totalDays - 1) {
-           queue = [...penghuni].sort(() => 0.5 - Math.random());
+      // 3. SWAP ALGORITMA (Fair Swap)
+      let anyConflict = false;
+      for (let i = 0; i < draft.length; i++) {
+        const day = draft[i];
+        
+        for (let j = 0; j < day.petugas.length; j++) {
+          const p = day.petugas[j];
+          
+          if (p.hari_ronda_khusus) {
+            const allowed = p.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
+            if (!allowed.includes(day.hari.toLowerCase())) {
+              // Butuh Swap!
+              let swapped = false;
+              
+              // Cari hari lain (k) yang mana p diperbolehkan
+              for (let k = 0; k < draft.length; k++) {
+                if (i === k) continue;
+                const targetDay = draft[k];
+                
+                if (allowed.includes(targetDay.hari.toLowerCase())) {
+                  // Cari orang di targetDay yang bisa dipindah ke 'day'
+                  for (let l = 0; l < targetDay.petugas.length; l++) {
+                    const q = targetDay.petugas[l];
+                    let qAllowedHere = true;
+                    
+                    if (q.hari_ronda_khusus) {
+                      const qAllowed = q.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
+                      if (!qAllowed.includes(day.hari.toLowerCase())) qAllowedHere = false;
+                    }
+
+                    if (qAllowedHere) {
+                      // TUKAR!
+                      day.petugas[j] = q;
+                      targetDay.petugas[l] = p;
+                      swapped = true;
+                      break;
+                    }
+                  }
+                }
+                if (swapped) break;
+              }
+
+              if (!swapped) {
+                day.has_conflict = true;
+                day.catatan = `${p.nama_lengkap} hanya bisa ${p.hari_ronda_khusus}`;
+                anyConflict = true;
+              }
+            }
+          }
         }
       }
 
       setDraftData(draft);
       setHasConflict(anyConflict);
-      alert('✅ Draft di-generate dengan sistem antrean adil!');
+      alert('✅ Draft di-generate dengan logika Strict Slot + Swap!');
     } catch (err) { alert('Gagal generate: ' + err.message); } finally { setIsGenerating(false); }
   };
 
@@ -280,7 +326,7 @@ export default function SekretarisRonda() {
   const formatTanggal = (dateStr) => dateStr ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(dateStr)) : '-';
   const formatJam = (timeStr) => timeStr ? timeStr.substring(0, 5) : '-';
 
-  // ═══ RENDER DETAIL (TABEL RAPI) ═══
+  // ═══ RENDER DETAIL ═══
   if (viewMode === 'detail' && selectedPeriode) {
     return (
       <Layout>
@@ -433,7 +479,7 @@ export default function SekretarisRonda() {
                     {periodeList.map((p) => (
                       <tr key={p.id} className="hover:bg-slate-800/40">
                         <td className="p-4"><div className="font-bold text-white text-sm">{p.nama_periode}</div></td>
-                        <td className="p-4 text-slate-300">{formatTanggal(p.tanggal_mulai)} {p.tanggal_selesai ? ` - ${formatTanggal(p.tanggal_selesai)}` : ''}</td>
+                        <td className="p-4 text-slate-300">{formatTanggal(p.tanggal_mulai)} {p.tanggal_selesai ? ` - ${formatTanggal(p.tanggal_selesai)}` : `(${p.tipe_periode === 'auto' ? '3 Putaran' : 'Custom'})`}</td>
                         <td className="p-4 text-slate-300">{formatJam(p.jam_mulai)} - {formatJam(p.jam_selesai)} WIB<div className="text-[10px] text-indigo-400 mt-0.5">{p.jumlah_per_grup || 3} Orang / Grup</div></td>
                         <td className="p-4"><span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${p.status === 'published' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>{p.status}</span></td>
                         <td className="p-4 text-right">
@@ -514,16 +560,33 @@ export default function SekretarisRonda() {
             </div>
             <form onSubmit={handleBuatPeriode} className="space-y-3">
               <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Nama Periode *</label><input type="text" required placeholder="Contoh: Desember 2026" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={namaPeriode} onChange={(e) => setNamaPeriode(e.target.value)} /></div>
+              
               <div className="grid grid-cols-2 gap-2">
                 <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Tanggal Mulai *</label><input type="date" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white [color-scheme:dark]" value={tglMulai} onChange={(e) => setTglMulai(e.target.value)} /></div>
-                <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Tanggal Selesai</label><input type="date" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white [color-scheme:dark]" value={tglSelesai} onChange={(e) => setTglSelesai(e.target.value)} /></div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Tipe Periode *</label>
+                  <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={tipePeriode} onChange={(e) => setTipePeriode(e.target.value)}>
+                    <option value="auto">3 Putaran Otomatis</option>
+                    <option value="custom">Custom (Tgl Selesai)</option>
+                  </select>
+                </div>
               </div>
-              <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Jumlah Personil / Grup *</label><input type="number" min="2" max="10" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={jumlahPerGrup} onChange={(e) => setJumlahPerGrup(e.target.value)} /></div>
+
+              {tipePeriode === 'custom' && (
+                <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Tanggal Selesai *</label><input type="date" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white [color-scheme:dark]" value={tglSelesai} onChange={(e) => setTglSelesai(e.target.value)} /></div>
+              )}
+
               <div className="grid grid-cols-3 gap-2">
                 <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Jam Mulai</label><input type="time" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2.5 text-xs text-white [color-scheme:dark]" value={jamMulai} onChange={(e) => setJamMulai(e.target.value)} /></div>
                 <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Jam Selesai</label><input type="time" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2.5 text-xs text-white [color-scheme:dark]" value={jamSelesai} onChange={(e) => setJamSelesai(e.target.value)} /></div>
                 <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Reminder</label><input type="time" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2.5 text-xs text-white [color-scheme:dark]" value={jamReminder} onChange={(e) => setJamReminder(e.target.value)} /></div>
               </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Jumlah Personil / Grup *</label>
+                <input type="number" min="2" max="10" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={jumlahPerGrup} onChange={(e) => setJumlahPerGrup(e.target.value)} />
+              </div>
+
               <div className="flex gap-2 pt-3 border-t border-slate-800 mt-4">
                 <button type="button" onClick={() => setShowModal(false)} className="w-1/3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs">Batal</button>
                 <button type="submit" disabled={processing} className="w-2/3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl text-xs transition">{processing ? 'Menyimpan...' : 'Simpan Periode'}</button>
