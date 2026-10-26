@@ -25,7 +25,7 @@ export default function SekretarisDataWarga() {
   const [password, setPassword] = useState('123456');
   const [statusHuni, setStatusHuni] = useState('pemilik');
 
-  // State Modal Detail Rumah (BARU)
+  // State Modal Detail Rumah
   const [showDetailRumah, setShowDetailRumah] = useState(false);
   const [detailRumah, setDetailRumah] = useState(null);
 
@@ -47,11 +47,14 @@ export default function SekretarisDataWarga() {
   const [isAddingNewKK, setIsAddingNewKK] = useState(false); 
   const [isKelolaMode, setIsKelolaMode] = useState(false); 
 
-  // State Form Tambah/Edit KK
+  // State Form Tambah/Edit KK & Anggota
   const [newNama, setNewNama] = useState('');
   const [newNik, setNewNik] = useState('');
   const [newNoKk, setNewNoKk] = useState('');
   const [newNoHp, setNewNoHp] = useState('');
+  const [newTglLahir, setNewTglLahir] = useState(''); // BARU
+  const [newJenisKelamin, setNewJenisKelamin] = useState('L'); // BARU
+  const [newPekerjaan, setNewPekerjaan] = useState(''); // BARU
   const [newHubungan, setNewHubungan] = useState('Kepala Keluarga');
   const [newFileKK, setNewFileKK] = useState(null);
   const [previewKK, setPreviewKK] = useState(null);
@@ -78,6 +81,7 @@ export default function SekretarisDataWarga() {
     setLoading(true);
     const [wargaData, penghuniData] = await Promise.all([
       supabase.from('warga').select('*').order('no_rumah', { ascending: true }),
+      // Hanya ambil yang approved
       supabase.from('penghuni').select('*').eq('is_aktif', true).eq('status_verifikasi', 'approved')
     ]);
     if (wargaData.data) setWargaList(wargaData.data);
@@ -198,6 +202,7 @@ export default function SekretarisDataWarga() {
     setIsKelolaMode(false);
     
     setNewNama(''); setNewNik(''); setNewNoKk(''); setNewNoHp(''); 
+    setNewTglLahir(''); setNewJenisKelamin('L'); setNewPekerjaan(''); // RESET FIELD BARU
     setNewHubungan('Kepala Keluarga'); setNewFileKK(null); setPreviewKK(null);
     setShowKKModal(true);
   };
@@ -227,6 +232,9 @@ export default function SekretarisDataWarga() {
         nik: newNik.trim() || null, 
         no_kk: newNoKk.trim() || null,
         no_hp: newNoHp.trim() || null, 
+        tanggal_lahir: newTglLahir || null, // FIELD BARU
+        jenis_kelamin: newJenisKelamin, // FIELD BARU
+        pekerjaan: newPekerjaan.trim() || null, // FIELD BARU
         hubungan: newHubungan, 
         tipe_penghuni: 'penyewa', 
         is_aktif: true, 
@@ -258,6 +266,9 @@ export default function SekretarisDataWarga() {
         warga_id: selectedKKWarga.id,
         nama_lengkap: newNama.trim(),
         nik: newNik.trim() || null,
+        tanggal_lahir: newTglLahir || null, // FIELD BARU
+        jenis_kelamin: newJenisKelamin, // FIELD BARU
+        pekerjaan: newPekerjaan.trim() || null, // FIELD BARU
         hubungan: newHubungan,
         tipe_penghuni: 'penyewa', 
         is_aktif: true, 
@@ -266,7 +277,7 @@ export default function SekretarisDataWarga() {
       if (error) throw error;
 
       alert('✅ Anggota keluarga berhasil ditambahkan!');
-      setNewNama(''); setNewNik(''); setNewHubungan('Istri'); setNewFileKK(null); setPreviewKK(null);
+      setNewNama(''); setNewNik(''); setNewTglLahir(''); setNewJenisKelamin('L'); setNewPekerjaan(''); setNewHubungan('Istri'); setNewFileKK(null); setPreviewKK(null);
       
       const { data } = await supabase.from('penghuni').select('*').eq('warga_id', selectedKKWarga.id).eq('is_aktif', true);
       const kk = data.find(p => p.hubungan === 'Kepala Keluarga');
@@ -444,7 +455,6 @@ export default function SekretarisDataWarga() {
                         <td className="p-4"><div className="font-semibold text-white">{w.nama_lengkap}</div><div className="text-[10px] text-teal-400 font-mono">{w.no_rumah}</div></td>
                         <td className="p-4"><span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${w.status_huni === 'sewa' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>{w.status_huni}</span></td>
                         <td className="p-4 text-right">
-                          {/* HANYA ADA TOMBOL LIHAT DETAIL */}
                           <button onClick={() => openDetailRumah(w)} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-[10px] whitespace-nowrap transition flex items-center gap-1 ml-auto">
                             👁️ Lihat Detail
                           </button>
@@ -460,7 +470,7 @@ export default function SekretarisDataWarga() {
 
       </div>
 
-      {/* MODAL DETAIL RUMAH (POP-UP BARU) */}
+      {/* MODAL DETAIL RUMAH */}
       {showDetailRumah && detailRumah && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4">
@@ -580,6 +590,17 @@ export default function SekretarisDataWarga() {
                     <input type="text" inputMode="numeric" placeholder="No. KK (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNoKk} onChange={(e) => handleAngkaChange(e, setNewNoKk)} />
                     <input type="text" placeholder="No. WhatsApp" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newNoHp} onChange={(e) => setNewNoHp(e.target.value)} />
                     
+                    {/* FIELD BARU */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="date" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newTglLahir} onChange={(e) => setNewTglLahir(e.target.value)} />
+                      <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newJenisKelamin} onChange={(e) => setNewJenisKelamin(e.target.value)}>
+                        <option value="L">Laki-laki</option>
+                        <option value="P">Perempuan</option>
+                      </select>
+                    </div>
+                    <input type="text" placeholder="Pekerjaan (Opsional)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={newPekerjaan} onChange={(e) => setNewPekerjaan(e.target.value)} />
+                    {/* END FIELD BARU */}
+
                     <div className="pt-2">
                       <label className="block text-xs text-slate-300 mb-1">Upload Foto KK *</label>
                       <input type="file" accept="image/*" onChange={handleFileKKChange} className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-600/20 file:text-indigo-400 hover:file:bg-indigo-600/30" />
@@ -605,6 +626,8 @@ export default function SekretarisDataWarga() {
                           <div>
                             <div className="text-sm font-bold text-white">{a.nama_lengkap}</div>
                             <div className="text-[10px] text-slate-400">NIK: {a.nik || '-'}</div>
+                            <div className="text-[10px] text-slate-400">Tgl Lahir: {a.tanggal_lahir || '-'} | {a.jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki'}</div>
+                            {a.pekerjaan && <div className="text-[10px] text-slate-400">Kerja: {a.pekerjaan}</div>}
                             <div className={`text-[10px] font-bold mt-1 ${a.hubungan === 'Kepala Keluarga' ? 'text-indigo-400' : 'text-slate-400'}`}>{a.hubungan}</div>
                           </div>
                           {isKelolaMode && a.hubungan !== 'Kepala Keluarga' && (
@@ -627,6 +650,18 @@ export default function SekretarisDataWarga() {
 
                         <input type="text" required placeholder="Nama Lengkap Anggota *" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newNama} onChange={(e) => setNewNama(e.target.value)} />
                         <input type="text" inputMode="numeric" placeholder="NIK Anggota (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newNik} onChange={(e) => handleAngkaChange(e, setNewNik)} />
+                        
+                        {/* FIELD BARU */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <input type="date" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newTglLahir} onChange={(e) => setNewTglLahir(e.target.value)} />
+                          <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newJenisKelamin} onChange={(e) => setNewJenisKelamin(e.target.value)}>
+                            <option value="L">Laki-laki</option>
+                            <option value="P">Perempuan</option>
+                          </select>
+                        </div>
+                        <input type="text" placeholder="Pekerjaan (Opsional)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newPekerjaan} onChange={(e) => setNewPekerjaan(e.target.value)} />
+                        {/* END FIELD BARU */}
+
                         <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newHubungan} onChange={(e) => setNewHubungan(e.target.value)}>
                           <option value="Istri">Istri</option>
                           <option value="Anak">Anak</option>
