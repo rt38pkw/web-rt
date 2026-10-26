@@ -164,6 +164,8 @@ export default function SekretarisDataWarga() {
     setKKData([kk, ...anggota]);
     setIsAddingNewKK(false);
     setIsKelolaMode(false);
+    setNewFileKK(null);
+    setPreviewKK(null);
     setShowKKModal(true);
   };
 
@@ -173,7 +175,6 @@ export default function SekretarisDataWarga() {
     setIsAddingNewKK(true);
     setIsKelolaMode(false);
     
-    // Reset form
     setNewNama(''); setNewNik(''); setNewNoKk(''); setNewNoHp(''); 
     setNewHubungan('Kepala Keluarga'); setNewFileKK(null); setPreviewKK(null);
     setShowKKModal(true);
@@ -192,14 +193,11 @@ export default function SekretarisDataWarga() {
     if (!newNama.trim()) { alert('Nama wajib diisi!'); return; }
     if (newNik.length > 0 && newNik.length < 16) { alert('NIK harus 16 digit!'); return; }
     if (newNoKk.length > 0 && newNoKk.length < 16) { alert('No. KK harus 16 digit!'); return; }
-    if (!newFileKK && !isKelolaMode) { alert('Foto KK wajib diupload untuk pendaftaran baru!'); return; }
+    if (!newFileKK) { alert('Foto KK wajib diupload untuk pendaftaran baru!'); return; }
 
     setProcessingId(selectedKKWarga.id);
     try {
-      let urlKK = null;
-      if (newFileKK) {
-        urlKK = await uploadKK(newFileKK, selectedKKWarga.id);
-      }
+      const urlKK = await uploadKK(newFileKK, selectedKKWarga.id);
 
       const { error } = await supabase.from('penghuni').insert([{
         warga_id: selectedKKWarga.id, 
@@ -228,6 +226,14 @@ export default function SekretarisDataWarga() {
 
     setProcessingId(selectedKKWarga.id);
     try {
+      // 1. Update KK jika ada file baru
+      let urlKK = kkData[0]?.url_kk || null;
+      if (newFileKK) {
+        urlKK = await uploadKK(newFileKK, selectedKKWarga.id);
+        await supabase.from('penghuni').update({ url_kk: urlKK }).eq('id', kkData[0].id);
+      }
+
+      // 2. Insert Anggota Baru
       const { error } = await supabase.from('penghuni').insert([{
         warga_id: selectedKKWarga.id,
         nama_lengkap: newNama.trim(),
@@ -240,7 +246,8 @@ export default function SekretarisDataWarga() {
       if (error) throw error;
 
       alert('✅ Anggota keluarga berhasil ditambahkan!');
-      setNewNama(''); setNewNik(''); setNewHubungan('Istri');
+      setNewNama(''); setNewNik(''); setNewHubungan('Istri'); setNewFileKK(null); setPreviewKK(null);
+      
       // Refresh data KK di modal
       const { data } = await supabase.from('penghuni').select('*').eq('warga_id', selectedKKWarga.id).eq('is_aktif', true);
       const kk = data.find(p => p.hubungan === 'Kepala Keluarga');
@@ -528,19 +535,27 @@ export default function SekretarisDataWarga() {
                       ))}
                     </div>
 
-                    {/* Form Tambah Anggota (Hanya muncul saat Kelola Mode) */}
+                    {/* Form Tambah Anggota & Update KK (Hanya muncul saat Kelola Mode) */}
                     {isKelolaMode && (
                       <form onSubmit={handleTambahAnggotaSubmit} className="bg-indigo-950/20 border border-indigo-500/30 p-3 rounded-xl space-y-3 mt-4">
-                        <h5 className="text-xs font-bold text-indigo-300">+ Tambah Anggota</h5>
-                        <input type="text" required placeholder="Nama Lengkap *" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newNama} onChange={(e) => setNewNama(e.target.value)} />
-                        <input type="text" inputMode="numeric" placeholder="NIK (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newNik} onChange={(e) => handleAngkaChange(e, setNewNik)} />
+                        <h5 className="text-xs font-bold text-indigo-300">+ Tambah Anggota / Update KK</h5>
+                        
+                        <div className="pt-1 pb-2 border-b border-slate-800">
+                          <label className="block text-[10px] text-slate-400 mb-1">Ganti Foto KK (Opsional)</label>
+                          <input type="file" accept="image/*" onChange={handleFileKKChange} className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-blue-600/20 file:text-blue-400 hover:file:bg-blue-600/30" />
+                          {previewKK && <p className="text-[9px] text-emerald-400 mt-1">✓ Foto baru siap disimpan</p>}
+                        </div>
+
+                        <input type="text" required placeholder="Nama Lengkap Anggota *" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newNama} onChange={(e) => setNewNama(e.target.value)} />
+                        <input type="text" inputMode="numeric" placeholder="NIK Anggota (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newNik} onChange={(e) => handleAngkaChange(e, setNewNik)} />
                         <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" value={newHubungan} onChange={(e) => setNewHubungan(e.target.value)}>
                           <option value="Istri">Istri</option>
                           <option value="Anak">Anak</option>
                           <option value="Saudara">Saudara</option>
                           <option value="Lainnya">Lainnya</option>
                         </select>
-                        <button type="submit" disabled={processingId === selectedKKWarga.id} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 rounded-xl text-xs transition">Simpan Anggota</button>
+                        
+                        <button type="submit" disabled={processingId === selectedKKWarga.id} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 rounded-xl text-xs transition mt-2">Simpan Perubahan</button>
                       </form>
                     )}
                   </>
@@ -549,15 +564,16 @@ export default function SekretarisDataWarga() {
 
               {/* Sisi Kanan: Gambar KK */}
               <div className="w-full md:w-1/2 bg-black/50 relative flex items-center justify-center overflow-auto p-4">
-                {isAddingNewKK ? (
-                  previewKK ? (
-                    <img src={previewKK} alt="Preview" className="max-w-full max-h-full object-contain rounded-lg" />
-                  ) : (
-                    <div className="text-slate-500 text-sm flex flex-col items-center gap-2">
-                      <span className="text-4xl">📸</span>
-                      <p>Belum ada foto KK yang dipilih.</p>
-                    </div>
-                  )
+                {previewKK ? (
+                   <div className="relative w-full h-full flex items-center justify-center">
+                     <img src={previewKK} alt="Preview Foto Baru" className="max-w-full max-h-full object-contain rounded-lg cursor-zoom-in" onClick={() => setZoomImage(previewKK)} />
+                     <span className="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] px-2 py-1 rounded">Foto Baru</span>
+                   </div>
+                ) : isAddingNewKK ? (
+                  <div className="text-slate-500 text-sm flex flex-col items-center gap-2">
+                    <span className="text-4xl">📸</span>
+                    <p>Pilih file foto KK di sebelah kiri.</p>
+                  </div>
                 ) : (
                   kkData[0]?.url_kk ? (
                     <img src={kkData[0].url_kk} alt="KK Terdaftar" className="max-w-full max-h-full object-contain rounded-lg cursor-zoom-in" onClick={() => setZoomImage(kkData[0].url_kk)} />
@@ -574,7 +590,7 @@ export default function SekretarisDataWarga() {
         </div>
       )}
 
-      {/* MODAL ZOOM GAMBAR (DI DALAM MODAL KK) */}
+      {/* MODAL ZOOM GAMBAR */}
       {zoomImage && (
         <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setZoomImage(null)}>
           <button className="absolute top-4 right-4 text-white text-3xl font-bold hover:text-rose-500 transition z-10" onClick={() => setZoomImage(null)}>✕</button>
