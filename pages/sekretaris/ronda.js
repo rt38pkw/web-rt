@@ -9,7 +9,7 @@ export default function SekretarisRonda() {
   const [periodeList, setPeriodeList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [viewMode, setViewMode] = useState('list'); // 'list' | 'detail'
+  const [viewMode, setViewMode] = useState('list'); 
   const [selectedPeriode, setSelectedPeriode] = useState(null);
 
   // State Modal Buat Periode
@@ -27,6 +27,7 @@ export default function SekretarisRonda() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
+  const [hasConflict, setHasConflict] = useState(false);
 
   // ═══ STATE ATURAN KHUSUS ═══
   const [wargaList, setWargaList] = useState([]);
@@ -82,8 +83,8 @@ export default function SekretarisRonda() {
     setSelectedPeriode(periode);
     setViewMode('detail');
     setIsPublished(periode.status === 'published');
+    setHasConflict(false);
     
-    // Cek apakah sudah ada jadwal tersimpan
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -95,15 +96,12 @@ export default function SekretarisRonda() {
       if (error) throw error;
       
       if (data && data.length > 0) {
-        // Format ulang agar sesuai dengan draftData
         const formatted = data.map(j => ({
-          id: j.id,
-          tanggal: j.tanggal,
+          id: j.id, tanggal: j.tanggal,
           hari: new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(new Date(j.tanggal)),
-          putaran: j.putaran,
-          grup_id: j.grup_id,
+          putaran: j.putaran, grup_id: j.grup_id,
           is_libur: j.status === 'libur',
-          has_conflict: false, // Untuk sementara false, karena sudah disimpan
+          has_conflict: false, // Default false saat load dari DB
           catatan: j.catatan_sistem || '',
           petugas: j.petugas.map(p => p.penghuni)
         }));
@@ -111,17 +109,13 @@ export default function SekretarisRonda() {
       } else {
         setDraftData([]);
       }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  // ═══ FUNGSI GENERATE DRAFT ═══
+  // ═══ FUNGSI GENERATE DRAFT (DENGAN FAIR SWAP CERDAS) ═══
   const handleGenerateDraft = async () => {
-    if (isPublished) return alert('Jadwal sudah di-publish. Kembalikan ke Draft untuk meng-generate ulang.');
-    if (!confirm('Generate ulang akan menghapus draft yang belum disimpan. Lanjutkan?')) return;
+    if (isPublished) return alert('Jadwal sudah di-publish. Tidak bisa generate ulang.');
+    if (!confirm('Generate ulang akan menimpa draft saat ini. Lanjutkan?')) return;
 
     setIsGenerating(true);
     try {
@@ -132,58 +126,75 @@ export default function SekretarisRonda() {
       if (error) throw error;
       if (penghuni.length < 2) throw new Error('Peserta ronda terlalu sedikit.');
 
-      const perGrup = selectedPeriode.jumlah_per_grup || 3;
+      const perGrup = Number(selectedPeriode.jumlah_per_grup) || 3;
       const totalPeserta = penghuni.length;
       let jumlahGrup = Math.floor(totalPeserta / perGrup);
       let sisa = totalPeserta % perGrup;
       if (sisa === 1) jumlahGrup = Math.max(1, jumlahGrup - 1); 
 
+      // Acak Awal
       const shuffled = [...penghuni].sort(() => 0.5 - Math.random());
-      const grupArr = [];
+      let grupArr = [];
       let currentIdx = 0;
       for (let i = 0; i < jumlahGrup; i++) {
         let ukuran = perGrup;
         if (i === jumlahGrup - 1) ukuran = totalPeserta - currentIdx;
-        grupArr.push({ id: i + 1, anggota: shuffled.slice(currentIdx, currentIdx + ukuran) });
+        grupArr.push({ 
+          id: i + 1, 
+          anggota: shuffled.slice(currentIdx, currentIdx + ukuran).map(p => ({...p})) // Deep Copy
+        });
         currentIdx += ukuran;
       }
 
       const hariArr = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
       let currentDate = new Date(selectedPeriode.tanggal_mulai);
       let tempDraft = [];
+      let anyConflict = false;
 
       for (let putaran = 1; putaran <= 3; putaran++) {
         for (let g = 0; g < grupArr.length; g++) {
           const grup = grupArr[g];
           const tglString = currentDate.toISOString().split('T')[0];
           const namaHari = hariArr[currentDate.getDay()];
-
-          let hasConflict = false;
-          let catatan = '';
+          
           let anggotaFinal = [...grup.anggota];
+          let catatan = '';
+          let rowConflict = false;
 
-          // Fair Swap
+          // FAIR SWAP ALGORITMA
           for (let i = 0; i < anggotaFinal.length; i++) {
             const p = anggotaFinal[i];
             if (p.hari_ronda_khusus) {
               const arrayHari = p.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
               if (!arrayHari.includes(namaHari.toLowerCase())) {
+                // Cari tukaran yang adil
                 let swapped = false;
                 for (let k = 0; k < grupArr.length; k++) {
-                  if (k === g) continue; 
-                  const calonTukar = grupArr[k].anggota.find(x => !x.hari_ronda_khusus || x.hari_ronda_khusus.toLowerCase().includes(namaHari.toLowerCase()));
+                  if (k === g) continue; // Jangan tukar dengan grup sendiri
+                  
+                  // Cari orang di grup k yang jadwal khususnya cocok dengan hari ini
+                  const calonTukar = grupArr[k].anggota.find(x => {
+                    if (!x.hari_ronda_khusus) return true; // Bebas
+                    const arrX = x.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
+                    return arrX.includes(namaHari.toLowerCase());
+                  });
+
                   if (calonTukar) {
-                    const idxP = anggotaFinal.indexOf(p);
-                    const idxX = grupArr[k].anggota.indexOf(calonTukar);
+                    const idxP = anggotaFinal.findIndex(x => x.id === p.id);
+                    const idxX = grupArr[k].anggota.findIndex(x => x.id === calonTukar.id);
+                    
+                    // Tukar posisi
                     anggotaFinal[idxP] = calonTukar;
                     grupArr[k].anggota[idxX] = p;
                     swapped = true;
                     break;
                   }
                 }
+                
                 if (!swapped) {
-                  hasConflict = true;
-                  catatan = `${p.nama_lengkap} hanya bisa hari ${p.hari_ronda_khusus}`;
+                  rowConflict = true;
+                  catatan = `${p.nama_lengkap} (${p.hari_ronda_khusus})`;
+                  anyConflict = true;
                   break;
                 }
               }
@@ -192,13 +203,14 @@ export default function SekretarisRonda() {
 
           tempDraft.push({
             id: `${putaran}-${grup.id}`, tanggal: tglString, hari: namaHari, putaran, grup_id: grup.id,
-            petugas: anggotaFinal, is_libur: false, has_conflict: hasConflict, catatan
+            petugas: anggotaFinal, is_libur: false, has_conflict: rowConflict, catatan
           });
           currentDate.setDate(currentDate.getDate() + 1);
         }
       }
       setDraftData(tempDraft);
-      alert('✅ Draft berhasil di-generate! Silakan periksa warna merah (jika ada).');
+      setHasConflict(anyConflict);
+      alert('✅ Draft di-generate! Periksa kotak berwarna merah jika ada konflik.');
     } catch (err) { alert('Gagal generate: ' + err.message); } finally { setIsGenerating(false); }
   };
 
@@ -209,17 +221,22 @@ export default function SekretarisRonda() {
     setDraftData(newDraft);
   };
 
-  // ═══ FUNGSI SIMPAN & PUBLISH KE DB ═══
+  // ═══ FUNGSI SIMPAN & PUBLISH ═══
   const handleSimpanJadwal = async (targetStatus) => {
     if (draftData.length === 0) return alert('Draft kosong!');
+    if (targetStatus === 'published' && hasConflict) {
+      return alert('❌ Tidak bisa Publish! Masih ada jadwal yang bentrok (kotak merah). Silakan tukar manual atau ubah aturan khusus.');
+    }
     if (!confirm(`Simpan jadwal sebagai ${targetStatus.toUpperCase()}?`)) return;
 
     setIsSaving(true);
     try {
-      // 1. Hapus jadwal lama (jika ada) untuk periode ini
-      await supabase.from('jadwal_ronda').delete().eq('periode_id', selectedPeriode.id);
+      // 1. Hapus jadwal lama (hanya jika masih draft)
+      if (selectedPeriode.status === 'draft') {
+        await supabase.from('jadwal_ronda').delete().eq('periode_id', selectedPeriode.id);
+      }
 
-      // 2. Loop dan masukkan jadwal baru
+      // 2. Masukkan jadwal baru
       for (const item of draftData) {
         const { data: jadwalBaru, error: errJ } = await supabase.from('jadwal_ronda').insert([{
           periode_id: selectedPeriode.id,
@@ -232,11 +249,9 @@ export default function SekretarisRonda() {
 
         if (errJ) throw errJ;
 
-        // Masukkan petugas
         if (!item.is_libur) {
           const petugasInserts = item.petugas.map(p => ({
-            jadwal_id: jadwalBaru.id,
-            penghuni_id: p.id
+            jadwal_id: jadwalBaru.id, penghuni_id: p.id
           }));
           const { error: errP } = await supabase.from('petugas_ronda').insert(petugasInserts);
           if (errP) throw errP;
@@ -247,14 +262,11 @@ export default function SekretarisRonda() {
       const { error: errU } = await supabase.from('periode_ronda').update({ status: targetStatus }).eq('id', selectedPeriode.id);
       if (errU) throw errU;
 
-      alert(`✅ Jadwal berhasil disimpan & di-${targetStatus}!`);
+      alert(`✅ Berhasil disimpan sebagai ${targetStatus.toUpperCase()}!`);
       setIsPublished(targetStatus === 'published');
-      fetchPeriode(); // Refresh list
-    } catch (err) {
-      alert('Gagal menyimpan: ' + err.message);
-    } finally {
-      setIsSaving(false);
-    }
+      setSelectedPeriode({ ...selectedPeriode, status: targetStatus });
+      fetchPeriode();
+    } catch (err) { alert('Gagal menyimpan: ' + err.message); } finally { setIsSaving(false); }
   };
 
   // ═══ FUNGSI ATURAN KHUSUS ═══
@@ -284,12 +296,13 @@ export default function SekretarisRonda() {
   const formatJam = (timeStr) => timeStr ? timeStr.substring(0, 5) : '-';
 
   // ═══════════════════════════════════════════════
-  // ═══ RENDER HALAMAN DETAIL (TABEL EXCEL STYLE) ═══
+  // ═══ RENDER HALAMAN DETAIL (GRID CARD STYLE) ═══
   // ═══════════════════════════════════════════════
   if (viewMode === 'detail' && selectedPeriode) {
     return (
       <Layout>
         <div className="max-w-7xl mx-auto space-y-4">
+          {/* Header Detail */}
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div className="flex items-center gap-3">
               <button onClick={() => setViewMode('list')} className="bg-slate-800 hover:bg-slate-700 text-white p-2.5 rounded-xl transition">← Kembali</button>
@@ -308,17 +321,23 @@ export default function SekretarisRonda() {
                   <button onClick={() => handleSimpanJadwal('draft')} disabled={isSaving || draftData.length === 0} className="bg-orange-600 hover:bg-orange-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg">
                     💾 Simpan Draft
                   </button>
-                  <button onClick={() => handleSimpanJadwal('published')} disabled={isSaving || draftData.length === 0} className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg">
+                  <button onClick={() => handleSimpanJadwal('published')} disabled={isSaving || draftData.length === 0 || hasConflict} className={`font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg ${hasConflict ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}>
                     🚀 Publish
                   </button>
                 </>
               ) : (
-                <button onClick={() => alert('Fitur Batal Publish akan dibuat selanjutnya.')} className="bg-rose-600/20 text-rose-400 font-semibold px-4 py-2.5 rounded-xl text-xs transition border border-rose-500/30">
+                <button onClick={() => alert('Fitur Batal Publish segera hadir.')} className="bg-rose-600/20 text-rose-400 font-semibold px-4 py-2.5 rounded-xl text-xs transition border border-rose-500/30">
                   Batalkan Publish
                 </button>
               )}
             </div>
           </div>
+
+          {hasConflict && (
+            <div className="bg-rose-950/40 border border-rose-500/50 rounded-xl p-3 text-xs text-rose-400 flex items-center gap-2">
+              <span className="text-lg">⚠️</span> Terdapat jadwal yang bentrok (kotak merah). Tombol Publish dikunci. Silakan perbaiki aturan khusus atau tukar manual.
+            </div>
+          )}
 
           {draftData.length === 0 ? (
              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl p-10 text-center">
@@ -327,62 +346,84 @@ export default function SekretarisRonda() {
              <p className="text-xs text-slate-400">Klik "Generate Draft" untuk membuat jadwal otomatis.</p>
            </div>
           ) : (
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-950 text-slate-400 border-b border-slate-800">
-                    <tr>
-                      <th className="p-3 border-r border-slate-800 text-center">Hari</th>
-                      <th className="p-3 border-r border-slate-800 text-center">Tanggal</th>
-                      <th className="p-3 border-r border-slate-800 text-center">Putaran</th>
-                      {/* Render Kolom Petugas Dinamis */}
-                      {Array.from({ length: selectedPeriode.jumlah_per_grup || 3 }).map((_, i) => (
-                        <th key={i} className="p-3 border-r border-slate-800">Petugas {i + 1}</th>
-                      ))}
-                      <th className="p-3 text-center">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {draftData.map((item, idx) => (
-                      <tr key={idx} className={`hover:bg-slate-800/40 ${item.is_libur ? 'opacity-50 grayscale bg-slate-900' : ''}`}>
-                        <td className="p-3 border-r border-slate-800 text-center font-semibold text-white">{item.hari}</td>
-                        <td className="p-3 border-r border-slate-800 text-center text-slate-300">{formatTanggal(item.tanggal)}</td>
-                        <td className="p-3 border-r border-slate-800 text-center text-slate-500">{item.putaran}</td>
+            <div className="space-y-6">
+              {/* Loop Per Putaran */}
+              {[1, 2, 3].map((putaranKe) => {
+                const jadwalPutaran = draftData.filter(d => d.putaran === putaranKe);
+                if (jadwalPutaran.length === 0) return null;
+
+                return (
+                  <div key={putaranKe} className="bg-slate-900/60 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl">
+                    <div className="flex items-center gap-2 mb-4 border-b border-slate-800/80 pb-3">
+                      <span className="bg-indigo-500/20 text-indigo-400 text-xs font-bold px-3 py-1 rounded-lg">Putaran {putaranKe}</span>
+                      <span className="text-xs text-slate-500">{jadwalPutaran.length} Hari</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {jadwalPutaran.map((item, idx) => {
+                        const globalIdx = draftData.findIndex(d => d.id === item.id);
                         
-                        {/* Render nama petugas di kolom masing-masing */}
-                        {item.is_libur ? (
-                          <td colSpan={selectedPeriode.jumlah_per_grup || 3} className="p-3 border-r border-slate-800 text-center text-rose-400 font-bold italic">LIBUR</td>
-                        ) : (
-                          <>
-                            {item.petugas.map((p, pIdx) => (
-                              <td key={pIdx} className="p-3 border-r border-slate-800 text-slate-200">
-                                <div className={item.has_conflict && p.hari_ronda_khusus ? 'text-rose-400' : ''}>
-                                  {p.nama_lengkap.split(' ')[0]} <span className="text-[9px] text-slate-500">({p.no_rumah || p.warga?.no_rumah})</span>
+                        let cardBorder = 'border-slate-700/60 hover:border-indigo-500/40';
+                        if (item.is_libur) cardBorder = 'border-slate-800 opacity-50 grayscale';
+                        else if (item.has_conflict) cardBorder = 'border-rose-500/60 shadow-lg shadow-rose-900/20';
+
+                        return (
+                          <div key={idx} className={`bg-slate-950/40 border rounded-2xl p-4 flex flex-col justify-between transition-all duration-200 ${cardBorder}`}>
+                            <div>
+                              {/* Header Kartu */}
+                              <div className="flex justify-between items-start mb-3">
+                                <div>
+                                  <div className="text-xs text-slate-400 font-medium">{item.hari}</div>
+                                  <div className="text-sm font-bold text-white mt-0.5">{formatTanggal(item.tanggal)}</div>
                                 </div>
-                              </td>
-                            ))}
-                            {/* Isi kolom kosong jika jumlah petugas kurang dari max kolom */}
-                            {Array.from({ length: (selectedPeriode.jumlah_per_grup || 3) - item.petugas.length }).map((_, emptyIdx) => (
-                              <td key={`empty-${emptyIdx}`} className="p-3 border-r border-slate-800 text-slate-600">-</td>
-                            ))}
-                          </>
-                        )}
-                        
-                        <td className="p-3 text-center">
-                          <button onClick={() => handleToggleLibur(idx)} disabled={isPublished} className={`px-2 py-1 rounded text-[10px] font-semibold transition ${item.is_libur ? 'bg-emerald-600/20 text-emerald-400' : 'bg-rose-600/20 text-rose-400'}`}>
-                            {item.is_libur ? 'Aktifkan' : 'Libur'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {draftData.some(d => d.has_conflict) && (
-                <div className="p-3 bg-rose-950/40 border-t border-rose-500/30 text-xs text-rose-400">
-                  ⚠️ Perhatian: Ada jadwal yang bentrok (nama merah). Silakan tukar jadwal manual atau ubah aturan khusus.
-                </div>
-              )}
+                                <span className="text-[10px] font-bold bg-slate-800 text-slate-400 px-2 py-1 rounded">Grup {item.grup_id}</span>
+                              </div>
+
+                              {/* List Petugas */}
+                              <div className="space-y-2 mt-4">
+                                {item.is_libur ? (
+                                  <div className="text-center py-4 text-rose-400 font-bold text-sm italic">Diliburkan</div>
+                                ) : (
+                                  item.petugas.map((p, pIdx) => (
+                                    <div key={pIdx} className="flex items-center gap-2 bg-slate-900/80 border border-slate-800 p-2 rounded-xl">
+                                      <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-[10px] font-bold shrink-0">
+                                        {pIdx + 1}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className={`text-xs font-semibold truncate ${item.has_conflict && p.hari_ronda_khusus ? 'text-rose-400' : 'text-slate-200'}`}>
+                                          {p.nama_lengkap.split(' ')[0]}
+                                        </div>
+                                        <div className="text-[9px] text-slate-500 font-mono truncate">{p.no_rumah || p.warga?.no_rumah}</div>
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                              
+                              {item.has_conflict && (
+                                <div className="mt-3 text-[10px] text-rose-400 bg-rose-500/10 p-2 rounded border border-rose-500/20">
+                                  ⚠️ Bentrok: {item.catatan}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Footer Kartu */}
+                            <div className="mt-4 pt-3 border-t border-slate-800/60 flex justify-end">
+                              <button 
+                                onClick={() => handleToggleLibur(globalIdx)} 
+                                disabled={isPublished}
+                                className={`text-[10px] font-bold px-3 py-1.5 rounded-lg transition ${item.is_libur ? 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white' : 'bg-rose-600/10 text-rose-400 hover:bg-rose-600 hover:text-white'}`}
+                              >
+                                {item.is_libur ? 'Aktifkan Ronda' : 'Liburkan'}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -402,13 +443,11 @@ export default function SekretarisRonda() {
     <Layout>
       <div className="max-w-6xl mx-auto space-y-4">
         
-        {/* HEADER TABS */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-2 flex gap-2">
           <button onClick={() => setActiveTab('jadwal')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'jadwal' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800'}`}>📅 Jadwal Ronda</button>
           <button onClick={() => setActiveTab('aturan')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'aturan' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800'}`}>⚙️ Aturan Khusus Peserta</button>
         </div>
 
-        {/* ═══ TAB 1: JADWAL RONDA ═══ */}
         {activeTab === 'jadwal' && (
           <div className="space-y-4 animate-in fade-in">
             <div className="flex justify-between items-center bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg">
@@ -461,7 +500,6 @@ export default function SekretarisRonda() {
           </div>
         )}
 
-        {/* ═══ TAB 2: ATURAN KHUSUS ═══ */}
         {activeTab === 'aturan' && (
           <div className="space-y-3 animate-in fade-in">
             <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-2xl space-y-3">
@@ -514,10 +552,8 @@ export default function SekretarisRonda() {
             </div>
           </div>
         )}
-
       </div>
 
-      {/* MODAL BUAT PERIODE */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4">
