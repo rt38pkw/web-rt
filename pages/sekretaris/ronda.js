@@ -99,7 +99,7 @@ export default function SekretarisRonda() {
         const formatted = data.map(j => ({
           id: j.id, tanggal: j.tanggal,
           hari: new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(new Date(j.tanggal)),
-          putaran: j.putaran, grup_id: j.grup_id,
+          grup_id: j.grup_id,
           is_libur: j.status === 'libur',
           has_conflict: false, 
           catatan: j.catatan_sistem || '',
@@ -112,7 +112,7 @@ export default function SekretarisRonda() {
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  // ═══ FUNGSI GENERATE (QUEUE-BASED FAIR ALGORITHM) ═══
+  // ═══ FUNGSI GENERATE (ANTREAN MURNI / QUEUE) ═══
   const handleGenerateDraft = async () => {
     if (isPublished) return alert('Jadwal sudah di-publish. Tidak bisa generate ulang.');
     if (!confirm('Generate ulang akan menimpa draft saat ini. Lanjutkan?')) return;
@@ -130,15 +130,15 @@ export default function SekretarisRonda() {
       if (penghuni.length < 2) throw new Error('Peserta ronda terlalu sedikit.');
 
       const N = Number(selectedPeriode.jumlah_per_grup) || 3;
-      const totalPeople = penghuni.length;
-      const numGroups = Math.ceil(totalPeople / N);
-      const totalDays = numGroups * 3; // 3 putaran
-
-      // Inisialisasi tracking fairness
-      const people = penghuni.map(p => ({ ...p, shifts: 0, lastDay: -999 }));
+      const totalDays = Math.ceil(penghuni.length / N) * 3; // 3 siklus penuh, tanpa label putaran
+      
+      // Buat Antrean (Acak awal biar tidak monoton)
+      let queue = [...penghuni].sort(() => 0.5 - Math.random());
+      
       const hariArr = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
       const startDate = new Date(selectedPeriode.tanggal_mulai);
       const draft = [];
+      let anyConflict = false;
 
       for (let d = 0; d < totalDays; d++) {
         const date = new Date(startDate);
@@ -146,60 +146,65 @@ export default function SekretarisRonda() {
         const dateStr = date.toISOString().split('T')[0];
         const dayName = hariArr[date.getDay()];
 
-        // Filter: shift masih kurang dari 3 DAN boleh bertugas hari ini
-        const eligible = people.filter(p => p.shifts < 3).filter(p => {
-          if (!p.hari_ronda_khusus) return true;
-          const allowed = p.hari_ronda_khusus.split(',').map(x => x.trim().toLowerCase());
-          return allowed.includes(dayName.toLowerCase());
-        });
+        const chosen = [];
+        let attempts = 0;
+        
+        // Ambil N orang dari antrean
+        while (chosen.length < N && attempts < queue.length) {
+          const candidate = queue.shift(); // Ambil dari depan
+          
+          // Cek apakah boleh ronda hari ini
+          let allowed = true;
+          if (candidate.hari_ronda_khusus) {
+            const arr = candidate.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
+            if (!arr.includes(dayName.toLowerCase())) allowed = false;
+          }
 
-        // Sort: Prioritaskan yang punya aturan khusus (supaya kebagian), lalu yang paling lama tidak bertugas
-        eligible.sort((a, b) => {
-          const aCon = a.hari_ronda_khusus ? 1 : 0;
-          const bCon = b.hari_ronda_khusus ? 1 : 0;
-          if (aCon !== bCon) return bCon - aCon;
-          return a.lastDay - b.lastDay;
-        });
-
-        const chosen = eligible.slice(0, N);
-
-        // Fallback jika tidak cukup (misal karena banyak yang aturan khusus)
-        if (chosen.length < N) {
-          const extra = people.filter(p => !chosen.includes(p) && p.shifts < 3);
-          while (chosen.length < N && extra.length > 0) {
-            chosen.push(extra.shift());
+          if (allowed) {
+            chosen.push(candidate);
+            attempts = 0; // Reset attempts jika dapat orang
+          } else {
+            queue.push(candidate); // Taruh di belakang antrean
+            attempts++;
           }
         }
 
-        // Update state fairness
-        chosen.forEach(p => {
-          p.shifts++;
-          p.lastDay = d;
-        });
+        // Jika antrean habis tapi belum dapat N orang, paksa ambil dari sisa
+        if (chosen.length < N) {
+          while (chosen.length < N && queue.length > 0) {
+            chosen.push(queue.shift());
+          }
+        }
 
-        // Cek apakah ada yang melanggar aturan khusus (karena terpaksa masuk)
+        // Cek konflik (jika ada yang terpaksa masuk)
         const conflict = chosen.some(p => {
           if (!p.hari_ronda_khusus) return false;
-          const allowed = p.hari_ronda_khusus.split(',').map(x => x.trim().toLowerCase());
+          const allowed = p.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
           return !allowed.includes(dayName.toLowerCase());
         });
 
+        if (conflict) anyConflict = true;
+
         draft.push({
-          id: `${Math.floor(d / numGroups) + 1}-${(d % numGroups) + 1}`,
+          id: `d-${d}`,
           tanggal: dateStr,
           hari: dayName,
-          putaran: Math.floor(d / numGroups) + 1,
-          grup_id: (d % numGroups) + 1,
+          grup_id: (d % Math.ceil(penghuni.length / N)) + 1,
           petugas: chosen,
           is_libur: false,
           has_conflict: conflict,
-          catatan: conflict ? 'Konflik hari khusus' : ''
+          catatan: conflict ? 'Bentrok aturan hari khusus' : ''
         });
+
+        // Jika antrean kosong (semua orang sudah dapat), isi ulang antrean untuk siklus berikutnya
+        if (queue.length === 0 && d < totalDays - 1) {
+           queue = [...penghuni].sort(() => 0.5 - Math.random());
+        }
       }
 
       setDraftData(draft);
-      setHasConflict(draft.some(d => d.has_conflict));
-      alert('✅ Draft di-generate! Setiap orang mendapat 3 shift.');
+      setHasConflict(anyConflict);
+      alert('✅ Draft di-generate dengan sistem antrean adil!');
     } catch (err) { alert('Gagal generate: ' + err.message); } finally { setIsGenerating(false); }
   };
 
@@ -225,7 +230,7 @@ export default function SekretarisRonda() {
 
       for (const item of draftData) {
         const { data: jadwalBaru, error: errJ } = await supabase.from('jadwal_ronda').insert([{
-          periode_id: selectedPeriode.id, tanggal: item.tanggal, grup_id: item.grup_id, putaran: item.putaran,
+          periode_id: selectedPeriode.id, tanggal: item.tanggal, grup_id: item.grup_id,
           status: item.is_libur ? 'libur' : 'aktif', catatan_sistem: item.catatan || null
         }]).select('id').single();
 
@@ -275,7 +280,7 @@ export default function SekretarisRonda() {
   const formatTanggal = (dateStr) => dateStr ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(dateStr)) : '-';
   const formatJam = (timeStr) => timeStr ? timeStr.substring(0, 5) : '-';
 
-  // ═══ RENDER DETAIL ═══
+  // ═══ RENDER DETAIL (TABEL RAPI) ═══
   if (viewMode === 'detail' && selectedPeriode) {
     return (
       <Layout>
@@ -328,9 +333,9 @@ export default function SekretarisRonda() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-950 text-slate-400 border-b border-slate-800">
                     <tr>
+                      <th className="p-3 border-r border-slate-800 text-center w-12">No</th>
                       <th className="p-3 border-r border-slate-800 text-center">Hari</th>
                       <th className="p-3 border-r border-slate-800 text-center">Tanggal</th>
-                      <th className="p-3 border-r border-slate-800 text-center">Putaran</th>
                       {Array.from({ length: selectedPeriode.jumlah_per_grup || 3 }).map((_, i) => (
                         <th key={i} className="p-3 border-r border-slate-800">Petugas {i + 1}</th>
                       ))}
@@ -340,9 +345,9 @@ export default function SekretarisRonda() {
                   <tbody className="divide-y divide-slate-800">
                     {draftData.map((item, idx) => (
                       <tr key={idx} className={`hover:bg-slate-800/40 ${item.is_libur ? 'opacity-50 grayscale bg-slate-900' : ''}`}>
+                        <td className="p-3 border-r border-slate-800 text-center text-slate-500">{idx + 1}</td>
                         <td className="p-3 border-r border-slate-800 text-center font-semibold text-white">{item.hari}</td>
                         <td className="p-3 border-r border-slate-800 text-center text-slate-300">{formatTanggal(item.tanggal)}</td>
-                        <td className="p-3 border-r border-slate-800 text-center text-slate-500">{item.putaran}</td>
                         
                         {item.is_libur ? (
                           <td colSpan={selectedPeriode.jumlah_per_grup || 3} className="p-3 border-r border-slate-800 text-center text-rose-400 font-bold italic">LIBUR</td>
