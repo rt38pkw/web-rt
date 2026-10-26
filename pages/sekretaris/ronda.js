@@ -63,6 +63,7 @@ export default function SekretarisRonda() {
         nama_periode: namaPeriode.trim(), 
         tanggal_mulai: tglMulai, 
         tanggal_selesai: finalTglSelesai,
+        tipe_periode: tipePeriode,
         jam_mulai: jamMulai, 
         jam_selesai: jamSelesai, 
         jam_reminder: jamReminder,
@@ -123,7 +124,7 @@ export default function SekretarisRonda() {
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  // ═══ FUNGSI GENERATE (LOGIKA BARU YANG BAKU & AMAN) ═══
+  // ═══ FUNGSI GENERATE (STRICT SLOT + SWAP) ═══
   const handleGenerateDraft = async () => {
     if (isPublished) return alert('Jadwal sudah di-publish. Tidak bisa generate ulang.');
     if (!confirm('Generate ulang akan menimpa draft saat ini. Lanjutkan?')) return;
@@ -146,7 +147,7 @@ export default function SekretarisRonda() {
       
       // Tentukan total hari
       let totalDays = 0;
-      if (selectedPeriode.tanggal_selesai) {
+      if (selectedPeriode.tipe_periode === 'custom' && selectedPeriode.tanggal_selesai) {
         const start = new Date(selectedPeriode.tanggal_mulai);
         const end = new Date(selectedPeriode.tanggal_selesai);
         const diffTime = Math.abs(end - start);
@@ -164,7 +165,6 @@ export default function SekretarisRonda() {
         if (i === numGroups - 1) ukuran = totalPeople - currentIdx;
         grupArr.push({ 
           id: i + 1, 
-          // Pastikan Deep Copy agar tidak terjadi bug duplikasi
           anggota: shuffled.slice(currentIdx, currentIdx + ukuran).map(p => ({...p})) 
         });
         currentIdx += ukuran;
@@ -189,19 +189,15 @@ export default function SekretarisRonda() {
           tanggal: dateStr,
           hari: dayName,
           grup_id: grup.id,
-          petugas: [...grup.anggota], // Shallow copy array, object references sama
+          petugas: [...grup.anggota], 
           is_libur: false,
           has_conflict: false,
           catatan: ''
         });
       }
 
-      // 3. SWAP ALGORITMA (MEMASTIKAN MINIMAL 1 KALI)
+      // 3. SWAP ALGORITMA (FAIR SWAP UNTUK HARI KHUSUS)
       let anyConflict = false;
-      const specialIds = new Set(penghuni.filter(p => p.hari_ronda_khusus).map(p => p.id));
-      let scheduledSpecialIds = new Set();
-
-      // Loop untuk proses swap per tanggal
       for (let i = 0; i < draft.length; i++) {
         const day = draft[i];
         
@@ -212,8 +208,8 @@ export default function SekretarisRonda() {
             const allowed = p.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
             if (!allowed.includes(day.hari.toLowerCase())) {
               
-              // Cari hari lain (k) yang bisa menerima p
               let swapped = false;
+              // Cari hari lain (k) yang bisa menerima p
               for (let k = 0; k < draft.length; k++) {
                 if (i === k) continue;
                 const targetDay = draft[k];
@@ -224,13 +220,12 @@ export default function SekretarisRonda() {
                     const q = targetDay.petugas[l];
                     let qAllowedHere = true;
                     
-                    // Cek apakah q boleh di hari 'day' (i)
                     if (q.hari_ronda_khusus) {
                       const qAllowed = q.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
                       if (!qAllowed.includes(day.hari.toLowerCase())) qAllowedHere = false;
                     }
 
-                    // Cek apakah q sudah ada di 'day' (anti duplikasi)
+                    // PASTIKAN q BELUM ADA DI 'day' (ANTI DUPLIKASI)
                     if (qAllowedHere && !day.petugas.some(x => x.id === q.id)) {
                       // TUKAR POSISI
                       day.petugas[j] = q;
@@ -249,37 +244,14 @@ export default function SekretarisRonda() {
                 day.catatan = `${p.nama_lengkap} hanya bisa ${p.hari_ronda_khusus}`;
                 anyConflict = true;
               }
-            } else {
-              scheduledSpecialIds.add(p.id);
             }
           }
         }
       }
 
-      // 4. POST-SWAP CHECK (Pastikan aturan khusus dapat minimal 1x)
-      specialIds.forEach(sId => {
-        if (!scheduledSpecialIds.has(sId)) {
-          const p = penghuni.find(x => x.id === sId);
-          const allowed = p.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
-          
-          // Cari tanggal yang cocok
-          const targetDayIdx = draft.findIndex(d => allowed.includes(d.hari.toLowerCase()));
-          if (targetDayIdx !== -1) {
-            const targetDay = draft[targetDayIdx];
-            // Ganti orang terakhir di tanggal itu dengan p
-            const replaced = targetDay.petugas[targetDay.petugas.length - 1];
-            targetDay.petugas[targetDay.petugas.length - 1] = p;
-            scheduledSpecialIds.add(sId);
-            
-            // Tandai bahwa ini adalah pergantian paksa (bisa dihapus catatannya jika dianggap normal)
-            targetDay.catatan = `Tukar otomatis: ${p.nama_lengkap}`;
-          }
-        }
-      });
-
       setDraftData(draft);
       setHasConflict(anyConflict);
-      alert('✅ Draft di-generate dengan sistem Strict Slot + Swap!');
+      alert('✅ Draft di-generate dengan logika Strict Slot + Swap!');
     } catch (err) { alert('Gagal generate: ' + err.message); } finally { setIsGenerating(false); }
   };
 
@@ -312,7 +284,7 @@ export default function SekretarisRonda() {
         if (errJ) throw errJ;
 
         if (!item.is_libur) {
-          // Pastikan tidak ada duplikat ID sebelum insert
+          // PASTIKAN TIDAK ADA DUPLIKAT SEBELUM INSERT
           const uniquePetugas = Array.from(new Map(item.petugas.map(p => [p.id, p])).values());
           
           const petugasInserts = uniquePetugas.map(p => ({
@@ -422,8 +394,7 @@ export default function SekretarisRonda() {
                   </thead>
                   <tbody className="divide-y divide-slate-800">
                     {draftData.map((item, idx) => {
-                      // Pastikan unik saat render
-                      const uniquePetugas = Array.from(new Map(item.petugas.map(p => [p.id, p])).values());
+                      // Render 3 kolom. Backend menjamin array length = N
                       return (
                         <tr key={idx} className={`hover:bg-slate-800/40 ${item.is_libur ? 'opacity-50 grayscale bg-slate-900' : ''}`}>
                           <td className="p-3 border-r border-slate-800 text-center text-slate-500">{idx + 1}</td>
@@ -434,7 +405,7 @@ export default function SekretarisRonda() {
                             <td colSpan={selectedPeriode.jumlah_per_grup || 3} className="p-3 border-r border-slate-800 text-center text-rose-400 font-bold italic">LIBUR</td>
                           ) : (
                             <>
-                              {uniquePetugas.map((p, pIdx) => (
+                              {item.petugas.map((p, pIdx) => (
                                 <td key={pIdx} className="p-3 border-r border-slate-800">
                                   <div className={`font-semibold ${item.has_conflict && p.hari_ronda_khusus ? 'text-rose-400' : 'text-slate-200'}`}>
                                     {p.nama_lengkap.split(' ')[0]}
@@ -442,7 +413,8 @@ export default function SekretarisRonda() {
                                   <div className="text-[10px] text-slate-500 font-mono">{p.warga?.no_rumah || '-'}</div>
                                 </td>
                               ))}
-                              {Array.from({ length: (selectedPeriode.jumlah_per_grup || 3) - uniquePetugas.length }).map((_, emptyIdx) => (
+                              {/* Render kolom kosong jika ada sisa bagi (meskipun jarang terjadi dengan 36 orang) */}
+                              {Array.from({ length: (selectedPeriode.jumlah_per_grup || 3) - item.petugas.length }).map((_, emptyIdx) => (
                                 <td key={`empty-${emptyIdx}`} className="p-3 border-r border-slate-800 text-slate-600">-</td>
                               ))}
                             </>
