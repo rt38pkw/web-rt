@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { uploadKK } from '../../lib/iuran/storage'; // Import fungsi upload
+import { uploadKK } from '../../lib/iuran/storage';
 import Layout from '../../components/sekretaris/Layout';
 
 export default function SekretarisDataWarga() {
@@ -35,12 +35,12 @@ export default function SekretarisDataWarga() {
   const [editKategori, setEditKategori] = useState('Warga');
   const [editStatusHuni, setEditStatusHuni] = useState('pemilik');
 
-  // ═══ STATE MODAL KARTU KELUARGA (VIEW & ADD) ═══
+  // State Modal Kartu Keluarga (View & Add)
   const [showKKModal, setShowKKModal] = useState(false);
   const [selectedKKWarga, setSelectedKKWarga] = useState(null);
-  const [kkData, setKKData] = useState([]); // List anggota keluarga
-  const [isAddingNewKK, setIsAddingNewKK] = useState(false); // Mode Tambah Baru
-  const [isKelolaMode, setIsKelolaMode] = useState(false); // Mode Edit Anggota
+  const [kkData, setKKData] = useState([]); 
+  const [isAddingNewKK, setIsAddingNewKK] = useState(false); 
+  const [isKelolaMode, setIsKelolaMode] = useState(false); 
 
   // State Form Tambah/Edit KK
   const [newNama, setNewNama] = useState('');
@@ -73,7 +73,8 @@ export default function SekretarisDataWarga() {
     setLoading(true);
     const [wargaData, penghuniData] = await Promise.all([
       supabase.from('warga').select('*').order('no_rumah', { ascending: true }),
-      supabase.from('penghuni').select('*').eq('is_aktif', true)
+      // ═══ PERBAIKAN: Hanya ambil yang approved ═══
+      supabase.from('penghuni').select('*').eq('is_aktif', true).eq('status_verifikasi', 'approved')
     ]);
     if (wargaData.data) setWargaList(wargaData.data);
     if (penghuniData.data) setPenghuniList(penghuniData.data);
@@ -208,7 +209,7 @@ export default function SekretarisDataWarga() {
         hubungan: newHubungan, 
         tipe_penghuni: 'penyewa', 
         is_aktif: true, 
-        status_verifikasi: 'approved',
+        status_verifikasi: 'approved', // Inputan sekretaris langsung approved
         url_kk: urlKK
       }]);
       if (error) throw error;
@@ -226,14 +227,12 @@ export default function SekretarisDataWarga() {
 
     setProcessingId(selectedKKWarga.id);
     try {
-      // 1. Update KK jika ada file baru
       let urlKK = kkData[0]?.url_kk || null;
       if (newFileKK) {
         urlKK = await uploadKK(newFileKK, selectedKKWarga.id);
         await supabase.from('penghuni').update({ url_kk: urlKK }).eq('id', kkData[0].id);
       }
 
-      // 2. Insert Anggota Baru
       const { error } = await supabase.from('penghuni').insert([{
         warga_id: selectedKKWarga.id,
         nama_lengkap: newNama.trim(),
@@ -241,14 +240,13 @@ export default function SekretarisDataWarga() {
         hubungan: newHubungan,
         tipe_penghuni: 'penyewa', 
         is_aktif: true, 
-        status_verifikasi: 'approved'
+        status_verifikasi: 'approved' // Inputan sekretaris langsung approved
       }]);
       if (error) throw error;
 
       alert('✅ Anggota keluarga berhasil ditambahkan!');
       setNewNama(''); setNewNik(''); setNewHubungan('Istri'); setNewFileKK(null); setPreviewKK(null);
       
-      // Refresh data KK di modal
       const { data } = await supabase.from('penghuni').select('*').eq('warga_id', selectedKKWarga.id).eq('is_aktif', true);
       const kk = data.find(p => p.hubungan === 'Kepala Keluarga');
       const anggota = data.filter(p => p.hubungan !== 'Kepala Keluarga');
@@ -262,7 +260,6 @@ export default function SekretarisDataWarga() {
     setProcessingId(id);
     await supabase.from('penghuni').update({ is_aktif: false }).eq('id', id);
     
-    // Refresh data KK di modal
     const { data } = await supabase.from('penghuni').select('*').eq('warga_id', selectedKKWarga.id).eq('is_aktif', true);
     const kk = data.find(p => p.hubungan === 'Kepala Keluarga');
     const anggota = data.filter(p => p.hubungan !== 'Kepala Keluarga');
