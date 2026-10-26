@@ -89,7 +89,7 @@ export default function SekretarisRonda() {
     try {
       const { data, error } = await supabase
         .from('jadwal_ronda')
-        .select('*, petugas:petugas_ronda(*, penghuni:penghuni_id(*))')
+        .select('*, petugas:petugas_ronda(*, penghuni:penghuni_id(*, warga:warga_id(no_rumah)))')
         .eq('periode_id', periode.id)
         .order('tanggal');
       
@@ -101,7 +101,7 @@ export default function SekretarisRonda() {
           hari: new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(new Date(j.tanggal)),
           putaran: j.putaran, grup_id: j.grup_id,
           is_libur: j.status === 'libur',
-          has_conflict: false, // Default false saat load dari DB
+          has_conflict: false, 
           catatan: j.catatan_sistem || '',
           petugas: j.petugas.map(p => p.penghuni)
         }));
@@ -112,7 +112,7 @@ export default function SekretarisRonda() {
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  // ═══ FUNGSI GENERATE DRAFT (DENGAN FAIR SWAP CERDAS) ═══
+  // ═══ FUNGSI GENERATE (QUEUE-BASED FAIR ALGORITHM) ═══
   const handleGenerateDraft = async () => {
     if (isPublished) return alert('Jadwal sudah di-publish. Tidak bisa generate ulang.');
     if (!confirm('Generate ulang akan menimpa draft saat ini. Lanjutkan?')) return;
@@ -120,97 +120,86 @@ export default function SekretarisRonda() {
     setIsGenerating(true);
     try {
       const { data: penghuni, error } = await supabase
-        .from('penghuni').select('*')
-        .eq('is_aktif', true).eq('status_verifikasi', 'approved').eq('ikut_ronda', true);
+        .from('penghuni')
+        .select('*, warga:warga_id(no_rumah)')
+        .eq('is_aktif', true)
+        .eq('status_verifikasi', 'approved')
+        .eq('ikut_ronda', true);
 
       if (error) throw error;
       if (penghuni.length < 2) throw new Error('Peserta ronda terlalu sedikit.');
 
-      const perGrup = Number(selectedPeriode.jumlah_per_grup) || 3;
-      const totalPeserta = penghuni.length;
-      let jumlahGrup = Math.floor(totalPeserta / perGrup);
-      let sisa = totalPeserta % perGrup;
-      if (sisa === 1) jumlahGrup = Math.max(1, jumlahGrup - 1); 
+      const N = Number(selectedPeriode.jumlah_per_grup) || 3;
+      const totalPeople = penghuni.length;
+      const numGroups = Math.ceil(totalPeople / N);
+      const totalDays = numGroups * 3; // 3 putaran
 
-      // Acak Awal
-      const shuffled = [...penghuni].sort(() => 0.5 - Math.random());
-      let grupArr = [];
-      let currentIdx = 0;
-      for (let i = 0; i < jumlahGrup; i++) {
-        let ukuran = perGrup;
-        if (i === jumlahGrup - 1) ukuran = totalPeserta - currentIdx;
-        grupArr.push({ 
-          id: i + 1, 
-          anggota: shuffled.slice(currentIdx, currentIdx + ukuran).map(p => ({...p})) // Deep Copy
-        });
-        currentIdx += ukuran;
-      }
-
+      // Inisialisasi tracking fairness
+      const people = penghuni.map(p => ({ ...p, shifts: 0, lastDay: -999 }));
       const hariArr = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-      let currentDate = new Date(selectedPeriode.tanggal_mulai);
-      let tempDraft = [];
-      let anyConflict = false;
+      const startDate = new Date(selectedPeriode.tanggal_mulai);
+      const draft = [];
 
-      for (let putaran = 1; putaran <= 3; putaran++) {
-        for (let g = 0; g < grupArr.length; g++) {
-          const grup = grupArr[g];
-          const tglString = currentDate.toISOString().split('T')[0];
-          const namaHari = hariArr[currentDate.getDay()];
-          
-          let anggotaFinal = [...grup.anggota];
-          let catatan = '';
-          let rowConflict = false;
+      for (let d = 0; d < totalDays; d++) {
+        const date = new Date(startDate);
+        date.setDate(date.getDate() + d);
+        const dateStr = date.toISOString().split('T')[0];
+        const dayName = hariArr[date.getDay()];
 
-          // FAIR SWAP ALGORITMA
-          for (let i = 0; i < anggotaFinal.length; i++) {
-            const p = anggotaFinal[i];
-            if (p.hari_ronda_khusus) {
-              const arrayHari = p.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
-              if (!arrayHari.includes(namaHari.toLowerCase())) {
-                // Cari tukaran yang adil
-                let swapped = false;
-                for (let k = 0; k < grupArr.length; k++) {
-                  if (k === g) continue; // Jangan tukar dengan grup sendiri
-                  
-                  // Cari orang di grup k yang jadwal khususnya cocok dengan hari ini
-                  const calonTukar = grupArr[k].anggota.find(x => {
-                    if (!x.hari_ronda_khusus) return true; // Bebas
-                    const arrX = x.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
-                    return arrX.includes(namaHari.toLowerCase());
-                  });
+        // Filter: shift masih kurang dari 3 DAN boleh bertugas hari ini
+        const eligible = people.filter(p => p.shifts < 3).filter(p => {
+          if (!p.hari_ronda_khusus) return true;
+          const allowed = p.hari_ronda_khusus.split(',').map(x => x.trim().toLowerCase());
+          return allowed.includes(dayName.toLowerCase());
+        });
 
-                  if (calonTukar) {
-                    const idxP = anggotaFinal.findIndex(x => x.id === p.id);
-                    const idxX = grupArr[k].anggota.findIndex(x => x.id === calonTukar.id);
-                    
-                    // Tukar posisi
-                    anggotaFinal[idxP] = calonTukar;
-                    grupArr[k].anggota[idxX] = p;
-                    swapped = true;
-                    break;
-                  }
-                }
-                
-                if (!swapped) {
-                  rowConflict = true;
-                  catatan = `${p.nama_lengkap} (${p.hari_ronda_khusus})`;
-                  anyConflict = true;
-                  break;
-                }
-              }
-            }
+        // Sort: Prioritaskan yang punya aturan khusus (supaya kebagian), lalu yang paling lama tidak bertugas
+        eligible.sort((a, b) => {
+          const aCon = a.hari_ronda_khusus ? 1 : 0;
+          const bCon = b.hari_ronda_khusus ? 1 : 0;
+          if (aCon !== bCon) return bCon - aCon;
+          return a.lastDay - b.lastDay;
+        });
+
+        const chosen = eligible.slice(0, N);
+
+        // Fallback jika tidak cukup (misal karena banyak yang aturan khusus)
+        if (chosen.length < N) {
+          const extra = people.filter(p => !chosen.includes(p) && p.shifts < 3);
+          while (chosen.length < N && extra.length > 0) {
+            chosen.push(extra.shift());
           }
-
-          tempDraft.push({
-            id: `${putaran}-${grup.id}`, tanggal: tglString, hari: namaHari, putaran, grup_id: grup.id,
-            petugas: anggotaFinal, is_libur: false, has_conflict: rowConflict, catatan
-          });
-          currentDate.setDate(currentDate.getDate() + 1);
         }
+
+        // Update state fairness
+        chosen.forEach(p => {
+          p.shifts++;
+          p.lastDay = d;
+        });
+
+        // Cek apakah ada yang melanggar aturan khusus (karena terpaksa masuk)
+        const conflict = chosen.some(p => {
+          if (!p.hari_ronda_khusus) return false;
+          const allowed = p.hari_ronda_khusus.split(',').map(x => x.trim().toLowerCase());
+          return !allowed.includes(dayName.toLowerCase());
+        });
+
+        draft.push({
+          id: `${Math.floor(d / numGroups) + 1}-${(d % numGroups) + 1}`,
+          tanggal: dateStr,
+          hari: dayName,
+          putaran: Math.floor(d / numGroups) + 1,
+          grup_id: (d % numGroups) + 1,
+          petugas: chosen,
+          is_libur: false,
+          has_conflict: conflict,
+          catatan: conflict ? 'Konflik hari khusus' : ''
+        });
       }
-      setDraftData(tempDraft);
-      setHasConflict(anyConflict);
-      alert('✅ Draft di-generate! Periksa kotak berwarna merah jika ada konflik.');
+
+      setDraftData(draft);
+      setHasConflict(draft.some(d => d.has_conflict));
+      alert('✅ Draft di-generate! Setiap orang mendapat 3 shift.');
     } catch (err) { alert('Gagal generate: ' + err.message); } finally { setIsGenerating(false); }
   };
 
@@ -221,30 +210,23 @@ export default function SekretarisRonda() {
     setDraftData(newDraft);
   };
 
-  // ═══ FUNGSI SIMPAN & PUBLISH ═══
   const handleSimpanJadwal = async (targetStatus) => {
     if (draftData.length === 0) return alert('Draft kosong!');
     if (targetStatus === 'published' && hasConflict) {
-      return alert('❌ Tidak bisa Publish! Masih ada jadwal yang bentrok (kotak merah). Silakan tukar manual atau ubah aturan khusus.');
+      return alert('❌ Tidak bisa Publish! Masih ada jadwal yang bentrok.');
     }
     if (!confirm(`Simpan jadwal sebagai ${targetStatus.toUpperCase()}?`)) return;
 
     setIsSaving(true);
     try {
-      // 1. Hapus jadwal lama (hanya jika masih draft)
       if (selectedPeriode.status === 'draft') {
         await supabase.from('jadwal_ronda').delete().eq('periode_id', selectedPeriode.id);
       }
 
-      // 2. Masukkan jadwal baru
       for (const item of draftData) {
         const { data: jadwalBaru, error: errJ } = await supabase.from('jadwal_ronda').insert([{
-          periode_id: selectedPeriode.id,
-          tanggal: item.tanggal,
-          grup_id: item.grup_id,
-          putaran: item.putaran,
-          status: item.is_libur ? 'libur' : 'aktif',
-          catatan_sistem: item.catatan || null
+          periode_id: selectedPeriode.id, tanggal: item.tanggal, grup_id: item.grup_id, putaran: item.putaran,
+          status: item.is_libur ? 'libur' : 'aktif', catatan_sistem: item.catatan || null
         }]).select('id').single();
 
         if (errJ) throw errJ;
@@ -258,7 +240,6 @@ export default function SekretarisRonda() {
         }
       }
 
-      // 3. Update status periode
       const { error: errU } = await supabase.from('periode_ronda').update({ status: targetStatus }).eq('id', selectedPeriode.id);
       if (errU) throw errU;
 
@@ -269,7 +250,6 @@ export default function SekretarisRonda() {
     } catch (err) { alert('Gagal menyimpan: ' + err.message); } finally { setIsSaving(false); }
   };
 
-  // ═══ FUNGSI ATURAN KHUSUS ═══
   const fetchWargaRonda = async () => {
     setLoadingWarga(true);
     const { data } = await supabase.from('warga').select('*, penghuni:penghuni(*)').order('no_rumah');
@@ -295,14 +275,11 @@ export default function SekretarisRonda() {
   const formatTanggal = (dateStr) => dateStr ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(dateStr)) : '-';
   const formatJam = (timeStr) => timeStr ? timeStr.substring(0, 5) : '-';
 
-  // ═══════════════════════════════════════════════
-  // ═══ RENDER HALAMAN DETAIL (GRID CARD STYLE) ═══
-  // ═══════════════════════════════════════════════
+  // ═══ RENDER DETAIL ═══
   if (viewMode === 'detail' && selectedPeriode) {
     return (
       <Layout>
         <div className="max-w-7xl mx-auto space-y-4">
-          {/* Header Detail */}
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div className="flex items-center gap-3">
               <button onClick={() => setViewMode('list')} className="bg-slate-800 hover:bg-slate-700 text-white p-2.5 rounded-xl transition">← Kembali</button>
@@ -335,7 +312,7 @@ export default function SekretarisRonda() {
 
           {hasConflict && (
             <div className="bg-rose-950/40 border border-rose-500/50 rounded-xl p-3 text-xs text-rose-400 flex items-center gap-2">
-              <span className="text-lg">⚠️</span> Terdapat jadwal yang bentrok (kotak merah). Tombol Publish dikunci. Silakan perbaiki aturan khusus atau tukar manual.
+              <span className="text-lg">⚠️</span> Terdapat jadwal yang bentrok. Silakan periksa nama berwarna merah.
             </div>
           )}
 
@@ -346,84 +323,55 @@ export default function SekretarisRonda() {
              <p className="text-xs text-slate-400">Klik "Generate Draft" untuk membuat jadwal otomatis.</p>
            </div>
           ) : (
-            <div className="space-y-6">
-              {/* Loop Per Putaran */}
-              {[1, 2, 3].map((putaranKe) => {
-                const jadwalPutaran = draftData.filter(d => d.putaran === putaranKe);
-                if (jadwalPutaran.length === 0) return null;
-
-                return (
-                  <div key={putaranKe} className="bg-slate-900/60 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl">
-                    <div className="flex items-center gap-2 mb-4 border-b border-slate-800/80 pb-3">
-                      <span className="bg-indigo-500/20 text-indigo-400 text-xs font-bold px-3 py-1 rounded-lg">Putaran {putaranKe}</span>
-                      <span className="text-xs text-slate-500">{jadwalPutaran.length} Hari</span>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {jadwalPutaran.map((item, idx) => {
-                        const globalIdx = draftData.findIndex(d => d.id === item.id);
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-950 text-slate-400 border-b border-slate-800">
+                    <tr>
+                      <th className="p-3 border-r border-slate-800 text-center">Hari</th>
+                      <th className="p-3 border-r border-slate-800 text-center">Tanggal</th>
+                      <th className="p-3 border-r border-slate-800 text-center">Putaran</th>
+                      {Array.from({ length: selectedPeriode.jumlah_per_grup || 3 }).map((_, i) => (
+                        <th key={i} className="p-3 border-r border-slate-800">Petugas {i + 1}</th>
+                      ))}
+                      <th className="p-3 text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {draftData.map((item, idx) => (
+                      <tr key={idx} className={`hover:bg-slate-800/40 ${item.is_libur ? 'opacity-50 grayscale bg-slate-900' : ''}`}>
+                        <td className="p-3 border-r border-slate-800 text-center font-semibold text-white">{item.hari}</td>
+                        <td className="p-3 border-r border-slate-800 text-center text-slate-300">{formatTanggal(item.tanggal)}</td>
+                        <td className="p-3 border-r border-slate-800 text-center text-slate-500">{item.putaran}</td>
                         
-                        let cardBorder = 'border-slate-700/60 hover:border-indigo-500/40';
-                        if (item.is_libur) cardBorder = 'border-slate-800 opacity-50 grayscale';
-                        else if (item.has_conflict) cardBorder = 'border-rose-500/60 shadow-lg shadow-rose-900/20';
-
-                        return (
-                          <div key={idx} className={`bg-slate-950/40 border rounded-2xl p-4 flex flex-col justify-between transition-all duration-200 ${cardBorder}`}>
-                            <div>
-                              {/* Header Kartu */}
-                              <div className="flex justify-between items-start mb-3">
-                                <div>
-                                  <div className="text-xs text-slate-400 font-medium">{item.hari}</div>
-                                  <div className="text-sm font-bold text-white mt-0.5">{formatTanggal(item.tanggal)}</div>
+                        {item.is_libur ? (
+                          <td colSpan={selectedPeriode.jumlah_per_grup || 3} className="p-3 border-r border-slate-800 text-center text-rose-400 font-bold italic">LIBUR</td>
+                        ) : (
+                          <>
+                            {item.petugas.map((p, pIdx) => (
+                              <td key={pIdx} className="p-3 border-r border-slate-800">
+                                <div className={`font-semibold ${item.has_conflict && p.hari_ronda_khusus ? 'text-rose-400' : 'text-slate-200'}`}>
+                                  {p.nama_lengkap.split(' ')[0]}
                                 </div>
-                                <span className="text-[10px] font-bold bg-slate-800 text-slate-400 px-2 py-1 rounded">Grup {item.grup_id}</span>
-                              </div>
-
-                              {/* List Petugas */}
-                              <div className="space-y-2 mt-4">
-                                {item.is_libur ? (
-                                  <div className="text-center py-4 text-rose-400 font-bold text-sm italic">Diliburkan</div>
-                                ) : (
-                                  item.petugas.map((p, pIdx) => (
-                                    <div key={pIdx} className="flex items-center gap-2 bg-slate-900/80 border border-slate-800 p-2 rounded-xl">
-                                      <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-[10px] font-bold shrink-0">
-                                        {pIdx + 1}
-                                      </div>
-                                      <div className="min-w-0">
-                                        <div className={`text-xs font-semibold truncate ${item.has_conflict && p.hari_ronda_khusus ? 'text-rose-400' : 'text-slate-200'}`}>
-                                          {p.nama_lengkap.split(' ')[0]}
-                                        </div>
-                                        <div className="text-[9px] text-slate-500 font-mono truncate">{p.no_rumah || p.warga?.no_rumah}</div>
-                                      </div>
-                                    </div>
-                                  ))
-                                )}
-                              </div>
-                              
-                              {item.has_conflict && (
-                                <div className="mt-3 text-[10px] text-rose-400 bg-rose-500/10 p-2 rounded border border-rose-500/20">
-                                  ⚠️ Bentrok: {item.catatan}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Footer Kartu */}
-                            <div className="mt-4 pt-3 border-t border-slate-800/60 flex justify-end">
-                              <button 
-                                onClick={() => handleToggleLibur(globalIdx)} 
-                                disabled={isPublished}
-                                className={`text-[10px] font-bold px-3 py-1.5 rounded-lg transition ${item.is_libur ? 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white' : 'bg-rose-600/10 text-rose-400 hover:bg-rose-600 hover:text-white'}`}
-                              >
-                                {item.is_libur ? 'Aktifkan Ronda' : 'Liburkan'}
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+                                <div className="text-[10px] text-slate-500 font-mono">{p.warga?.no_rumah || '-'}</div>
+                              </td>
+                            ))}
+                            {Array.from({ length: (selectedPeriode.jumlah_per_grup || 3) - item.petugas.length }).map((_, emptyIdx) => (
+                              <td key={`empty-${emptyIdx}`} className="p-3 border-r border-slate-800 text-slate-600">-</td>
+                            ))}
+                          </>
+                        )}
+                        
+                        <td className="p-3 text-center">
+                          <button onClick={() => handleToggleLibur(idx)} disabled={isPublished} className={`px-2 py-1.5 rounded-lg text-[10px] font-semibold transition ${item.is_libur ? 'bg-emerald-600/20 text-emerald-400' : 'bg-rose-600/20 text-rose-400'}`}>
+                            {item.is_libur ? 'Aktifkan' : 'Libur'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -431,9 +379,7 @@ export default function SekretarisRonda() {
     );
   }
 
-  // ═══════════════════════════════════════════════
-  // ═══ RENDER HALAMAN LIST (TABS) ═══
-  // ═══════════════════════════════════════════════
+  // ═══ RENDER LIST (TABS) ═══
   const filteredWarga = wargaList.filter(w => 
     w.nama_lengkap?.toLowerCase().includes(searchWarga.toLowerCase()) || 
     w.no_rumah?.toLowerCase().includes(searchWarga.toLowerCase())
@@ -505,7 +451,7 @@ export default function SekretarisRonda() {
             <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-2xl space-y-3">
               <div>
                 <h2 className="text-lg font-bold text-white">Aturan Khusus Ronda</h2>
-                <p className="text-xs text-slate-400">Atur siapa saja yang <strong>tidak ikut ronda</strong>, atau yang <strong>hanya bisa hari tertentu</strong> (pisahkan dengan koma jika lebih dari satu, contoh: "Sabtu, Minggu").</p>
+                <p className="text-xs text-slate-400">Atur siapa saja yang <strong>tidak ikut ronda</strong>, atau yang <strong>hanya bisa hari tertentu</strong> (contoh: "Sabtu" atau "Sabtu, Minggu").</p>
               </div>
               <input type="text" placeholder="Cari nama atau no. rumah..." className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={searchWarga} onChange={(e) => setSearchWarga(e.target.value)} />
             </div>
