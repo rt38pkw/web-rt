@@ -32,7 +32,6 @@ export default function SekretarisRonda() {
     else fetchWargaRonda();
   }, [activeTab]);
 
-  // ═══ FUNGSI PERIODE ═══
   async function fetchPeriode() {
     setLoading(true);
     const { data, error } = await supabase.from('periode_ronda').select('*').order('created_at', { ascending: false });
@@ -61,7 +60,6 @@ export default function SekretarisRonda() {
     } catch (err) { alert('❌ Gagal: ' + err.message); } finally { setProcessing(false); }
   };
 
-  // ═══ FUNGSI DETAIL & GENERATE ═══
   const handleLihatDetail = async (periode) => {
     setSelectedPeriode(periode);
     setViewMode('detail');
@@ -93,14 +91,42 @@ export default function SekretarisRonda() {
 
     setIsGenerating(true);
     try {
+      // 1. Ambil data penghuni aktif
       const { data: penghuni, error } = await supabase.from('penghuni').select('*, warga:warga_id(no_rumah)').eq('is_aktif', true).eq('status_verifikasi', 'approved').eq('ikut_ronda', true);
       if (error) throw error;
+
+      // 2. Ambil HISTORY MAP dari jadwal PUBLISHED sebelumnya
+      // Kita cari jadwal yang tanggalnya lebih kecil dari tanggal mulai periode baru
+      const { data: historyData, error: histErr } = await supabase
+        .from('jadwal_ronda')
+        .select('tanggal, petugas:petugas_ronda(penghuni_id), periode:periode_id(status)')
+        .lt('tanggal', selectedPeriode.tanggal_mulai)
+        .order('tanggal', { ascending: false }); // Urutkan dari yang paling baru
+
+      if (histErr) throw histErr;
+
+      // 3. Susun History Map (Catatan Tanggal Terakhir)
+      let historyMap = {};
+      if (historyData) {
+        historyData.forEach(j => {
+          // Hanya baca dari periode yang sudah PUBLISHED
+          if (j.periode && j.periode.status === 'published' && j.petugas) {
+            j.petugas.forEach(p => {
+              // Karena descending, data pertama yang ditemukan adalah tanggal terakhirnya
+              if (!historyMap[p.penghuni_id]) {
+                historyMap[p.penghuni_id] = j.tanggal;
+              }
+            });
+          }
+        });
+      }
       
-      const { draft, hasConflict } = generateJadwalRonda(penghuni, selectedPeriode);
+      // 4. Panggil Generator dengan membawa History Map
+      const { draft, hasConflict } = generateJadwalRonda(penghuni, selectedPeriode, historyMap);
       
       setDraftData(draft);
       setHasConflict(hasConflict);
-      alert('✅ Draft berhasil di-generate!');
+      alert('✅ Draft berhasil di-generate dengan kalkulasi Cross-Periode!');
     } catch (err) { alert('Gagal generate: ' + err.message); } finally { setIsGenerating(false); }
   };
 
@@ -127,7 +153,6 @@ export default function SekretarisRonda() {
     } catch (err) { alert('Gagal menyimpan: ' + err.message); } finally { setIsSaving(false); }
   };
 
-  // ═══ FITUR BARU: BATAL PUBLISH & HAPUS DRAFT ═══
   const handleBatalPublish = async () => {
     if (!confirm('Batalkan publish? Jadwal akan kembali menjadi draft dan bisa diedit/di-generate ulang.')) return;
     setIsSaving(true);
@@ -146,7 +171,6 @@ export default function SekretarisRonda() {
     if (!confirm('Hapus semua jadwal draft saat ini? Anda bisa generate ulang dari awal.')) return;
     setIsSaving(true);
     try {
-      // Hapus dari DB jika sebelumnya sudah pernah disimpan sebagai draft
       const { data: jadwalIds } = await supabase.from('jadwal_ronda').select('id').eq('periode_id', selectedPeriode.id);
       if (jadwalIds && jadwalIds.length > 0) {
         const ids = jadwalIds.map(j => j.id);
@@ -158,7 +182,6 @@ export default function SekretarisRonda() {
     } catch (err) { alert('Gagal: ' + err.message); } finally { setIsSaving(false); }
   };
 
-  // ═══ FUNGSI ATURAN KHUSUS ═══
   const fetchWargaRonda = async () => {
     setLoadingWarga(true);
     const { data } = await supabase.from('warga').select('*, penghuni:penghuni(*)').order('no_rumah');
@@ -180,7 +203,6 @@ export default function SekretarisRonda() {
   const formatTanggal = (dateStr) => dateStr ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(dateStr)) : '-';
   const formatJam = (timeStr) => timeStr ? timeStr.substring(0, 5) : '-';
 
-  // ═══ RENDER DETAIL JADWAL ═══
   if (viewMode === 'detail' && selectedPeriode) {
     return (
       <Layout>
@@ -203,7 +225,6 @@ export default function SekretarisRonda() {
                   <button onClick={() => handleSimpanJadwal('draft')} disabled={isSaving || draftData.length === 0} className="bg-orange-600 hover:bg-orange-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg">💾 Simpan Draft</button>
                   <button onClick={() => handleSimpanJadwal('published')} disabled={isSaving || draftData.length === 0 || hasConflict} className={`font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg ${hasConflict ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}>🚀 Publish</button>
                   
-                  {/* Tombol Hapus Draft hanya muncul jika ada data */}
                   {draftData.length > 0 && (
                     <button onClick={handleHapusDraft} disabled={isSaving} className="bg-rose-600/20 border border-rose-500/30 hover:bg-rose-600 hover:text-white text-rose-400 font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg">🗑️ Hapus Draft</button>
                   )}
@@ -229,7 +250,6 @@ export default function SekretarisRonda() {
     );
   }
 
-  // ═══ RENDER HALAMAN UTAMA ═══
   return (
     <Layout>
       <div className="max-w-6xl mx-auto space-y-4">
