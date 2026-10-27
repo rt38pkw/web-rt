@@ -37,13 +37,11 @@ export default function SekretarisRonda() {
   const [verifikasiEdits, setVerifikasiEdits] = useState({}); 
   const [zoomImage, setZoomImage] = useState(null);
 
-  // ═══ PERBAIKAN: FETCH WARGA & PERIODE SAAT PERTAMA KALI DIBUKA ═══
   useEffect(() => {
     fetchPeriode();
-    fetchWargaRonda(); // Wajib di-load di awal agar Import Excel bisa mencocokkan data
+    fetchWargaRonda();
   }, []);
 
-  // ═══ FETCH DATA SAAT PINDAH TAB ═══
   useEffect(() => {
     if (activeTab === 'verifikasi') fetchVerifikasiRonda();
   }, [activeTab]);
@@ -55,17 +53,19 @@ export default function SekretarisRonda() {
     setLoading(false);
   }
 
+  // ═══ PERBAIKAN: FILTER VERIFIKASI HANYA YANG PENDING ═══
   async function fetchVerifikasiRonda() {
     setLoadingVerifikasi(true);
     try {
       const { data, error } = await supabase
         .from('petugas_ronda')
         .select(`
-          id, jadwal_id, status_hadir, foto_bukti,
-          jadwal:jadwal_id ( tanggal, periode:periode_id(nama_periode, jam_selesai) ),
+          id, jadwal_id, status_hadir, foto_bukti, catatan,
+          jadwal:jadwal_id!inner ( tanggal, periode:periode_id!inner(nama_periode, jam_selesai, status) ),
           penghuni:penghuni_id ( nama_lengkap, warga:warga_id(no_rumah) )
         `)
-        .or(`status_hadir.eq.pending,foto_bukti.is.null`) 
+        .eq('status_hadir', 'pending') // Hanya tarik yang masih pending
+        .eq('jadwal.periode.status', 'published') // Hanya dari periode yang sudah publish
         .order('jadwal(tanggal)', { ascending: true });
 
       if (error) throw error;
@@ -77,7 +77,8 @@ export default function SekretarisRonda() {
             tanggal: curr.jadwal.tanggal,
             periode: curr.jadwal.periode.nama_periode,
             jam_selesai: curr.jadwal.periode.jam_selesai,
-            foto_bukti: curr.foto_bukti,
+            foto_bukti: curr.foto_bukti, // Ambil foto dari salah satu petugas di grup
+            catatan: curr.catatan,
             petugas: []
           };
         }
@@ -85,6 +86,7 @@ export default function SekretarisRonda() {
         return acc;
       }, {});
 
+      // Filter: Hanya tampilkan yang tanggalnya HARI INI atau MASA LALU
       const today = new Date();
       today.setHours(0,0,0,0);
       
@@ -95,6 +97,7 @@ export default function SekretarisRonda() {
 
       setVerifikasiData(filteredGroups);
 
+      // Inisialisasi edit: default hadir
       const initialEdits = {};
       (data || []).forEach(p => { initialEdits[p.id] = 'hadir'; });
       setVerifikasiEdits(initialEdits);
@@ -359,7 +362,10 @@ export default function SekretarisRonda() {
                       <div className="p-4 flex-1 flex flex-col gap-3">
                         <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                           <span className="text-xs text-slate-300">Petugas:</span>
-                          {!hasPhoto && <span className="text-[10px] text-rose-400 font-bold">{formatTanggal(group.tanggal)}</span>}
+                          <div className="text-right">
+                            {!hasPhoto && <div className="text-[10px] text-rose-400 font-bold">{formatTanggal(group.tanggal)}</div>}
+                            {group.catatan && <div className="text-[9px] text-amber-400 italic mt-1">Catatan: "{group.catatan}"</div>}
+                          </div>
                         </div>
                         
                         <div className="space-y-2 flex-1">
