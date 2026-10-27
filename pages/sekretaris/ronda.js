@@ -37,10 +37,15 @@ export default function SekretarisRonda() {
   const [verifikasiEdits, setVerifikasiEdits] = useState({}); 
   const [zoomImage, setZoomImage] = useState(null);
 
+  // ═══ PERBAIKAN: FETCH WARGA & PERIODE SAAT PERTAMA KALI DIBUKA ═══
   useEffect(() => {
-    if (activeTab === 'jadwal') fetchPeriode();
-    else if (activeTab === 'aturan') fetchWargaRonda();
-    else if (activeTab === 'verifikasi') fetchVerifikasiRonda();
+    fetchPeriode();
+    fetchWargaRonda(); // Wajib di-load di awal agar Import Excel bisa mencocokkan data
+  }, []);
+
+  // ═══ FETCH DATA SAAT PINDAH TAB ═══
+  useEffect(() => {
+    if (activeTab === 'verifikasi') fetchVerifikasiRonda();
   }, [activeTab]);
 
   async function fetchPeriode() {
@@ -50,11 +55,9 @@ export default function SekretarisRonda() {
     setLoading(false);
   }
 
-  // ═══ FUNGSI VERIFIKASI & ALPA MANUAL ═══
   async function fetchVerifikasiRonda() {
     setLoadingVerifikasi(true);
     try {
-      // Ambil data jadwal yang statusnya pending ATAU yang tidak punya foto
       const { data, error } = await supabase
         .from('petugas_ronda')
         .select(`
@@ -62,12 +65,11 @@ export default function SekretarisRonda() {
           jadwal:jadwal_id ( tanggal, periode:periode_id(nama_periode, jam_selesai) ),
           penghuni:penghuni_id ( nama_lengkap, warga:warga_id(no_rumah) )
         `)
-        .or(`status_hadir.eq.pending,foto_bukti.is.null`) // Ambil yang pending ATAU belum ada foto
+        .or(`status_hadir.eq.pending,foto_bukti.is.null`) 
         .order('jadwal(tanggal)', { ascending: true });
 
       if (error) throw error;
 
-      // Kelompokkan
       const grouped = (data || []).reduce((acc, curr) => {
         if (!acc[curr.jadwal_id]) {
           acc[curr.jadwal_id] = {
@@ -83,13 +85,12 @@ export default function SekretarisRonda() {
         return acc;
       }, {});
 
-      // Filter: Hanya tampilkan yang tanggalnya HARI INI atau MASA LALU
       const today = new Date();
       today.setHours(0,0,0,0);
       
       const filteredGroups = Object.values(grouped).filter(group => {
         const jadwalDate = new Date(group.tanggal);
-        return jadwalDate <= today; // Hanya tampilkan yang sudah lewat/hari ini
+        return jadwalDate <= today; 
       });
 
       setVerifikasiData(filteredGroups);
@@ -130,7 +131,6 @@ export default function SekretarisRonda() {
     }
   };
 
-  // ═══ FUNGSI LAINNYA (Sama seperti sebelumnya) ═══
   const handleBuatPeriode = async (formData) => {
     setProcessing(true);
     try {
@@ -317,7 +317,6 @@ export default function SekretarisRonda() {
           </div>
         )}
 
-        {/* ═══ TAB VERIFIKASI (DIPERBARUI) ═══ */}
         {activeTab === 'verifikasi' && (
           <div className="space-y-4 animate-in fade-in">
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg">
@@ -340,7 +339,6 @@ export default function SekretarisRonda() {
                   return (
                     <div key={group.jadwal_id} className={`border rounded-2xl overflow-hidden shadow-lg flex flex-col ${!hasPhoto ? 'bg-rose-950/20 border-rose-500/30' : 'bg-slate-900 border-slate-800'}`}>
                       
-                      {/* Bagian Atas: Foto atau Peringatan */}
                       {hasPhoto ? (
                         <div className="h-48 bg-black relative cursor-zoom-in" onClick={() => setZoomImage(group.foto_bukti)}>
                           <img src={group.foto_bukti} alt="Bukti" className="w-full h-full object-cover opacity-80" />
@@ -358,7 +356,6 @@ export default function SekretarisRonda() {
                         </div>
                       )}
 
-                      {/* Bagian Daftar Petugas */}
                       <div className="p-4 flex-1 flex flex-col gap-3">
                         <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                           <span className="text-xs text-slate-300">Petugas:</span>
