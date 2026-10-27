@@ -1,15 +1,20 @@
+// components/warga/Layout.js
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import InstallButton from '../InstallButton';
-import NotifToggle from '../NotifToggle'; // <--- IMPORT INI
+import NotifToggle from '../NotifToggle';
 
 const MENU = [
   { key: 'iuran', label: 'Status Iuran', icon: '💰', path: '/dashboard-warga/iuran' },
   { key: 'projek', label: 'Projek', icon: '🏗️', path: '/dashboard-warga/projek' },
+  // ═══ TAMBAHAN BARU: MENU RONDA ═══
+  { key: 'ronda', label: 'Ronda', icon: '🛡️', path: '/dashboard-warga/ronda' }, 
 ];
 
 export default function Layout({ children, warga, onLogout }) {
   const router = useRouter();
+  
+  // Logika activeKey tetap berjalan normal
   const activeKey = MENU.find((m) => router.pathname.startsWith(m.path))?.key || 'iuran';
 
   return (
@@ -26,9 +31,7 @@ export default function Layout({ children, warga, onLogout }) {
         </Link>
 
         <div className="flex items-center gap-2">
-          {/* TOMBOL NOTIFIKASI DIPASANG DI SINI */}
           {warga && <NotifToggle userId={warga.id} userType="warga" />}
-          
           <InstallButton />
           <button
             onClick={onLogout}
