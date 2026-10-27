@@ -33,11 +33,17 @@ export default function SekretarisRonda() {
   const [loadingWarga, setLoadingWarga] = useState(false);
   const [searchWarga, setSearchWarga] = useState('');
 
-  // LOAD DATA WALGA DI AWAL AGAR EXCEL BISA VALIDASI
+  // ═══ STATE UNTUK VERIFIKASI ═══
+  const [verifikasiData, setVerifikasiData] = useState([]);
+  const [loadingVerifikasi, setLoadingVerifikasi] = useState(false);
+  const [verifikasiEdits, setVerifikasiEdits] = useState({}); // Menyimpan status sementara (hadir/alpa)
+  const [zoomImage, setZoomImage] = useState(null);
+
   useEffect(() => {
-    fetchPeriode();
-    fetchWargaRonda();
-  }, []);
+    if (activeTab === 'jadwal') fetchPeriode();
+    else if (activeTab === 'aturan') fetchWargaRonda();
+    else if (activeTab === 'verifikasi') fetchVerifikasiRonda();
+  }, [activeTab]);
 
   async function fetchPeriode() {
     setLoading(true);
@@ -46,12 +52,83 @@ export default function SekretarisRonda() {
     setLoading(false);
   }
 
+  // ═══ FUNGSI VERIFIKASI ═══
+  async function fetchVerifikasiRonda() {
+    setLoadingVerifikasi(true);
+    try {
+      const { data, error } = await supabase
+        .from('petugas_ronda')
+        .select(`
+          id, jadwal_id, status_hadir, foto_bukti,
+          jadwal:jadwal_id ( tanggal, periode:periode_id(nama_periode) ),
+          penghuni:penghuni_id ( nama_lengkap, warga:warga_id(no_rumah) )
+        `)
+        .not('foto_bukti', 'is', null) // Hanya ambil yang ada fotonya
+        .eq('status_hadir', 'pending'); // Hanya yang butuh verifikasi
+
+      if (error) throw error;
+
+      // Kelompokkan berdasarkan jadwal_id (karena 1 foto untuk 1 grup)
+      const grouped = (data || []).reduce((acc, curr) => {
+        if (!acc[curr.jadwal_id]) {
+          acc[curr.jadwal_id] = {
+            jadwal_id: curr.jadwal_id,
+            tanggal: curr.jadwal.tanggal,
+            periode: curr.jadwal.periode.nama_periode,
+            foto_bukti: curr.foto_bukti,
+            petugas: []
+          };
+        }
+        acc[curr.jadwal_id].petugas.push(curr);
+        return acc;
+      }, {});
+
+      setVerifikasiData(Object.values(grouped));
+
+      // Inisialisasi edit: Semua dianggap "hadir" sampai Sekretaris mengubahnya
+      const initialEdits = {};
+      (data || []).forEach(p => { initialEdits[p.id] = 'hadir'; });
+      setVerifikasiEdits(initialEdits);
+
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingVerifikasi(false);
+    }
+  }
+
+  const handleSimpanVerifikasi = async (jadwalId, petugasList) => {
+    if (!confirm('Simpan hasil verifikasi untuk grup ini?')) return;
+    setProcessing(true);
+    try {
+      const savedUser = JSON.parse(localStorage.getItem('pengurusSession'));
+      const verifierId = savedUser?.id || null;
+
+      for (const p of petugasList) {
+        const newStatus = verifikasiEdits[p.id];
+        const { error } = await supabase
+          .from('petugas_ronda')
+          .update({ status_hadir: newStatus, verified_by: verifierId })
+          .eq('id', p.id);
+        if (error) throw error;
+      }
+
+      alert('✅ Verifikasi berhasil disimpan!');
+      fetchVerifikasiRonda(); // Refresh list
+    } catch (err) {
+      alert('Gagal memverifikasi: ' + err.message);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // ═══ FUNGSI PERIODE & DRAFT LAINNYA ═══
   const handleBuatPeriode = async (formData) => {
     setProcessing(true);
     try {
       const { error } = await supabase.from('periode_ronda').insert([formData]);
       if (error) throw error;
-      alert('✅ Wadah Periode berhasil dibuat! Silakan isi jadwal di dalamnya.');
+      alert('✅ Wadah Periode berhasil dibuat!');
       setShowModalPeriode(false);
       fetchPeriode();
     } catch (err) { alert('Gagal: ' + err.message); } finally { setProcessing(false); }
@@ -59,12 +136,11 @@ export default function SekretarisRonda() {
 
   const handleHapusPeriode = async (id, nama, status) => {
     if (status === 'published') return alert('❌ Gagal: Batalkan Publish terlebih dahulu.');
-    if (!confirm(`Hapus periode "${nama}" beserta seluruh jadwalnya?`)) return;
+    if (!confirm(`Hapus periode "${nama}"?`)) return;
     setProcessing(true);
     try {
-      const { error } = await supabase.from('periode_ronda').delete().eq('id', id);
-      if (error) throw error;
-      alert('✅ Periode dihapus!'); fetchPeriode();
+      await supabase.from('periode_ronda').delete().eq('id', id);
+      fetchPeriode();
     } catch (err) { alert('❌ Gagal: ' + err.message); } finally { setProcessing(false); }
   };
 
@@ -88,14 +164,12 @@ export default function SekretarisRonda() {
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  // ═══ GENERATE OTOMATIS ═══
   const handleGenerateDraft = async (setupData) => {
     setIsGenerating(true);
     try {
       const { data: penghuni, error } = await supabase.from('penghuni').select('*, warga:warga_id(no_rumah)').eq('is_aktif', true).eq('status_verifikasi', 'approved').eq('ikut_ronda', true);
       if (error) throw error;
 
-      // Ambil History
       const { data: historyData } = await supabase.from('jadwal_ronda').select('tanggal, petugas:petugas_ronda(penghuni_id), periode:periode_id(status)').lt('tanggal', setupData.tanggal_mulai).order('tanggal', { ascending: false });
       let historyMap = {};
       if (historyData) {
@@ -112,26 +186,20 @@ export default function SekretarisRonda() {
       setDraftData(draft);
       setHasConflict(hasConflict);
       setShowSetupOtomatis(false);
-      alert('✅ Draft berhasil di-generate!');
     } catch (err) { alert('Gagal generate: ' + err.message); } finally { setIsGenerating(false); }
   };
 
-  // ═══ SIMPAN HASIL EXCEL KE DRAFT ═══
   const handleSaveExcelToDraft = async (excelData) => {
     setIsSaving(true);
     try {
       await simpanJadwalRonda(selectedPeriode.id, 'draft', excelData);
-      
-      // Update periode tanggal_mulai sesuai tanggal terawal di Excel
       if (excelData.length > 0) {
         const dates = excelData.map(d => new Date(d.tanggal));
         const minDate = new Date(Math.min.apply(null, dates)).toISOString().split('T')[0];
         await supabase.from('periode_ronda').update({ tanggal_mulai: minDate, tipe_periode: 'custom_excel' }).eq('id', selectedPeriode.id);
       }
-
-      alert('✅ Data Excel berhasil disimpan ke Draft!');
+      alert('✅ Data Excel berhasil disimpan!');
       setShowImportExcel(false);
-      setSelectedPeriode({ ...selectedPeriode, tanggal_mulai: excelData[0].tanggal });
       handleLihatDetail({ ...selectedPeriode, tanggal_mulai: excelData[0].tanggal });
       fetchPeriode();
     } catch (err) { alert('Gagal simpan: ' + err.message); } finally { setIsSaving(false); }
@@ -211,13 +279,12 @@ export default function SekretarisRonda() {
         <div className="max-w-7xl mx-auto space-y-4">
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div className="flex items-center gap-3">
-              <button onClick={() => setViewMode('list')} className="bg-slate-800 hover:bg-slate-700 text-white p-2.5 rounded-xl transition">← Kembali</button>
+              <button onClick={() => { setViewMode('list'); fetchPeriode(); }} className="bg-slate-800 hover:bg-slate-700 text-white p-2.5 rounded-xl transition">← Kembali</button>
               <div>
                 <h2 className="text-lg font-bold text-white">{selectedPeriode.nama_periode} {isPublished && <span className="text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded ml-2 uppercase">Published</span>}</h2>
                 <p className="text-xs text-slate-400">{selectedPeriode.tanggal_mulai ? `Mulai ${formatTanggal(selectedPeriode.tanggal_mulai)}` : 'Belum ada tanggal'} • {formatJam(selectedPeriode.jam_mulai)} WIB</p>
               </div>
             </div>
-            
             <div className="flex flex-wrap gap-2">
               {!isPublished && draftData.length > 0 && (
                 <>
@@ -232,22 +299,16 @@ export default function SekretarisRonda() {
             </div>
           </div>
           
-          {hasConflict && <div className="bg-rose-950/40 border border-rose-500/50 rounded-xl p-3 text-xs text-rose-400 flex items-center gap-2"><span className="text-lg">⚠️</span> Terdapat jadwal yang bentrok. Silakan periksa nama berwarna merah.</div>}
+          {hasConflict && <div className="bg-rose-950/40 border border-rose-500/50 rounded-xl p-3 text-xs text-rose-400 flex items-center gap-2"><span className="text-lg">⚠️</span> Terdapat jadwal yang bentrok.</div>}
 
-          {/* KONDISI JIKA DRAFT MASIH KOSONG (PILIHAN Awal) */}
           {draftData.length === 0 && !isPublished ? (
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-10 text-center flex flex-col items-center justify-center min-h-[300px]">
               <div className="text-5xl mb-4">📝</div>
               <h3 className="text-lg font-bold text-white mb-2">Meja Draft Kosong</h3>
-              <p className="text-xs text-slate-400 mb-6 max-w-md">Silakan pilih metode pengisian jadwal untuk periode ini. Anda bisa menggunakan kecerdasan buatan (Generate) atau memasukkan racikan manual Anda (Import Excel).</p>
-              
+              <p className="text-xs text-slate-400 mb-6 max-w-md">Silakan pilih metode pengisian jadwal untuk periode ini.</p>
               <div className="flex flex-col sm:flex-row gap-3">
-                <button onClick={() => setShowSetupOtomatis(true)} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-3 rounded-xl text-sm transition shadow-lg flex items-center justify-center gap-2">
-                  ⚡ Setup Otomatis
-                </button>
-                <button onClick={() => setShowImportExcel(true)} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-3 rounded-xl text-sm transition shadow-lg flex items-center justify-center gap-2">
-                  📥 Import Excel
-                </button>
+                <button onClick={() => setShowSetupOtomatis(true)} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-3 rounded-xl text-sm transition shadow-lg flex items-center justify-center gap-2">⚡ Setup Otomatis</button>
+                <button onClick={() => setShowImportExcel(true)} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-3 rounded-xl text-sm transition shadow-lg flex items-center justify-center gap-2">📥 Import Excel</button>
               </div>
             </div>
           ) : (
@@ -255,20 +316,8 @@ export default function SekretarisRonda() {
           )}
         </div>
 
-        <ModalSetupOtomatis 
-          isOpen={showSetupOtomatis} 
-          onClose={() => setShowSetupOtomatis(false)} 
-          onGenerate={handleGenerateDraft} 
-          isGenerating={isGenerating} 
-        />
-
-        <ModalImportExcel 
-          isOpen={showImportExcel} 
-          onClose={() => setShowImportExcel(false)} 
-          onSave={handleSaveExcelToDraft} 
-          wargaList={wargaList} 
-          isSaving={isSaving} 
-        />
+        <ModalSetupOtomatis isOpen={showSetupOtomatis} onClose={() => setShowSetupOtomatis(false)} onGenerate={handleGenerateDraft} isGenerating={isGenerating} />
+        <ModalImportExcel isOpen={showImportExcel} onClose={() => setShowImportExcel(false)} onSave={handleSaveExcelToDraft} wargaList={wargaList} isSaving={isSaving} />
       </Layout>
     );
   }
@@ -277,11 +326,15 @@ export default function SekretarisRonda() {
   return (
     <Layout>
       <div className="max-w-6xl mx-auto space-y-4">
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-2 flex gap-2">
-          <button onClick={() => setActiveTab('jadwal')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'jadwal' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800'}`}>📅 Jadwal Ronda</button>
-          <button onClick={() => setActiveTab('aturan')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'aturan' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800'}`}>⚙️ Aturan Khusus Peserta</button>
+        
+        {/* TAB NAVIGATION */}
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-2 flex gap-2 overflow-x-auto">
+          <button onClick={() => setActiveTab('jadwal')} className={`flex-1 py-2.5 px-4 text-xs font-semibold rounded-xl transition whitespace-nowrap ${activeTab === 'jadwal' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800'}`}>📅 Jadwal Ronda</button>
+          <button onClick={() => setActiveTab('verifikasi')} className={`flex-1 py-2.5 px-4 text-xs font-semibold rounded-xl transition whitespace-nowrap ${activeTab === 'verifikasi' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800'}`}>✅ Verifikasi Absen</button>
+          <button onClick={() => setActiveTab('aturan')} className={`flex-1 py-2.5 px-4 text-xs font-semibold rounded-xl transition whitespace-nowrap ${activeTab === 'aturan' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800'}`}>⚙️ Aturan Khusus</button>
         </div>
         
+        {/* TAB 1: JADWAL */}
         {activeTab === 'jadwal' && (
           <div className="space-y-4 animate-in fade-in">
             <div className="flex justify-between items-center bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg">
@@ -324,12 +377,103 @@ export default function SekretarisRonda() {
           </div>
         )}
 
+        {/* TAB 2: VERIFIKASI ABSEN */}
+        {activeTab === 'verifikasi' && (
+          <div className="space-y-4 animate-in fade-in">
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg">
+              <h2 className="text-lg font-bold text-white">Verifikasi Kehadiran Ronda</h2>
+              <p className="text-xs text-slate-400">Periksa foto grup yang diunggah warga. Matikan tombol jika ada warga yang tidak hadir di foto.</p>
+            </div>
+
+            {loadingVerifikasi ? (
+              <div className="py-12 text-center text-slate-500 text-xs animate-pulse">Memuat data absensi...</div>
+            ) : verifikasiData.length === 0 ? (
+              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-10 text-center flex flex-col items-center justify-center">
+                <div className="text-5xl mb-3">📭</div>
+                <h3 className="text-base font-bold text-white mb-1">Tidak Ada Absensi Pending</h3>
+                <p className="text-xs text-slate-400">Semua bukti ronda sudah diverifikasi.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {verifikasiData.map((group) => (
+                  <div key={group.jadwal_id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg flex flex-col">
+                    
+                    {/* Bagian Foto */}
+                    <div 
+                      className="h-48 bg-black relative cursor-zoom-in group"
+                      onClick={() => setZoomImage(group.foto_bukti)}
+                    >
+                      <img src={group.foto_bukti} alt="Bukti Ronda" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition" />
+                      <div className="absolute top-2 left-2 bg-black/70 px-2 py-1 rounded text-[10px] text-white backdrop-blur-sm border border-slate-700">
+                        🔍 Klik untuk Perbesar
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-3">
+                        <div className="text-xs font-bold text-white">{formatTanggal(group.tanggal)}</div>
+                        <div className="text-[10px] text-teal-400">{group.periode}</div>
+                      </div>
+                    </div>
+
+                    {/* Bagian Daftar Petugas (Toggle) */}
+                    <div className="p-4 flex-1 flex flex-col gap-3">
+                      <p className="text-xs text-slate-300 border-b border-slate-800 pb-2">Daftar Petugas Bertugas:</p>
+                      
+                      <div className="space-y-2 flex-1">
+                        {group.petugas.map(p => {
+                          const statusSekarang = verifikasiEdits[p.id] || 'hadir';
+                          return (
+                            <div key={p.id} className="flex justify-between items-center bg-slate-950 p-2 rounded-lg border border-slate-800">
+                              <div>
+                                <div className="text-xs font-semibold text-white">{p.penghuni?.nama_lengkap}</div>
+                                <div className="text-[10px] text-slate-500 font-mono">{p.penghuni?.warga?.no_rumah}</div>
+                              </div>
+                              
+                              <button
+                                onClick={() => setVerifikasiEdits({ ...verifikasiEdits, [p.id]: statusSekarang === 'hadir' ? 'tidak_hadir' : 'hadir' })}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition border ${
+                                  statusSekarang === 'hadir' 
+                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+                                    : 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                                }`}
+                              >
+                                {statusSekarang === 'hadir' ? '✅ Hadir' : '❌ Alpa'}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <button 
+                        onClick={() => handleSimpanVerifikasi(group.jadwal_id, group.petugas)}
+                        disabled={processing}
+                        className="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-lg"
+                      >
+                        {processing ? 'Menyimpan...' : 'Simpan Verifikasi'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: ATURAN KHUSUS */}
         {activeTab === 'aturan' && (
           <TabelAturanKhusus wargaList={wargaList} loading={loadingWarga} search={searchWarga} setSearch={setSearchWarga} onUpdateAturan={handleUpdateAturan} />
         )}
       </div>
 
       <ModalBuatPeriode isOpen={showModalPeriode} onClose={() => setShowModalPeriode(false)} onSave={handleBuatPeriode} processing={processing} />
+
+      {/* MODAL ZOOM FOTO */}
+      {zoomImage && (
+        <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setZoomImage(null)}>
+          <button className="absolute top-4 right-4 text-white text-3xl font-bold hover:text-rose-500 transition z-10" onClick={() => setZoomImage(null)}>✕</button>
+          <div className="w-full h-full overflow-auto flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+             <img src={zoomImage} alt="Zoom Bukti" className="min-w-full min-h-full object-contain rounded-lg shadow-2xl" />
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }
