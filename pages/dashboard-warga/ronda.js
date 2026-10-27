@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabase';
 import { uploadBuktiRonda } from '../../lib/ronda/storage';
-import Layout from '../../components/warga/Layout'; // <--- TAMBAHKAN INI
+import Layout from '../../components/warga/Layout';
 
 export default function RondaWarga() {
   const router = useRouter();
@@ -34,6 +34,7 @@ export default function RondaWarga() {
       
       const penghuniIds = (penghuniData || []).map(p => p.id);
 
+      // 1. Ambil Jadwal MILIK SAYA (untuk keperluan absen di bawah)
       if (penghuniIds.length > 0) {
         const { data: myJadwal } = await supabase
           .from('petugas_ronda')
@@ -43,6 +44,7 @@ export default function RondaWarga() {
         setJadwalSaya(myJadwal || []);
       }
 
+      // 2. Ambil Jadwal FULL RT (Tabel Utama)
       const { data: fullJadwal } = await supabase
         .from('jadwal_ronda')
         .select(`
@@ -53,6 +55,7 @@ export default function RondaWarga() {
         .order('tanggal', { ascending: true });
       setJadwalFull(fullJadwal || []);
 
+      // 3. Ambil Leaderboard
       const { data: allPetugas } = await supabase
         .from('petugas_ronda')
         .select('penghuni_id, penghuni:penghuni_id(nama_lengkap, warga:warga_id(no_rumah))')
@@ -105,7 +108,7 @@ export default function RondaWarga() {
   };
 
   const formatTanggal = (dateStr) => dateStr ? new Intl.DateTimeFormat('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(dateStr)) : '-';
-
+  
   const cekStatusWaktu = (tanggalJadwal, jamSelesai) => {
     if (!tanggalJadwal || !jamSelesai) return 'closed';
     const deadline = new Date(`${tanggalJadwal}T${jamSelesai}`);
@@ -123,7 +126,6 @@ export default function RondaWarga() {
   if (!user) return null;
 
   return (
-    // ═══ BUNGKUS DENGAN LAYOUT WARGA ═══
     <Layout warga={user} onLogout={handleLogout}>
       <div className="space-y-6">
         
@@ -132,65 +134,46 @@ export default function RondaWarga() {
           <p className="text-xs text-slate-400">Pantau jadwal, lakukan absensi, dan lihat siapa yang paling rajin!</p>
         </div>
 
+        {/* ═══ ATAS: JADWAL FULL & LEADERBOARD ═══ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           
           <div className="lg:col-span-2 space-y-4">
-            <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-2">📅 Jadwal Ronda Terdekat</h2>
+            <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-2">📅 Jadwal Ronda Lengkap</h2>
             
             <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full text-left text-xs min-w-[500px]">
                   <thead className="bg-slate-950 text-slate-400 border-b border-slate-800">
                     <tr>
-                      <th className="p-3 whitespace-nowrap">Tanggal</th>
-                      <th className="p-3">Petugas (Status)</th>
-                      <th className="p-3 text-right">Aksi Anda</th>
+                      <th className="p-4 whitespace-nowrap">Tanggal</th>
+                      <th className="p-4">Petugas</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
                     {jadwalFull.slice(0, 15).map((j) => {
                       const myPetugasData = jadwalSaya.find(ms => ms.jadwal_id === j.id);
                       const isMySchedule = !!myPetugasData;
-                      const statusWaktu = cekStatusWaktu(j.tanggal, j.periode?.jam_selesai);
                       
                       return (
                         <tr key={j.id} className={isMySchedule ? 'bg-indigo-900/20' : 'hover:bg-slate-800/40'}>
-                          <td className="p-3 align-top text-slate-200 whitespace-nowrap font-semibold">
+                          <td className="p-4 align-middle text-slate-200 whitespace-nowrap font-semibold">
                             {formatTanggal(j.tanggal)}
+                            {isMySchedule && <span className="ml-2 text-[9px] bg-indigo-500 text-white px-1.5 py-0.5 rounded">Anda</span>}
                           </td>
-                          <td className="p-3 align-top">
+                          <td className="p-4 align-middle">
                             <div className="flex flex-wrap gap-1.5">
                               {j.petugas.map((p, idx) => (
-                                <span key={idx} className={`px-2 py-1 rounded text-[10px] border ${
+                                <span key={idx} className={`px-2 py-1.5 rounded-lg text-[10px] border flex items-center gap-1 ${
                                   p.status_hadir === 'hadir' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 
                                   p.status_hadir === 'pending' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                                   p.status_hadir === 'tidak_hadir' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
                                   'bg-slate-800 text-slate-400 border-slate-700'
                                 }`}>
+                                  {p.status_hadir === 'hadir' ? '✅' : p.status_hadir === 'pending' ? '⏳' : p.status_hadir === 'tidak_hadir' ? '❌' : '⚪'}
                                   {p.penghuni?.nama_lengkap.split(' ')[0]} <span className="opacity-50">({p.penghuni?.warga?.no_rumah})</span>
                                 </span>
                               ))}
                             </div>
-                          </td>
-                          <td className="p-3 align-top text-right">
-                            {isMySchedule ? (
-                              !myPetugasData.foto_bukti ? (
-                                statusWaktu === 'open' ? (
-                                  <>
-                                    <input type="file" accept="image/*" capture="environment" id={`up-${j.id}`} className="hidden" onChange={(e) => handleUploadBukti(e, j.id, myPetugasData.id)} />
-                                    <label htmlFor={`up-${j.id}`} className={`bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-3 py-1.5 rounded-lg text-[10px] cursor-pointer transition ${uploadingId === j.id ? 'opacity-50' : ''}`}>
-                                      {uploadingId === j.id ? 'Upload...' : '📸 Absen'}
-                                    </label>
-                                  </>
-                                ) : (
-                                  <span className="text-[10px] text-rose-400 italic font-bold">Waktu Habis</span>
-                                )
-                              ) : (
-                                <span className="text-[10px] text-teal-400">Terkirim</span>
-                              )
-                            ) : (
-                              <span className="text-[10px] text-slate-600">-</span>
-                            )}
                           </td>
                         </tr>
                       );
@@ -199,10 +182,11 @@ export default function RondaWarga() {
                 </table>
               </div>
             </div>
+            {jadwalFull.length > 15 && <p className="text-center text-xs text-slate-500">Menampilkan 15 jadwal terdekat...</p>}
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-2">🏆 Papan Kehadiran</h2>
+            <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-2">🏆 Papan Kehadiran</h2>
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
               {leaderboard.length === 0 ? (
                 <div className="text-center text-xs text-slate-500 py-6">Belum ada data kehadiran.</div>
@@ -225,6 +209,82 @@ export default function RondaWarga() {
             </div>
           </div>
         </div>
+
+        {/* ═══ BAWAH: AREA ABSENSI SAYA ═══ */}
+        <div className="pt-6 border-t border-slate-800">
+          <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">📸 Absensi Ronda Saya</h2>
+          
+          {jadwalSaya.length === 0 ? (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center text-xs text-slate-500">
+              Anda tidak memiliki jadwal ronda di periode ini.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {jadwalSaya.map((item) => {
+                const statusWaktu = cekStatusWaktu(item.jadwal.tanggal, item.jadwal.periode?.jam_selesai);
+                
+                return (
+                  <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden">
+                    {/* Garis warna di pinggir card sesuai status */}
+                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+                      item.status_hadir === 'hadir' ? 'bg-emerald-500' : 
+                      item.status_hadir === 'pending' ? 'bg-amber-500' : 
+                      item.status_hadir === 'tidak_hadir' ? 'bg-rose-500' : 'bg-slate-600'
+                    }`}></div>
+
+                    <div>
+                      <div className="font-bold text-white text-sm">{formatTanggal(item.jadwal.tanggal)}</div>
+                      <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+                        🕒 {item.jadwal.periode?.jam_mulai?.substring(0,5)} - {item.jadwal.periode?.jam_selesai?.substring(0,5)} WIB
+                      </div>
+                    </div>
+
+                    {item.foto_bukti ? (
+                      <div className="w-full h-32 bg-slate-950 rounded-lg overflow-hidden relative border border-slate-800">
+                        <img src={item.foto_bukti} alt="Bukti" className="w-full h-full object-cover opacity-90" />
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-[1px]">
+                          <span className={`px-3 py-1.5 rounded-full text-xs font-bold border shadow-lg ${
+                            item.status_hadir === 'hadir' ? 'bg-emerald-500 text-white border-emerald-400' : 
+                            item.status_hadir === 'pending' ? 'bg-amber-500 text-white border-amber-400' : 
+                            'bg-rose-500 text-white border-rose-400'
+                          }`}>
+                            {item.status_hadir === 'hadir' ? '✅ Terverifikasi' : item.status_hadir === 'pending' ? '⏳ Menunggu Cek' : '❌ Alpa'}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full h-32 bg-slate-950/50 rounded-lg border border-slate-800 border-dashed flex items-center justify-center">
+                        <span className="text-xs text-slate-500">Belum ada foto bukti</span>
+                      </div>
+                    )}
+
+                    <div className="mt-auto pt-2">
+                      {!item.foto_bukti ? (
+                        statusWaktu === 'open' ? (
+                          <>
+                            <input type="file" accept="image/*" capture="environment" id={`up-${item.jadwal_id}`} className="hidden" onChange={(e) => handleUploadBukti(e, item.jadwal_id, item.id)} />
+                            <label htmlFor={`up-${item.jadwal_id}`} className={`w-full flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl text-xs cursor-pointer transition shadow-lg ${uploadingId === item.jadwal_id ? 'opacity-50' : ''}`}>
+                              {uploadingId === item.jadwal_id ? 'Mengupload...' : '📸 Upload Bukti Sekarang'}
+                            </label>
+                          </>
+                        ) : (
+                          <div className="w-full text-center bg-rose-500/10 border border-rose-500/20 text-rose-400 font-semibold py-2.5 rounded-xl text-xs">
+                            Waktu Absen Habis
+                          </div>
+                        )
+                      ) : (
+                         <div className="w-full text-center bg-slate-800 border border-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs">
+                           Absensi Selesai
+                         </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
       </div>
     </Layout>
   );
