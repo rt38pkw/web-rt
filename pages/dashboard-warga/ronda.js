@@ -32,12 +32,12 @@ export default function RondaWarga() {
   async function fetchData(wargaId) {
     setLoading(true);
     try {
-      // 1. Cek Penghuni (Bisa jadi kosong)
       const { data: penghuniData } = await supabase
         .from('penghuni').select('id').eq('warga_id', wargaId).eq('is_aktif', true);
+      
       const penghuniIds = (penghuniData || []).map(p => p.id);
 
-      // 2. Ambil Jadwal MILIK SAYA (Jika punya)
+      // 1. Ambil Jadwal MILIK SAYA
       if (penghuniIds.length > 0) {
         const { data: myJadwal } = await supabase
           .from('petugas_ronda')
@@ -51,20 +51,20 @@ export default function RondaWarga() {
         setJadwalSaya([]);
       }
 
-      // 3. Ambil Jadwal FULL RT (Selalu dijalankan, tidak peduli punya jadwal atau tidak)
+      // 2. Ambil Jadwal FULL RT (Tambahkan foto_bukti agar bisa cek status)
       const { data: fullJadwal } = await supabase
         .from('jadwal_ronda')
         .select(`
           id, tanggal, status, 
           periode:periode_id!inner(jam_mulai, jam_selesai, status),
-          petugas:petugas_ronda( status_hadir, penghuni:penghuni_id(nama_lengkap, warga:warga_id(no_rumah)) )
+          petugas:petugas_ronda( status_hadir, foto_bukti, penghuni:penghuni_id(nama_lengkap, warga:warga_id(no_rumah)) )
         `)
         .eq('status', 'aktif')
         .eq('periode.status', 'published')
         .order('tanggal', { ascending: true });
       setJadwalFull(fullJadwal || []);
 
-      // 4. Ambil Leaderboard
+      // 3. Ambil Leaderboard
       const { data: allPetugas } = await supabase
         .from('petugas_ronda')
         .select('penghuni_id, jadwal:jadwal_id!inner(periode:periode_id!inner(status)), penghuni:penghuni_id(nama_lengkap, warga:warga_id(no_rumah))')
@@ -98,7 +98,7 @@ export default function RondaWarga() {
       const catatanTeks = catatanMap[jadwalId] || null;
       const { error } = await supabase.from('petugas_ronda').update({ status_hadir: 'pending', foto_bukti: publicUrl, waktu_absen: new Date().toISOString(), catatan: catatanTeks }).eq('jadwal_id', jadwalId); 
       if (error) throw error;
-      alert('✅ Bukti berhasil diupload! Menunggu verifikasi Sekretaris.');
+      alert('✅ Absen berhasil dikirim! Menunggu verifikasi Sekretaris.');
       fetchData(user.id); 
     } catch (err) {
       alert('Gagal upload: ' + err.message);
@@ -131,6 +131,15 @@ export default function RondaWarga() {
     return 'open'; 
   };
 
+  // ═══ LOGIKA BADGE STATUS ═══
+  const getBadgeStatus = (p) => {
+    if (p.status_hadir === 'hadir') return { icon: '✅', text: 'Hadir', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
+    if (p.status_hadir === 'tidak_hadir') return { icon: '❌', text: 'Alpa', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20' };
+    if (p.status_hadir === 'pending' && p.foto_bukti) return { icon: '⏳', text: 'Pending', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' };
+    // Jika tidak ada foto dan status masih default (pending) / null
+    return { icon: '⚪', text: 'Belum', color: 'bg-slate-800 text-slate-400 border-slate-700' };
+  };
+
   if (loading) return <div className="min-h-screen bg-slate-950 text-white flex justify-center p-10">Memuat data ronda...</div>;
   if (!user) return null;
 
@@ -146,8 +155,51 @@ export default function RondaWarga() {
           <button onClick={() => setShowRekap(true)} className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition">📊 Rekap Kehadiran</button>
         </div>
 
-        {/* BAGIAN 1: ABSENSI SAYA */}
+        {/* ═══ BAGIAN 1: JADWAL LENGKAP RT (DIPINDAH KE ATAS) ═══ */}
         <div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+            <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">📅 Jadwal Ronda RT</h2>
+            <div className="flex flex-wrap gap-2 text-[9px] font-semibold">
+              <span className="flex items-center gap-1 text-slate-400"><span className="w-2 h-2 rounded-full bg-slate-700"></span> Belum</span>
+              <span className="flex items-center gap-1 text-amber-400"><span className="w-2 h-2 rounded-full bg-amber-500"></span> Pending</span>
+              <span className="flex items-center gap-1 text-emerald-400"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Hadir</span>
+              <span className="flex items-center gap-1 text-rose-400"><span className="w-2 h-2 rounded-full bg-rose-500"></span> Alpa</span>
+            </div>
+          </div>
+          
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg max-h-[450px] overflow-y-auto custom-scrollbar">
+            {jadwalFull.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-500">Belum ada jadwal yang di-publish.</div>
+            ) : (
+              jadwalFull.map((j) => {
+                const myPetugasData = jadwalSaya.find(ms => ms.jadwal_id === j.id);
+                const isMySchedule = !!myPetugasData;
+                
+                return (
+                  <div key={j.id} className={`p-4 border-b border-slate-800/50 last:border-0 flex flex-col gap-2 ${isMySchedule ? 'bg-indigo-900/10' : ''}`}>
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-slate-200 text-sm">{formatTanggal(j.tanggal)}</span>
+                      {isMySchedule && <span className="text-[9px] bg-indigo-500 text-white px-2 py-0.5 rounded shadow-sm">Anda Bertugas</span>}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {j.petugas.map((p, pIdx) => {
+                        const badge = getBadgeStatus(p);
+                        return (
+                          <span key={pIdx} className={`px-2 py-1.5 rounded-lg text-[10px] border flex items-center gap-1 ${badge.color}`}>
+                            {badge.icon} {p.penghuni?.nama_lengkap.split(' ')[0]} <span className="opacity-50">({p.penghuni?.warga?.no_rumah})</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* ═══ BAGIAN 2: TUGAS RONDA SAYA (DIPINDAH KE BAWAH) ═══ */}
+        <div className="pt-2">
           <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">📸 Tugas Ronda Saya</h2>
           {jadwalSaya.length === 0 ? (
             <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 text-center">
@@ -159,11 +211,12 @@ export default function RondaWarga() {
                 const statusWaktu = cekStatusWaktu(item.jadwal.tanggal, item.jadwal.periode?.jam_selesai);
                 return (
                   <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg relative overflow-hidden flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${item.status_hadir === 'hadir' ? 'bg-emerald-500' : item.status_hadir === 'pending' ? 'bg-amber-500' : item.status_hadir === 'tidak_hadir' ? 'bg-rose-500' : 'bg-indigo-500'}`}></div>
+                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${item.status_hadir === 'hadir' ? 'bg-emerald-500' : item.status_hadir === 'pending' && item.foto_bukti ? 'bg-amber-500' : item.status_hadir === 'tidak_hadir' ? 'bg-rose-500' : 'bg-slate-500'}`}></div>
                     <div className="flex-1 pl-2">
                       <div className="font-bold text-white text-sm">{formatTanggal(item.jadwal.tanggal)}</div>
                       <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">🕒 {item.jadwal.periode?.jam_mulai?.substring(0,5)} - {item.jadwal.periode?.jam_selesai?.substring(0,5)} WIB</div>
                       <div className="text-[10px] text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2 py-1.5 rounded-md mt-2 inline-block">💡 Absen cukup di salah satu HP warga, foto bersama.</div>
+                      
                       {item.foto_bukti && (
                         <div className="mt-3 flex items-center gap-2 bg-slate-950/50 p-2 rounded-xl border border-slate-800">
                           <img src={item.foto_bukti} alt="Bukti" className="w-10 h-10 rounded-lg object-cover border border-slate-700" />
@@ -183,7 +236,10 @@ export default function RondaWarga() {
                               <input type="text" placeholder="Cth: Pak Hezki tukar dengan Pak Untung" className="w-full sm:w-64 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder:text-slate-600 focus:border-indigo-500" value={catatanMap[item.jadwal_id] || ''} onChange={(e) => setCatatanMap({ ...catatanMap, [item.jadwal_id]: e.target.value })} />
                             </div>
                             <input type="file" accept="image/*" capture="environment" id={`up-${item.jadwal_id}`} className="hidden" onChange={(e) => handleUploadBukti(e, item.jadwal_id)} />
-                            <label htmlFor={`up-${item.jadwal_id}`} className={`w-full flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-2.5 rounded-xl text-xs cursor-pointer transition shadow-lg ${uploadingId === item.jadwal_id ? 'opacity-50' : ''}`}>{uploadingId === item.jadwal_id ? 'Mengupload...' : '📸 Upload Bukti'}</label>
+                            {/* Teks tombol diganti menjadi "Absen" */}
+                            <label htmlFor={`up-${item.jadwal_id}`} className={`w-full flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-2.5 rounded-xl text-xs cursor-pointer transition shadow-lg ${uploadingId === item.jadwal_id ? 'opacity-50' : ''}`}>
+                              {uploadingId === item.jadwal_id ? 'Mengirim...' : '📸 Absen'}
+                            </label>
                           </>
                         ) : (
                           <div className={`w-full sm:w-auto text-center font-semibold px-4 py-2.5 rounded-xl text-xs border ${statusWaktu === 'wait' ? 'bg-slate-800/50 border-slate-700 text-slate-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>{statusWaktu === 'wait' ? 'Belum Waktunya Absen' : 'Waktu Absen Habis'}</div>
@@ -197,45 +253,6 @@ export default function RondaWarga() {
               })}
             </div>
           )}
-        </div>
-
-        {/* BAGIAN 2: JADWAL LENGKAP (LIST VIEW) */}
-        <div className="pt-2">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
-            <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">📅 Jadwal Ronda RT</h2>
-            <div className="flex flex-wrap gap-2 text-[9px] font-semibold">
-              <span className="flex items-center gap-1 text-slate-400"><span className="w-2 h-2 rounded-full bg-slate-700"></span> Belum</span>
-              <span className="flex items-center gap-1 text-amber-400"><span className="w-2 h-2 rounded-full bg-amber-500"></span> Pending</span>
-              <span className="flex items-center gap-1 text-emerald-400"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Hadir</span>
-              <span className="flex items-center gap-1 text-rose-400"><span className="w-2 h-2 rounded-full bg-rose-500"></span> Alpa</span>
-            </div>
-          </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg max-h-[450px] overflow-y-auto custom-scrollbar">
-            {jadwalFull.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-500">Belum ada jadwal yang di-publish.</div>
-            ) : (
-              jadwalFull.map((j) => {
-                const myPetugasData = jadwalSaya.find(ms => ms.jadwal_id === j.id);
-                const isMySchedule = !!myPetugasData;
-                return (
-                  <div key={j.id} className={`p-4 border-b border-slate-800/50 last:border-0 flex flex-col gap-2 ${isMySchedule ? 'bg-indigo-900/10' : ''}`}>
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-slate-200 text-sm">{formatTanggal(j.tanggal)}</span>
-                      {isMySchedule && <span className="text-[9px] bg-indigo-500 text-white px-2 py-0.5 rounded shadow-sm">Anda Bertugas</span>}
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 mt-1">
-                      {j.petugas.map((p, pIdx) => (
-                        <span key={pIdx} className={`px-2 py-1.5 rounded-lg text-[10px] border flex items-center gap-1 ${p.status_hadir === 'hadir' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : p.status_hadir === 'pending' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : p.status_hadir === 'tidak_hadir' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-                          {p.status_hadir === 'hadir' ? '✅' : p.status_hadir === 'pending' ? '⏳' : p.status_hadir === 'tidak_hadir' ? '❌' : '⚪'}
-                          {p.penghuni?.nama_lengkap.split(' ')[0]} <span className="opacity-50">({p.penghuni?.warga?.no_rumah})</span>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
         </div>
       </div>
 
