@@ -3,29 +3,59 @@ import { useState } from 'react';
 import * as XLSX from 'xlsx';
 
 // ═══ FUNGSI SANITASI NOMOR RUMAH ═══
-// Mengubah input acak menjadi format baku: "A1 - 01"
 const sanitizeNoRumah = (input) => {
   if (!input) return '';
-  // 1. Ubah ke huruf besar & hapus semua spasi
   let clean = input.toString().toUpperCase().replace(/\s+/g, '');
-  
-  // 2. Ekstrak Huruf, Angka Blok, dan Angka Rumah menggunakan Regex
-  // Contoh: A101 -> A, 1, 01 | A21-15 -> A, 21, 15
   const match = clean.match(/^([A-Z]+)(\d+)[-_.]?(\d+)$/);
   
   if (match) {
-    const letter = match[1]; // A
-    const block = match[2];  // 1 atau 21
-    const number = match[3]; // 01 atau 15
-    
-    // Pastikan angka rumah selalu 2 digit (misal 5 jadi 05)
+    const letter = match[1]; 
+    const block = match[2];  
+    const number = match[3]; 
     const formattedNumber = number.padStart(2, '0');
-    
     return `${letter}${block} - ${formattedNumber}`;
   }
-  
-  // Jika format terlalu aneh dan tidak bisa dibaca, kembalikan seperti aslinya
   return input.toString().trim();
+};
+
+// ═══ FUNGSI PINTAR BACA TANGGAL EXCEL ═══
+const parseExcelDate = (val) => {
+  if (!val) return null;
+  
+  // Jika Excel mengubahnya jadi angka (Serial Date)
+  if (typeof val === 'number') {
+    // Rumus konversi serial number Excel ke Date JS
+    const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+    return date.toISOString().split('T')[0];
+  }
+
+  // Jika bentuknya teks (String)
+  const str = val.toString().trim();
+  
+  // Jika formatnya sudah YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
+  }
+  
+  // Jika formatnya DD/MM/YYYY atau MM/DD/YYYY (Fallback)
+  const parts = str.split(/[-/.]/);
+  if (parts.length === 3) {
+    // Asumsi format Indonesia: DD/MM/YYYY
+    if (parts[2].length === 4) {
+      const d = parts[0].padStart(2, '0');
+      const m = parts[1].padStart(2, '0');
+      const y = parts[2];
+      return `${y}-${m}-${d}`;
+    }
+  }
+
+  // Fallback terakhir pakai Date bawaan JS
+  const parsed = new Date(val);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString().split('T')[0];
+  }
+
+  return null; // Gagal baca
 };
 
 export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, isSaving }) {
@@ -41,7 +71,8 @@ export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, i
     const reader = new FileReader();
     reader.onload = (evt) => {
       const bstr = evt.target.result;
-      const wb = XLSX.read(bstr, { type: 'binary' });
+      // cellDates: true memaksa library membaca tanggal sebagai objek Date
+      const wb = XLSX.read(bstr, { type: 'binary', cellDates: true }); 
       const wsname = wb.SheetNames[0];
       const ws = wb.Sheets[wsname];
       const data = XLSX.utils.sheet_to_json(ws, { header: 1 }); 
@@ -55,7 +86,7 @@ export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, i
     const newErrors = [];
     const parsed = [];
     
-    // Buat "Kamus" Warga berdasarkan nomor rumah yang sudah disanitasi
+    // Buat Kamus Warga berdasarkan nomor rumah
     const wargaMap = {};
     wargaList.forEach(w => {
       if (w.kk_data && w.no_rumah) {
@@ -68,11 +99,16 @@ export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, i
       const row = rows[i];
       if (!row || !row[0]) continue; 
 
-      const tanggal = row[0];
+      // Baca Tanggal Pakai Fungsi Pintar
+      const parsedTanggal = parseExcelDate(row[0]);
+      if (!parsedTanggal) {
+        newErrors.push(`Baris ${i + 1}: Format tanggal "${row[0]}" tidak dikenali. Gunakan format YYYY-MM-DD (contoh: 2026-12-01).`);
+        continue; // Lanjut ke baris berikutnya
+      }
+
       const petugasInput = row.slice(1).filter(val => val);
-      
       let petugasValid = [];
-      let petugasPreview = []; // Untuk ditampilkan di layar
+      let petugasPreview = []; 
       
       for (const inputNoRumah of petugasInput) {
         const cleanInput = sanitizeNoRumah(inputNoRumah);
@@ -86,13 +122,13 @@ export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, i
             noRumahBaku: cleanInput
           });
         } else {
-          newErrors.push(`Baris ${i + 1}: Nomor rumah "${inputNoRumah}" (dibaca sistem sebagai "${cleanInput}") tidak ditemukan di database.`);
+          newErrors.push(`Baris ${i + 1}: Nomor rumah "${inputNoRumah}" (dibaca sistem: "${cleanInput}") tidak ditemukan di database.`);
         }
       }
 
       if (petugasValid.length > 0) {
         parsed.push({
-          tanggal: new Date(tanggal).toISOString().split('T')[0],
+          tanggal: parsedTanggal,
           grup_id: i,
           petugas: petugasValid,
           petugasPreview: petugasPreview,
@@ -113,7 +149,7 @@ export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, i
         <div className="flex justify-between items-center border-b border-slate-800 pb-3 shrink-0">
           <div>
             <h3 className="text-base font-bold text-white">📥 Import Excel</h3>
-            <p className="text-[10px] text-slate-400">Kolom 1 = Tanggal (YYYY-MM-DD). Kolom 2 dst = Nomor Rumah (Bebas ketik, sistem akan merapikan).</p>
+            <p className="text-[10px] text-slate-400">Kolom 1 = Tanggal (Disarankan: YYYY-MM-DD). Kolom 2 dst = Nomor Rumah.</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
         </div>
@@ -142,7 +178,7 @@ export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, i
                 <tbody className="divide-y divide-slate-800">
                   {previewData.map((row, idx) => (
                     <tr key={idx}>
-                      <td className="p-2 text-white">{row.tanggal}</td>
+                      <td className="p-2 text-white font-mono">{row.tanggal}</td>
                       <td className="p-2">
                         <div className="flex flex-wrap gap-2">
                           {row.petugasPreview.map((p, pIdx) => (
