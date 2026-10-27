@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabase';
 import { uploadBuktiRonda } from '../../lib/ronda/storage';
+import Layout from '../../components/warga/Layout'; // <--- TAMBAHKAN INI
 
 export default function RondaWarga() {
   const router = useRouter();
@@ -97,43 +98,35 @@ export default function RondaWarga() {
     }
   };
 
+  const handleLogout = () => {
+    if (!confirm('Keluar dari akun warga?')) return;
+    localStorage.removeItem('warga_session'); 
+    router.replace('/');
+  };
+
   const formatTanggal = (dateStr) => dateStr ? new Intl.DateTimeFormat('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(dateStr)) : '-';
 
-  // ═══ LOGIKA TIMER ABSEN ═══
   const cekStatusWaktu = (tanggalJadwal, jamSelesai) => {
     if (!tanggalJadwal || !jamSelesai) return 'closed';
-    
-    // Gabungkan tanggal dan jam selesai (contoh: 2026-12-01T02:00:00)
     const deadline = new Date(`${tanggalJadwal}T${jamSelesai}`);
-    
-    // Jika jam selesai adalah jam 00:00 - 06:00 pagi, berarti ronda berakhir BESOK harinya
     const jam = parseInt(jamSelesai.split(':')[0]);
     if (jam < 12) {
       deadline.setDate(deadline.getDate() + 1); 
     }
-    
-    // Beri toleransi 2 jam setelah jam selesai
     deadline.setHours(deadline.getHours() + 2);
-
     const now = new Date();
-    
-    // Jika sekarang sudah melewati deadline
     if (now > deadline) return 'closed';
-    
-    // Jika sekarang masih H-1 atau Hari-H
     return 'open';
   };
 
   if (loading) return <div className="min-h-screen bg-slate-950 text-white flex justify-center p-10">Memuat data ronda...</div>;
+  if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 pb-20">
-      <div className="max-w-4xl mx-auto space-y-6">
+    // ═══ BUNGKUS DENGAN LAYOUT WARGA ═══
+    <Layout warga={user} onLogout={handleLogout}>
+      <div className="space-y-6">
         
-        <button onClick={() => router.push('/dashboard-warga/iuran')} className="text-slate-400 text-xs flex items-center gap-1 hover:text-white">
-          ← Kembali ke Dashboard
-        </button>
-
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
           <h1 className="text-xl font-bold text-white mb-1">Jadwal Ronda RT 38</h1>
           <p className="text-xs text-slate-400">Pantau jadwal, lakukan absensi, dan lihat siapa yang paling rajin!</p>
@@ -233,6 +226,6 @@ export default function RondaWarga() {
           </div>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }
