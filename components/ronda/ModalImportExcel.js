@@ -2,13 +2,11 @@
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
 
-// ═══ FUNGSI SANITASI NOMOR RUMAH (VERSI PINTAR) ═══
+// ═══ FUNGSI SANITASI NOMOR RUMAH ═══
 const sanitizeNoRumah = (input) => {
   if (!input) return '';
   const clean = input.toString().toUpperCase().trim();
   
-  // 1. Coba pisahkan berdasarkan delimiter (spasi, strip, titik, underscore)
-  // Contoh: "A21 01", "A21-01", "A21.01"
   const matchDelimiter = clean.match(/^([A-Z]+)\s*[-_.\s]*\s*(\d+)\s*[-_.\s]*\s*(\d+)$/);
   if (matchDelimiter) {
     const letter = matchDelimiter[1];
@@ -17,8 +15,6 @@ const sanitizeNoRumah = (input) => {
     return `${letter}${block} - ${number}`;
   }
 
-  // 2. Jika tidak ada delimiter sama sekali (misal: "A2101")
-  // Kita asumsikan 2 digit terakhir adalah nomor rumah, sisanya adalah blok
   const matchNoDelimiter = clean.match(/^([A-Z]+)(\d+)(\d{2})$/);
   if (matchNoDelimiter) {
     const letter = matchNoDelimiter[1];
@@ -54,9 +50,35 @@ export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, i
 
   if (!isOpen) return null;
 
+  // ═══ FUNGSI DOWNLOAD TEMPLATE ═══
+  const handleDownloadTemplate = () => {
+    // Buat data contoh
+    const data = [
+      ["Tanggal", "Petugas 1", "Petugas 2", "Petugas 3"],
+      ["2026-12-01", "A1 - 01", "A2 - 05", "A3 - 10"],
+      ["2026-12-02", "a101", "a2 05", ""],
+      ["2026-12-03", "A1.03", "A21 15", "A3-07"]
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Jadwal Ronda");
+
+    // Lebarkan kolom agar rapi
+    ws['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
+
+    // Download file
+    XLSX.writeFile(wb, "Template_Jadwal_Ronda_RT38.xlsx");
+  };
+
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // Cek nama file agar tidak salah upload
+    if (file.name.toLowerCase().includes('pengeluaran') || file.name.toLowerCase().includes('iuran')) {
+      alert('⚠️ Sepertinya Anda salah memilih file. Ini adalah file Rekapan, bukan Jadwal Ronda.');
+    }
 
     const reader = new FileReader();
     reader.onload = (evt) => {
@@ -137,18 +159,32 @@ export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, i
         <div className="flex justify-between items-center border-b border-slate-800 pb-3 shrink-0">
           <div>
             <h3 className="text-base font-bold text-white">📥 Import Excel</h3>
-            <p className="text-[10px] text-slate-400">Kolom 1 = Tanggal (Disarankan: YYYY-MM-DD). Kolom 2 dst = Nomor Rumah.</p>
+            <p className="text-[10px] text-slate-400">Kolom 1 = Tanggal (YYYY-MM-DD). Kolom 2 dst = Nomor Rumah.</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
         </div>
         
         <div className="flex-1 overflow-y-auto space-y-4">
-          <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-600/20 file:text-indigo-400 hover:file:bg-indigo-600/30" />
+          
+          {/* ═══ TOMBOL DOWNLOAD TEMPLATE ═══ */}
+          <div className="bg-indigo-950/30 border border-indigo-500/30 rounded-xl p-3 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div className="text-xs text-indigo-300">
+              Belum punya format Excel-nya? Download template di samping, lalu isi sesuai contoh.
+            </div>
+            <button 
+              onClick={handleDownloadTemplate}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-lg text-xs whitespace-nowrap shadow-lg"
+            >
+              ⬇️ Download Template
+            </button>
+          </div>
+
+          <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-white hover:file:bg-slate-700" />
 
           {errors.length > 0 && (
             <div className="bg-rose-950/40 border border-rose-500/50 rounded-xl p-3 text-xs text-rose-400">
               <p className="font-bold mb-1">❌ Gagal Membaca Data:</p>
-              <ul className="list-disc pl-4 space-y-1">
+              <ul className="list-disc pl-4 space-y-1 max-h-40 overflow-y-auto">
                 {errors.map((err, i) => <li key={i}>{err}</li>)}
               </ul>
             </div>
