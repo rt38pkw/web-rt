@@ -6,6 +6,7 @@ import { generateJadwalRonda } from '../../lib/ronda/generator';
 import { simpanJadwalRonda } from '../../lib/ronda/rpc';
 import ModalBuatPeriode from '../../components/ronda/ModalBuatPeriode';
 import TabelJadwal from '../../components/ronda/TabelJadwal';
+import TabelAturanKhusus from '../../components/ronda/TabelAturanKhusus';
 
 export default function SekretarisRonda() {
   const [activeTab, setActiveTab] = useState('jadwal'); 
@@ -31,6 +32,7 @@ export default function SekretarisRonda() {
     else fetchWargaRonda();
   }, [activeTab]);
 
+  // ═══ FUNGSI PERIODE ═══
   async function fetchPeriode() {
     setLoading(true);
     const { data, error } = await supabase.from('periode_ronda').select('*').order('created_at', { ascending: false });
@@ -38,7 +40,6 @@ export default function SekretarisRonda() {
     setLoading(false);
   }
 
-  // ═══ FUNGSI PERIODE ═══
   const handleBuatPeriode = async (formData) => {
     setProcessing(true);
     try {
@@ -70,6 +71,7 @@ export default function SekretarisRonda() {
     try {
       const { data, error } = await supabase.from('jadwal_ronda').select('*, petugas:petugas_ronda(*, penghuni:penghuni_id(*, warga:warga_id(no_rumah)))').eq('periode_id', periode.id).order('tanggal');
       if (error) throw error;
+      
       if (data && data.length > 0) {
         setDraftData(data.map(j => ({
           id: j.id, 
@@ -94,7 +96,7 @@ export default function SekretarisRonda() {
       const { data: penghuni, error } = await supabase.from('penghuni').select('*, warga:warga_id(no_rumah)').eq('is_aktif', true).eq('status_verifikasi', 'approved').eq('ikut_ronda', true);
       if (error) throw error;
       
-      // Memanggil algoritma murni dari lib/ronda/generator.js
+      // Memanggil algoritma dari lib/ronda/generator.js
       const { draft, hasConflict } = generateJadwalRonda(penghuni, selectedPeriode);
       
       setDraftData(draft);
@@ -178,7 +180,6 @@ export default function SekretarisRonda() {
           </div>
           {hasConflict && <div className="bg-rose-950/40 border border-rose-500/50 rounded-xl p-3 text-xs text-rose-400 flex items-center gap-2"><span className="text-lg">⚠️</span> Terdapat jadwal yang bentrok. Silakan periksa nama berwarna merah.</div>}
           
-          {/* Memanggil Komponen Tabel */}
           <TabelJadwal 
             draftData={draftData} 
             selectedPeriode={selectedPeriode} 
@@ -191,8 +192,6 @@ export default function SekretarisRonda() {
   }
 
   // ═══ RENDER HALAMAN UTAMA ═══
-  const filteredWarga = wargaList.filter(w => w.nama_lengkap?.toLowerCase().includes(searchWarga.toLowerCase()) || w.no_rumah?.toLowerCase().includes(searchWarga.toLowerCase()));
-
   return (
     <Layout>
       <div className="max-w-6xl mx-auto space-y-4">
@@ -233,33 +232,16 @@ export default function SekretarisRonda() {
         )}
 
         {activeTab === 'aturan' && (
-          <div className="space-y-3 animate-in fade-in">
-            <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-2xl space-y-3">
-              <div><h2 className="text-lg font-bold text-white">Aturan Khusus Ronda</h2><p className="text-xs text-slate-400">Atur siapa saja yang <strong>tidak ikut ronda</strong>, atau yang <strong>hanya bisa hari tertentu</strong> (contoh: "Sabtu" atau "Sabtu, Minggu").</p></div>
-              <input type="text" placeholder="Cari nama atau no. rumah..." className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={searchWarga} onChange={(e) => setSearchWarga(e.target.value)} />
-            </div>
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950 text-slate-400"><tr><th className="p-4">Nama Kepala Keluarga</th><th className="p-4 text-center">Ikut Ronda?</th><th className="p-4">Hari Khusus (Opsional)</th></tr></thead>
-                <tbody className="divide-y divide-slate-800">
-                  {loadingWarga ? (<tr><td colSpan="3" className="text-center py-8 text-slate-500">Memuat...</td></tr>) : filteredWarga.map((w) => {
-                    const kk = w.kk_data;
-                    return (
-                      <tr key={w.id} className="hover:bg-slate-800/40">
-                        <td className="p-4"><div className="font-bold text-white">{kk.nama_lengkap}</div><div className="text-[10px] text-teal-400 font-mono">{w.no_rumah}</div></td>
-                        <td className="p-4 text-center"><label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" className="sr-only peer" checked={kk.ikut_ronda !== false} onChange={(e) => handleUpdateAturan(kk.id, 'ikut_ronda', e.target.checked)} /><div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div></label></td>
-                        <td className="p-4"><input type="text" placeholder="Cth: Sabtu, Minggu" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" defaultValue={kk.hari_ronda_khusus || ''} onBlur={(e) => { if (e.target.value !== (kk.hari_ronda_khusus || '')) handleUpdateAturan(kk.id, 'hari_ronda_khusus', e.target.value); }} /></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <TabelAturanKhusus 
+            wargaList={wargaList} 
+            loading={loadingWarga} 
+            search={searchWarga} 
+            setSearch={setSearchWarga} 
+            onUpdateAturan={handleUpdateAturan} 
+          />
         )}
       </div>
 
-      {/* Memanggil Komponen Modal */}
       <ModalBuatPeriode 
         isOpen={showModal} 
         onClose={() => setShowModal(false)} 
