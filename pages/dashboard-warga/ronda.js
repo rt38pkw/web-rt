@@ -15,10 +15,7 @@ export default function RondaWarga() {
   const [leaderboard, setLeaderboard] = useState([]); 
   const [uploadingId, setUploadingId] = useState(null);
   
-  // State untuk Pop-up Rekap Kehadiran
   const [showRekap, setShowRekap] = useState(false);
-  
-  // State untuk Catatan Absen (Menyimpan ketikan sementara per jadwal_id)
   const [catatanMap, setCatatanMap] = useState({});
 
   useEffect(() => {
@@ -89,8 +86,6 @@ export default function RondaWarga() {
     setUploadingId(jadwalId);
     try {
       const publicUrl = await uploadBuktiRonda(file, jadwalId);
-      
-      // Ambil catatan dari state jika ada
       const catatanTeks = catatanMap[jadwalId] || null;
 
       const { error } = await supabase
@@ -99,7 +94,7 @@ export default function RondaWarga() {
           status_hadir: 'pending', 
           foto_bukti: publicUrl, 
           waktu_absen: new Date().toISOString(),
-          catatan: catatanTeks // Simpan catatan (misal: "Pak Z gantikan Pak C")
+          catatan: catatanTeks 
         })
         .eq('jadwal_id', jadwalId); 
 
@@ -178,8 +173,14 @@ export default function RondaWarga() {
 
                     <div className="flex-1 pl-2">
                       <div className="font-bold text-white text-sm">{formatTanggal(item.jadwal.tanggal)}</div>
-                      <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1 mb-2">
+                      
+                      <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
                         🕒 {item.jadwal.periode?.jam_mulai?.substring(0,5)} - {item.jadwal.periode?.jam_selesai?.substring(0,5)} WIB
+                      </div>
+
+                      {/* ═══ INSTRUKSI FOTO BERSAMA ═══ */}
+                      <div className="text-[10px] text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2 py-1.5 rounded-md mt-2 inline-block">
+                        💡 Absen cukup di salah satu HP warga, foto bersama.
                       </div>
 
                       {/* Tampilkan Foto jika ada */}
@@ -203,13 +204,17 @@ export default function RondaWarga() {
                       {!item.foto_bukti ? (
                         statusWaktu === 'open' ? (
                           <>
-                            <input 
-                              type="text" 
-                              placeholder="Catatan (misal: Pak Z ganti Pak C)" 
-                              className="w-full sm:w-64 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder:text-slate-600 focus:border-indigo-500"
-                              value={catatanMap[item.jadwal_id] || ''}
-                              onChange={(e) => setCatatanMap({ ...catatanMap, [item.jadwal_id]: e.target.value })}
-                            />
+                            <div className="flex flex-col gap-1">
+                              <label className="text-[10px] text-slate-400">Ada tukar jadwal? Tulis di sini:</label>
+                              <input 
+                                type="text" 
+                                placeholder="Cth: Pak Hezki tukar dengan Pak Untung" 
+                                className="w-full sm:w-64 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder:text-slate-600 focus:border-indigo-500"
+                                value={catatanMap[item.jadwal_id] || ''}
+                                onChange={(e) => setCatatanMap({ ...catatanMap, [item.jadwal_id]: e.target.value })}
+                              />
+                            </div>
+                            
                             <input type="file" accept="image/*" capture="environment" id={`up-${item.jadwal_id}`} className="hidden" onChange={(e) => handleUploadBukti(e, item.jadwal_id)} />
                             <label htmlFor={`up-${item.jadwal_id}`} className={`w-full flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-2.5 rounded-xl text-xs cursor-pointer transition shadow-lg ${uploadingId === item.jadwal_id ? 'opacity-50' : ''}`}>
                               {uploadingId === item.jadwal_id ? 'Mengupload...' : '📸 Upload Bukti'}
@@ -235,11 +240,20 @@ export default function RondaWarga() {
 
         {/* ═══ BAGIAN 2: JADWAL LENGKAP (LIST VIEW) ═══ */}
         <div className="pt-2">
-          <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
-            📅 Jadwal Ronda RT
-          </h2>
           
-          {/* Kotak ini yang diberi tinggi max dan overflow-y-auto agar bisa di-scroll */}
+          {/* ═══ LEGENDA WARNA ═══ */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+            <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              📅 Jadwal Ronda RT
+            </h2>
+            <div className="flex flex-wrap gap-2 text-[9px] font-semibold">
+              <span className="flex items-center gap-1 text-slate-400"><span className="w-2 h-2 rounded-full bg-slate-700"></span> Belum</span>
+              <span className="flex items-center gap-1 text-amber-400"><span className="w-2 h-2 rounded-full bg-amber-500"></span> Pending</span>
+              <span className="flex items-center gap-1 text-emerald-400"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Hadir</span>
+              <span className="flex items-center gap-1 text-rose-400"><span className="w-2 h-2 rounded-full bg-rose-500"></span> Alpa</span>
+            </div>
+          </div>
+          
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg max-h-[450px] overflow-y-auto custom-scrollbar">
             {jadwalFull.map((j, idx) => {
               const myPetugasData = jadwalSaya.find(ms => ms.jadwal_id === j.id);
