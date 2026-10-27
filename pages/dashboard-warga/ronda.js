@@ -37,29 +37,37 @@ export default function RondaWarga() {
       
       const penghuniIds = (penghuniData || []).map(p => p.id);
 
+      // 1. Ambil Jadwal MILIK SAYA (Hanya periode PUBLISHED)
       if (penghuniIds.length > 0) {
         const { data: myJadwal } = await supabase
           .from('petugas_ronda')
-          .select('id, jadwal_id, status_hadir, foto_bukti, catatan, jadwal:jadwal_id(tanggal, status, periode:periode_id(jam_mulai, jam_selesai))')
+          .select('id, jadwal_id, status_hadir, foto_bukti, catatan, jadwal:jadwal_id!inner(tanggal, status, periode:periode_id!inner(jam_mulai, jam_selesai, status))')
           .in('penghuni_id', penghuniIds)
+          .eq('jadwal.status', 'aktif')
+          .eq('jadwal.periode.status', 'published')
           .order('jadwal(tanggal)', { ascending: true });
         setJadwalSaya(myJadwal || []);
       }
 
+      // 2. Ambil Jadwal FULL RT (Hanya periode PUBLISHED)
       const { data: fullJadwal } = await supabase
         .from('jadwal_ronda')
         .select(`
-          id, tanggal, status, periode:periode_id(jam_mulai, jam_selesai),
+          id, tanggal, status, 
+          periode:periode_id!inner(jam_mulai, jam_selesai, status),
           petugas:petugas_ronda( status_hadir, penghuni:penghuni_id(nama_lengkap, warga:warga_id(no_rumah)) )
         `)
         .eq('status', 'aktif')
+        .eq('periode.status', 'published')
         .order('tanggal', { ascending: true });
       setJadwalFull(fullJadwal || []);
 
+      // 3. Ambil Leaderboard (Hanya dari periode PUBLISHED)
       const { data: allPetugas } = await supabase
         .from('petugas_ronda')
-        .select('penghuni_id, penghuni:penghuni_id(nama_lengkap, warga:warga_id(no_rumah))')
-        .eq('status_hadir', 'hadir');
+        .select('penghuni_id, jadwal:jadwal_id!inner(periode:periode_id!inner(status)), penghuni:penghuni_id(nama_lengkap, warga:warga_id(no_rumah))')
+        .eq('status_hadir', 'hadir')
+        .eq('jadwal.periode.status', 'published');
 
       const tally = {};
       (allPetugas || []).forEach(p => {
@@ -116,15 +124,28 @@ export default function RondaWarga() {
 
   const formatTanggal = (dateStr) => dateStr ? new Intl.DateTimeFormat('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(dateStr)) : '-';
   
+  // ═══ LOGIKA WAKTU ABSEN (NORMAL) ═══
   const cekStatusWaktu = (tanggalJadwal, jamSelesai) => {
     if (!tanggalJadwal || !jamSelesai) return 'closed';
+    
+    const now = new Date();
+    
+    // 1. Tentukan Batas Waktu (Deadline)
     const deadline = new Date(`${tanggalJadwal}T${jamSelesai}`);
     const jam = parseInt(jamSelesai.split(':')[0]);
+    // Jika jam selesai adalah dini hari (00:00 - 11:59), berarti ronda berakhir BESOK harinya
     if (jam < 12) deadline.setDate(deadline.getDate() + 1); 
+    // Beri toleransi 2 jam setelah jam selesai
     deadline.setHours(deadline.getHours() + 2);
-    const now = new Date();
-    if (now > deadline) return 'closed';
-    return 'open';
+
+    // 2. Tentukan Waktu Mulai (H-1 jam 12 siang)
+    const startDate = new Date(tanggalJadwal);
+    startDate.setDate(startDate.getDate() - 1);
+    startDate.setHours(12, 0, 0, 0); 
+
+    if (now > deadline) return 'closed'; // Waktu sudah habis
+    if (now < startDate) return 'wait';  // Belum masuk waktunya
+    return 'open'; // Waktunya absen
   };
 
   if (loading) return <div className="min-h-screen bg-slate-950 text-white flex justify-center p-10">Memuat data ronda...</div>;
@@ -221,8 +242,12 @@ export default function RondaWarga() {
                             </label>
                           </>
                         ) : (
-                          <div className="w-full sm:w-auto text-center bg-rose-500/10 border border-rose-500/20 text-rose-400 font-semibold px-4 py-2.5 rounded-xl text-xs">
-                            Waktu Absen Habis
+                          <div className={`w-full sm:w-auto text-center font-semibold px-4 py-2.5 rounded-xl text-xs border ${
+                            statusWaktu === 'wait' 
+                              ? 'bg-slate-800/50 border-slate-700 text-slate-400' 
+                              : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                          }`}>
+                            {statusWaktu === 'wait' ? 'Belum Waktunya Absen' : 'Waktu Absen Habis'}
                           </div>
                         )
                       ) : (
@@ -240,8 +265,6 @@ export default function RondaWarga() {
 
         {/* ═══ BAGIAN 2: JADWAL LENGKAP (LIST VIEW) ═══ */}
         <div className="pt-2">
-          
-          {/* ═══ LEGENDA WARNA ═══ */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
             <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
               📅 Jadwal Ronda RT
