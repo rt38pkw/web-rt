@@ -25,7 +25,6 @@ export default function RondaWarga() {
   async function fetchJadwalWarga(wargaId) {
     setLoading(true);
     try {
-      // 1. Cari ID Penghuni (baik Pemilik maupun Penyewa)
       const { data: penghuniData } = await supabase
         .from('penghuni')
         .select('id')
@@ -39,7 +38,6 @@ export default function RondaWarga() {
 
       const penghuniIds = penghuniData.map(p => p.id);
 
-      // 2. Tarik data jadwal ronda mereka
       const { data: jadwalData, error } = await supabase
         .from('petugas_ronda')
         .select(`
@@ -48,7 +46,7 @@ export default function RondaWarga() {
           penghuni:penghuni_id ( nama_lengkap )
         `)
         .in('penghuni_id', penghuniIds)
-        .eq('jadwal.status', 'aktif') // Hanya ambil yang tidak libur
+        .eq('jadwal.status', 'aktif') 
         .order('jadwal(tanggal)', { ascending: true });
 
       if (error) throw error;
@@ -60,17 +58,14 @@ export default function RondaWarga() {
     }
   }
 
-  // ═══ LOGIKA UPLOAD PER GRUP (JADWAL_ID) ═══
   const handleUploadBukti = async (e, jadwalId, petugasId) => {
     const file = e.target.files[0];
     if (!file) return;
 
     setUploadingId(jadwalId);
     try {
-      // 1. Upload foto fisik ke Storage (pakai jadwalId sebagai nama file)
       const publicUrl = await uploadBuktiRonda(file, jadwalId);
 
-      // 2. Update SEMUA orang di grup ini (berdasarkan jadwal_id)
       const { error } = await supabase
         .from('petugas_ronda')
         .update({
@@ -78,12 +73,12 @@ export default function RondaWarga() {
           foto_bukti: publicUrl,
           waktu_absen: new Date().toISOString()
         })
-        .eq('jadwal_id', jadwalId); // Update semua yang punya jadwal_id ini
+        .eq('jadwal_id', jadwalId); 
 
       if (error) throw error;
 
       alert('✅ Bukti grup berhasil diupload! Menunggu verifikasi Sekretaris.');
-      fetchJadwalWarga(user.id); // Refresh data
+      fetchJadwalWarga(user.id); 
     } catch (err) {
       alert('Gagal upload: ' + err.message);
     } finally {
@@ -93,10 +88,14 @@ export default function RondaWarga() {
 
   const formatTanggal = (dateStr) => dateStr ? new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(dateStr)) : '-';
   
-  // Cek apakah hari ini adalah hari H ronda
+  // PERBAIKAN: Fungsi isToday menggunakan Waktu Lokal (WIB)
   const isToday = (dateStr) => {
-    const today = new Date().toISOString().split('T')[0];
-    return dateStr === today;
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const localToday = `${yyyy}-${mm}-${dd}`;
+    return dateStr === localToday;
   };
 
   if (loading) return <div className="min-h-screen bg-slate-950 text-white flex justify-center p-10">Memuat jadwal ronda...</div>;
@@ -105,6 +104,10 @@ export default function RondaWarga() {
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 pb-20">
       <div className="max-w-md mx-auto space-y-4">
         
+        <button onClick={() => router.push('/dashboard-warga')} className="text-slate-400 text-xs mb-2 flex items-center gap-1 hover:text-white">
+          ← Kembali ke Dashboard
+        </button>
+
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
           <h1 className="text-lg font-bold text-white mb-1">Jadwal Ronda Saya</h1>
           <p className="text-xs text-slate-400">Cukup 1 orang dari grup Anda yang mengunggah foto grup (selfie bersama) sebagai bukti kehadiran.</p>
@@ -122,10 +125,8 @@ export default function RondaWarga() {
                     <div className="text-xs text-teal-400 mt-1">
                       🕒 {item.jadwal.periode?.jam_mulai?.substring(0,5)} - {item.jadwal.periode?.jam_selesai?.substring(0,5)} WIB
                     </div>
-                    <div className="text-[10px] text-slate-500 mt-1">Anda bertugas bersama warga lain di grup ini.</div>
                   </div>
                   
-                  {/* Status Badge */}
                   <div>
                     {item.status_hadir === 'pending' && <span className="bg-amber-500/20 text-amber-400 text-[10px] px-2 py-1 rounded border border-amber-500/30">⏳ Pending</span>}
                     {item.status_hadir === 'hadir' && <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded border border-emerald-500/30">✅ Hadir</span>}
@@ -134,7 +135,6 @@ export default function RondaWarga() {
                   </div>
                 </div>
 
-                {/* Foto Bukti (Jika ada) */}
                 {item.foto_bukti && (
                   <div className="w-full h-40 bg-slate-950 rounded-lg overflow-hidden relative border border-slate-800">
                     <img src={item.foto_bukti} alt="Bukti Ronda" className="w-full h-full object-cover" />
@@ -144,19 +144,19 @@ export default function RondaWarga() {
                   </div>
                 )}
 
-                {/* Tombol Aksi Upload */}
                 <div className="pt-2 border-t border-slate-800 flex justify-between items-center">
                   <div className="text-[10px] text-slate-400">
-                    {isToday(item.jadwal.tanggal) ? '🔔 Jadwal Anda malam ini!' : 'Belum waktunya.'}
+                    {/* UNTUK TESTING: Pesan ini sengaja saya buat selalu aktif */}
+                    🔔 Silakan upload bukti jika sudah waktunya.
                   </div>
                   
-                  {/* Tombol muncul jika BELUM ada foto, dan hari ini adalah jadwalnya */}
-                  {(!item.foto_bukti) && isToday(item.jadwal.tanggal) && (
+                  {/* PERBAIKAN: Pengecekan isToday dihilangkan sementara agar bisa dites kapan saja */}
+                  {(!item.foto_bukti) && (
                     <>
                       <input 
                         type="file" 
                         accept="image/*" 
-                        capture="environment" // Buka kamera langsung di HP
+                        capture="environment" 
                         id={`upload-${item.jadwal_id}`} 
                         className="hidden" 
                         onChange={(e) => handleUploadBukti(e, item.jadwal_id, item.id)} 
