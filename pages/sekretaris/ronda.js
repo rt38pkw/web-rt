@@ -1,6 +1,11 @@
+// pages/sekretaris/ronda.js
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import Layout from '../../components/sekretaris/Layout';
+import { generateJadwalRonda } from '../../lib/ronda/generator';
+import { simpanJadwalRonda } from '../../lib/ronda/rpc';
+import ModalBuatPeriode from '../../components/ronda/ModalBuatPeriode';
+import TabelJadwal from '../../components/ronda/TabelJadwal';
 
 export default function SekretarisRonda() {
   const [activeTab, setActiveTab] = useState('jadwal'); 
@@ -11,15 +16,6 @@ export default function SekretarisRonda() {
   const [selectedPeriode, setSelectedPeriode] = useState(null);
 
   const [showModal, setShowModal] = useState(false);
-  const [namaPeriode, setNamaPeriode] = useState('');
-  const [tglMulai, setTglMulai] = useState('');
-  const [tipePeriode, setTipePeriode] = useState('auto'); 
-  const [tglSelesai, setTglSelesai] = useState('');
-  const [jamMulai, setJamMulai] = useState('23:00');
-  const [jamSelesai, setJamSelesai] = useState('02:00');
-  const [jamReminder, setJamReminder] = useState('07:00');
-  const [jumlahPerGrup, setJumlahPerGrup] = useState(3);
-  
   const [draftData, setDraftData] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -42,22 +38,14 @@ export default function SekretarisRonda() {
     setLoading(false);
   }
 
-  const handleBuatPeriode = async (e) => {
-    e.preventDefault();
-    if (!namaPeriode.trim() || !tglMulai) return alert('Nama & Tanggal Wajib diisi!');
-    let finalTglSelesai = tipePeriode === 'custom' && tglSelesai ? tglSelesai : null;
-
+  // ═══ FUNGSI PERIODE ═══
+  const handleBuatPeriode = async (formData) => {
     setProcessing(true);
     try {
-      const { error } = await supabase.from('periode_ronda').insert([{
-        nama_periode: namaPeriode.trim(), tanggal_mulai: tglMulai, tanggal_selesai: finalTglSelesai,
-        tipe_periode: tipePeriode, jam_mulai: jamMulai, jam_selesai: jamSelesai, jam_reminder: jamReminder,
-        jumlah_per_grup: Number(jumlahPerGrup), status: 'draft'
-      }]);
+      const { error } = await supabase.from('periode_ronda').insert([formData]);
       if (error) throw error;
       alert('✅ Periode Ronda berhasil dibuat!');
       setShowModal(false);
-      setNamaPeriode(''); setTglMulai(''); setTglSelesai('');
       fetchPeriode();
     } catch (err) { alert('Gagal: ' + err.message); } finally { setProcessing(false); }
   };
@@ -72,6 +60,7 @@ export default function SekretarisRonda() {
     } catch (err) { alert('❌ Gagal: ' + err.message); } finally { setProcessing(false); }
   };
 
+  // ═══ FUNGSI DETAIL & GENERATE ═══
   const handleLihatDetail = async (periode) => {
     setSelectedPeriode(periode);
     setViewMode('detail');
@@ -83,15 +72,19 @@ export default function SekretarisRonda() {
       if (error) throw error;
       if (data && data.length > 0) {
         setDraftData(data.map(j => ({
-          id: j.id, tanggal: j.tanggal, hari: new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(new Date(j.tanggal)),
-          grup_id: j.grup_id, is_libur: j.status === 'libur', has_conflict: false, catatan: j.catatan_sistem || '',
+          id: j.id, 
+          tanggal: j.tanggal, 
+          hari: new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(new Date(j.tanggal)),
+          grup_id: j.grup_id, 
+          is_libur: j.status === 'libur', 
+          has_conflict: false, 
+          catatan: j.catatan_sistem || '',
           petugas: j.petugas.map(p => p.penghuni)
         })));
       } else { setDraftData([]); }
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  // ═══ FUNGSI GENERATE (STRICT SLOT + SWAP + ANTI DUPLIKASI) ═══
   const handleGenerateDraft = async () => {
     if (isPublished) return alert('Jadwal sudah di-publish. Tidak bisa generate ulang.');
     if (!confirm('Generate ulang akan menimpa draft saat ini. Lanjutkan?')) return;
@@ -100,135 +93,12 @@ export default function SekretarisRonda() {
     try {
       const { data: penghuni, error } = await supabase.from('penghuni').select('*, warga:warga_id(no_rumah)').eq('is_aktif', true).eq('status_verifikasi', 'approved').eq('ikut_ronda', true);
       if (error) throw error;
-      if (penghuni.length < 2) throw new Error('Peserta ronda terlalu sedikit.');
-
-      const N = Number(selectedPeriode.jumlah_per_grup) || 3;
-      const totalPeople = penghuni.length;
-      const numGroups = Math.ceil(totalPeople / N);
       
-      let totalDays = 0;
-      if (selectedPeriode.tipe_periode === 'custom' && selectedPeriode.tanggal_selesai) {
-        const start = new Date(selectedPeriode.tanggal_mulai);
-        const end = new Date(selectedPeriode.tanggal_selesai);
-        totalDays = Math.ceil(Math.abs(end - start) / (1000 * 60 * 60 * 24)) + 1;
-      } else {
-        totalDays = numGroups * 3;
-      }
-
-      const shuffled = [...penghuni].sort(() => 0.5 - Math.random());
-      let grupArr = [];
-      let currentIdx = 0;
-      for (let i = 0; i < numGroups; i++) {
-        let ukuran = N;
-        if (i === numGroups - 1) ukuran = totalPeople - currentIdx;
-        grupArr.push({ id: i + 1, anggota: shuffled.slice(currentIdx, currentIdx + ukuran).map(p => ({...p})) });
-        currentIdx += ukuran;
-      }
-
-      const hariArr = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-      const startDate = new Date(selectedPeriode.tanggal_mulai);
-      let draft = [];
-
-      for (let d = 0; d < totalDays; d++) {
-        const date = new Date(startDate);
-        date.setDate(date.getDate() + d);
-        const grup = grupArr[d % numGroups];
-        
-        draft.push({
-          id: `d-${d}`, tanggal: date.toISOString().split('T')[0], hari: hariArr[date.getDay()], grup_id: grup.id,
-          petugas: [...grup.anggota], is_libur: false, has_conflict: false, catatan: ''
-        });
-      }
-
-      let anyConflict = false;
-      const lastSpecialSchedule = {};
-
-      for (let i = 0; i < draft.length; i++) {
-        const day = draft[i];
-        const currentDateObj = new Date(day.tanggal);
-        
-        for (let j = 0; j < day.petugas.length; j++) {
-          const p = day.petugas[j];
-          
-          if (p.hari_ronda_khusus) {
-            const allowed = p.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
-            
-            if (allowed.includes(day.hari.toLowerCase())) {
-              lastSpecialSchedule[p.id] = currentDateObj;
-            } else {
-              let swapped = false;
-              // Tahap 1: Cari swap ideal (Jarak >= 14 hari & Anti Duplikasi)
-              for (let k = 0; k < draft.length; k++) {
-                if (i === k) continue;
-                const targetDay = draft[k];
-                const targetDateObj = new Date(targetDay.tanggal);
-
-                if (allowed.includes(targetDay.hari.toLowerCase())) {
-                  let isIntervalValid = true;
-                  if (lastSpecialSchedule[p.id]) {
-                    const diffDays = Math.ceil(Math.abs(targetDateObj - lastSpecialSchedule[p.id]) / (1000 * 60 * 60 * 24));
-                    if (diffDays < 14) isIntervalValid = false;
-                  }
-                  if (!isIntervalValid) continue;
-
-                  for (let l = 0; l < targetDay.petugas.length; l++) {
-                    const q = targetDay.petugas[l];
-                    let qAllowedHere = true;
-                    if (q.hari_ronda_khusus) {
-                      const qAllowed = q.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
-                      if (!qAllowed.includes(day.hari.toLowerCase())) qAllowedHere = false;
-                    }
-
-                    // KUNCI ANTI DUPLIKASI
-                    if (qAllowedHere && !day.petugas.some(x => x.id === q.id) && !targetDay.petugas.some(x => x.id === p.id)) {
-                      day.petugas[j] = q;
-                      targetDay.petugas[l] = p;
-                      swapped = true;
-                      lastSpecialSchedule[p.id] = targetDateObj;
-                      break;
-                    }
-                  }
-                }
-                if (swapped) break;
-              }
-
-              // Tahap 2: Paksa swap jika tahap 1 gagal
-              if (!swapped) {
-                for (let k = 0; k < draft.length; k++) {
-                  if (i === k) continue;
-                  const targetDay = draft[k];
-                  if (allowed.includes(targetDay.hari.toLowerCase())) {
-                    for (let l = 0; l < targetDay.petugas.length; l++) {
-                      const q = targetDay.petugas[l];
-                      let qAllowedHere = true;
-                      if (q.hari_ronda_khusus) {
-                        const qAllowed = q.hari_ronda_khusus.split(',').map(s => s.trim().toLowerCase());
-                        if (!qAllowed.includes(day.hari.toLowerCase())) qAllowedHere = false;
-                      }
-                      if (qAllowedHere && !day.petugas.some(x => x.id === q.id) && !targetDay.petugas.some(x => x.id === p.id)) {
-                        day.petugas[j] = q;
-                        targetDay.petugas[l] = p;
-                        swapped = true;
-                        lastSpecialSchedule[p.id] = new Date(targetDay.tanggal);
-                        break;
-                      }
-                    }
-                  }
-                  if (swapped) break;
-                }
-              }
-
-              if (!swapped) {
-                day.has_conflict = true;
-                day.catatan = `${p.nama_lengkap} hanya bisa ${p.hari_ronda_khusus}`;
-                anyConflict = true;
-              }
-            }
-          }
-        }
-      }
+      // Memanggil algoritma murni dari lib/ronda/generator.js
+      const { draft, hasConflict } = generateJadwalRonda(penghuni, selectedPeriode);
+      
       setDraftData(draft);
-      setHasConflict(anyConflict);
+      setHasConflict(hasConflict);
       alert('✅ Draft berhasil di-generate!');
     } catch (err) { alert('Gagal generate: ' + err.message); } finally { setIsGenerating(false); }
   };
@@ -247,21 +117,9 @@ export default function SekretarisRonda() {
 
     setIsSaving(true);
     try {
-      if (selectedPeriode.status === 'draft') await supabase.from('jadwal_ronda').delete().eq('periode_id', selectedPeriode.id);
-      for (const item of draftData) {
-        const { data: jadwalBaru, error: errJ } = await supabase.from('jadwal_ronda').insert([{
-          periode_id: selectedPeriode.id, tanggal: item.tanggal, grup_id: item.grup_id,
-          status: item.is_libur ? 'libur' : 'aktif', catatan_sistem: item.catatan || null
-        }]).select('id').single();
-        if (errJ) throw errJ;
-        if (!item.is_libur) {
-          const uniquePetugas = Array.from(new Map(item.petugas.map(p => [p.id, p])).values());
-          const { error: errP } = await supabase.from('petugas_ronda').insert(uniquePetugas.map(p => ({ jadwal_id: jadwalBaru.id, penghuni_id: p.id })));
-          if (errP) throw errP;
-        }
-      }
-      const { error: errU } = await supabase.from('periode_ronda').update({ status: targetStatus }).eq('id', selectedPeriode.id);
-      if (errU) throw errU;
+      // Memanggil RPC dari lib/ronda/rpc.js
+      await simpanJadwalRonda(selectedPeriode.id, targetStatus, draftData);
+      
       alert(`✅ Berhasil disimpan sebagai ${targetStatus.toUpperCase()}!`);
       setIsPublished(targetStatus === 'published');
       setSelectedPeriode({ ...selectedPeriode, status: targetStatus });
@@ -269,6 +127,7 @@ export default function SekretarisRonda() {
     } catch (err) { alert('Gagal menyimpan: ' + err.message); } finally { setIsSaving(false); }
   };
 
+  // ═══ FUNGSI ATURAN KHUSUS ═══
   const fetchWargaRonda = async () => {
     setLoadingWarga(true);
     const { data } = await supabase.from('warga').select('*, penghuni:penghuni(*)').order('no_rumah');
@@ -290,6 +149,7 @@ export default function SekretarisRonda() {
   const formatTanggal = (dateStr) => dateStr ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(dateStr)) : '-';
   const formatJam = (timeStr) => timeStr ? timeStr.substring(0, 5) : '-';
 
+  // ═══ RENDER DETAIL JADWAL ═══
   if (viewMode === 'detail' && selectedPeriode) {
     return (
       <Layout>
@@ -317,58 +177,20 @@ export default function SekretarisRonda() {
             </div>
           </div>
           {hasConflict && <div className="bg-rose-950/40 border border-rose-500/50 rounded-xl p-3 text-xs text-rose-400 flex items-center gap-2"><span className="text-lg">⚠️</span> Terdapat jadwal yang bentrok. Silakan periksa nama berwarna merah.</div>}
-          {draftData.length === 0 ? (
-             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl p-10 text-center"><div className="text-5xl mb-3">📝</div><h3 className="text-base font-bold text-white mb-1">Jadwal Belum Ada</h3><p className="text-xs text-slate-400">Klik "Generate Draft" untuk membuat jadwal otomatis.</p></div>
-          ) : (
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-950 text-slate-400 border-b border-slate-800">
-                    <tr>
-                      <th className="p-3 border-r border-slate-800 text-center w-12">No</th>
-                      <th className="p-3 border-r border-slate-800 text-center">Hari</th>
-                      <th className="p-3 border-r border-slate-800 text-center">Tanggal</th>
-                      {Array.from({ length: selectedPeriode.jumlah_per_grup || 3 }).map((_, i) => (<th key={i} className="p-3 border-r border-slate-800">Petugas {i + 1}</th>))}
-                      <th className="p-3 text-center">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {draftData.map((item, idx) => {
-                      const uniquePetugas = Array.from(new Map(item.petugas.map(p => [p.id, p])).values());
-                      return (
-                        <tr key={idx} className={`hover:bg-slate-800/40 ${item.is_libur ? 'opacity-50 grayscale bg-slate-900' : ''}`}>
-                          <td className="p-3 border-r border-slate-800 text-center text-slate-500">{idx + 1}</td>
-                          <td className="p-3 border-r border-slate-800 text-center font-semibold text-white">{item.hari}</td>
-                          <td className="p-3 border-r border-slate-800 text-center text-slate-300">{formatTanggal(item.tanggal)}</td>
-                          {item.is_libur ? (
-                            <td colSpan={selectedPeriode.jumlah_per_grup || 3} className="p-3 border-r border-slate-800 text-center text-rose-400 font-bold italic">LIBUR</td>
-                          ) : (
-                            <>
-                              {uniquePetugas.map((p, pIdx) => (
-                                <td key={pIdx} className="p-3 border-r border-slate-800">
-                                  <div className={`font-semibold ${item.has_conflict && p.hari_ronda_khusus ? 'text-rose-400' : 'text-slate-200'}`}>{p.nama_lengkap.split(' ')[0]}</div>
-                                  <div className="text-[10px] text-slate-500 font-mono">{p.warga?.no_rumah || '-'}</div>
-                                </td>
-                              ))}
-                              {Array.from({ length: (selectedPeriode.jumlah_per_grup || 3) - uniquePetugas.length }).map((_, emptyIdx) => (<td key={`empty-${emptyIdx}`} className="p-3 border-r border-slate-800 text-slate-600">-</td>))}
-                            </>
-                          )}
-                          <td className="p-3 text-center">
-                            <button onClick={() => handleToggleLibur(idx)} disabled={isPublished} className={`px-2 py-1.5 rounded-lg text-[10px] font-semibold transition ${item.is_libur ? 'bg-emerald-600/20 text-emerald-400' : 'bg-rose-600/20 text-rose-400'}`}>{item.is_libur ? 'Aktifkan' : 'Libur'}</button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+          
+          {/* Memanggil Komponen Tabel */}
+          <TabelJadwal 
+            draftData={draftData} 
+            selectedPeriode={selectedPeriode} 
+            isPublished={isPublished} 
+            onToggleLibur={handleToggleLibur} 
+          />
         </div>
       </Layout>
     );
   }
 
+  // ═══ RENDER HALAMAN UTAMA ═══
   const filteredWarga = wargaList.filter(w => w.nama_lengkap?.toLowerCase().includes(searchWarga.toLowerCase()) || w.no_rumah?.toLowerCase().includes(searchWarga.toLowerCase()));
 
   return (
@@ -378,6 +200,7 @@ export default function SekretarisRonda() {
           <button onClick={() => setActiveTab('jadwal')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'jadwal' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800'}`}>📅 Jadwal Ronda</button>
           <button onClick={() => setActiveTab('aturan')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'aturan' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800'}`}>⚙️ Aturan Khusus Peserta</button>
         </div>
+        
         {activeTab === 'jadwal' && (
           <div className="space-y-4 animate-in fade-in">
             <div className="flex justify-between items-center bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg">
@@ -408,6 +231,7 @@ export default function SekretarisRonda() {
             )}
           </div>
         )}
+
         {activeTab === 'aturan' && (
           <div className="space-y-3 animate-in fade-in">
             <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-2xl space-y-3">
@@ -434,28 +258,14 @@ export default function SekretarisRonda() {
           </div>
         )}
       </div>
-      {showModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3"><h3 className="text-base font-bold text-white">➕ Buat Periode Ronda</h3><button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white">✕</button></div>
-            <form onSubmit={handleBuatPeriode} className="space-y-3">
-              <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Nama Periode *</label><input type="text" required placeholder="Contoh: Desember 2026" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={namaPeriode} onChange={(e) => setNamaPeriode(e.target.value)} /></div>
-              <div className="grid grid-cols-2 gap-2">
-                <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Tanggal Mulai *</label><input type="date" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white [color-scheme:dark]" value={tglMulai} onChange={(e) => setTglMulai(e.target.value)} /></div>
-                <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Tipe Periode *</label><select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={tipePeriode} onChange={(e) => setTipePeriode(e.target.value)}><option value="auto">3 Putaran Otomatis</option><option value="custom">Custom (Tgl Selesai)</option></select></div>
-              </div>
-              {tipePeriode === 'custom' && (<div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Tanggal Selesai *</label><input type="date" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white [color-scheme:dark]" value={tglSelesai} onChange={(e) => setTglSelesai(e.target.value)} /></div>)}
-              <div className="grid grid-cols-3 gap-2">
-                <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Jam Mulai</label><input type="time" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2.5 text-xs text-white [color-scheme:dark]" value={jamMulai} onChange={(e) => setJamMulai(e.target.value)} /></div>
-                <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Jam Selesai</label><input type="time" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2.5 text-xs text-white [color-scheme:dark]" value={jamSelesai} onChange={(e) => setJamSelesai(e.target.value)} /></div>
-                <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Reminder</label><input type="time" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2.5 text-xs text-white [color-scheme:dark]" value={jamReminder} onChange={(e) => setJamReminder(e.target.value)} /></div>
-              </div>
-              <div><label className="block text-[10px] text-slate-400 mb-1 uppercase tracking-wider font-semibold">Jumlah Personil / Grup *</label><input type="number" min="2" max="10" required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={jumlahPerGrup} onChange={(e) => setJumlahPerGrup(e.target.value)} /></div>
-              <div className="flex gap-2 pt-3 border-t border-slate-800 mt-4"><button type="button" onClick={() => setShowModal(false)} className="w-1/3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs">Batal</button><button type="submit" disabled={processing} className="w-2/3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl text-xs transition">{processing ? 'Menyimpan...' : 'Simpan Periode'}</button></div>
-            </form>
-          </div>
-        </div>
-      )}
+
+      {/* Memanggil Komponen Modal */}
+      <ModalBuatPeriode 
+        isOpen={showModal} 
+        onClose={() => setShowModal(false)} 
+        onSave={handleBuatPeriode} 
+        processing={processing} 
+      />
     </Layout>
   );
 }
