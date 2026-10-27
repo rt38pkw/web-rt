@@ -2,60 +2,50 @@
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
 
-// ═══ FUNGSI SANITASI NOMOR RUMAH ═══
+// ═══ FUNGSI SANITASI NOMOR RUMAH (VERSI PINTAR) ═══
 const sanitizeNoRumah = (input) => {
   if (!input) return '';
-  let clean = input.toString().toUpperCase().replace(/\s+/g, '');
-  const match = clean.match(/^([A-Z]+)(\d+)[-_.]?(\d+)$/);
+  const clean = input.toString().toUpperCase().trim();
   
-  if (match) {
-    const letter = match[1]; 
-    const block = match[2];  
-    const number = match[3]; 
-    const formattedNumber = number.padStart(2, '0');
-    return `${letter}${block} - ${formattedNumber}`;
+  // 1. Coba pisahkan berdasarkan delimiter (spasi, strip, titik, underscore)
+  // Contoh: "A21 01", "A21-01", "A21.01"
+  const matchDelimiter = clean.match(/^([A-Z]+)\s*[-_.\s]*\s*(\d+)\s*[-_.\s]*\s*(\d+)$/);
+  if (matchDelimiter) {
+    const letter = matchDelimiter[1];
+    const block = matchDelimiter[2];
+    const number = matchDelimiter[3].padStart(2, '0');
+    return `${letter}${block} - ${number}`;
   }
-  return input.toString().trim();
+
+  // 2. Jika tidak ada delimiter sama sekali (misal: "A2101")
+  // Kita asumsikan 2 digit terakhir adalah nomor rumah, sisanya adalah blok
+  const matchNoDelimiter = clean.match(/^([A-Z]+)(\d+)(\d{2})$/);
+  if (matchNoDelimiter) {
+    const letter = matchNoDelimiter[1];
+    const block = matchNoDelimiter[2];
+    const number = matchNoDelimiter[3];
+    return `${letter}${block} - ${number}`;
+  }
+  
+  return clean;
 };
 
 // ═══ FUNGSI PINTAR BACA TANGGAL EXCEL ═══
 const parseExcelDate = (val) => {
   if (!val) return null;
-  
-  // Jika Excel mengubahnya jadi angka (Serial Date)
   if (typeof val === 'number') {
-    // Rumus konversi serial number Excel ke Date JS
     const date = new Date(Math.round((val - 25569) * 86400 * 1000));
     return date.toISOString().split('T')[0];
   }
-
-  // Jika bentuknya teks (String)
   const str = val.toString().trim();
-  
-  // Jika formatnya sudah YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-    return str;
-  }
-  
-  // Jika formatnya DD/MM/YYYY atau MM/DD/YYYY (Fallback)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
   const parts = str.split(/[-/.]/);
-  if (parts.length === 3) {
-    // Asumsi format Indonesia: DD/MM/YYYY
-    if (parts[2].length === 4) {
-      const d = parts[0].padStart(2, '0');
-      const m = parts[1].padStart(2, '0');
-      const y = parts[2];
-      return `${y}-${m}-${d}`;
-    }
+  if (parts.length === 3 && parts[2].length === 4) {
+    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
   }
-
-  // Fallback terakhir pakai Date bawaan JS
   const parsed = new Date(val);
-  if (!isNaN(parsed.getTime())) {
-    return parsed.toISOString().split('T')[0];
-  }
-
-  return null; // Gagal baca
+  if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+  return null;
 };
 
 export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, isSaving }) {
@@ -71,7 +61,6 @@ export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, i
     const reader = new FileReader();
     reader.onload = (evt) => {
       const bstr = evt.target.result;
-      // cellDates: true memaksa library membaca tanggal sebagai objek Date
       const wb = XLSX.read(bstr, { type: 'binary', cellDates: true }); 
       const wsname = wb.SheetNames[0];
       const ws = wb.Sheets[wsname];
@@ -99,11 +88,10 @@ export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, i
       const row = rows[i];
       if (!row || !row[0]) continue; 
 
-      // Baca Tanggal Pakai Fungsi Pintar
       const parsedTanggal = parseExcelDate(row[0]);
       if (!parsedTanggal) {
-        newErrors.push(`Baris ${i + 1}: Format tanggal "${row[0]}" tidak dikenali. Gunakan format YYYY-MM-DD (contoh: 2026-12-01).`);
-        continue; // Lanjut ke baris berikutnya
+        newErrors.push(`Baris ${i + 1}: Format tanggal "${row[0]}" tidak dikenali.`);
+        continue; 
       }
 
       const petugasInput = row.slice(1).filter(val => val);
@@ -122,7 +110,7 @@ export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, i
             noRumahBaku: cleanInput
           });
         } else {
-          newErrors.push(`Baris ${i + 1}: Nomor rumah "${inputNoRumah}" (dibaca sistem: "${cleanInput}") tidak ditemukan di database.`);
+          newErrors.push(`Baris ${i + 1}: Nomor rumah "${inputNoRumah}" (dibaca sistem: "${cleanInput}") tidak ditemukan.`);
         }
       }
 
