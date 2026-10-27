@@ -96,7 +96,6 @@ export default function SekretarisRonda() {
       const { data: penghuni, error } = await supabase.from('penghuni').select('*, warga:warga_id(no_rumah)').eq('is_aktif', true).eq('status_verifikasi', 'approved').eq('ikut_ronda', true);
       if (error) throw error;
       
-      // Memanggil algoritma dari lib/ronda/generator.js
       const { draft, hasConflict } = generateJadwalRonda(penghuni, selectedPeriode);
       
       setDraftData(draft);
@@ -119,7 +118,6 @@ export default function SekretarisRonda() {
 
     setIsSaving(true);
     try {
-      // Memanggil RPC dari lib/ronda/rpc.js
       await simpanJadwalRonda(selectedPeriode.id, targetStatus, draftData);
       
       alert(`✅ Berhasil disimpan sebagai ${targetStatus.toUpperCase()}!`);
@@ -127,6 +125,37 @@ export default function SekretarisRonda() {
       setSelectedPeriode({ ...selectedPeriode, status: targetStatus });
       fetchPeriode();
     } catch (err) { alert('Gagal menyimpan: ' + err.message); } finally { setIsSaving(false); }
+  };
+
+  // ═══ FITUR BARU: BATAL PUBLISH & HAPUS DRAFT ═══
+  const handleBatalPublish = async () => {
+    if (!confirm('Batalkan publish? Jadwal akan kembali menjadi draft dan bisa diedit/di-generate ulang.')) return;
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from('periode_ronda').update({ status: 'draft' }).eq('id', selectedPeriode.id);
+      if (error) throw error;
+      
+      setIsPublished(false);
+      setSelectedPeriode({ ...selectedPeriode, status: 'draft' });
+      fetchPeriode();
+      alert('✅ Publish dibatalkan. Status kembali ke Draft.');
+    } catch (err) { alert('Gagal: ' + err.message); } finally { setIsSaving(false); }
+  };
+
+  const handleHapusDraft = async () => {
+    if (!confirm('Hapus semua jadwal draft saat ini? Anda bisa generate ulang dari awal.')) return;
+    setIsSaving(true);
+    try {
+      // Hapus dari DB jika sebelumnya sudah pernah disimpan sebagai draft
+      const { data: jadwalIds } = await supabase.from('jadwal_ronda').select('id').eq('periode_id', selectedPeriode.id);
+      if (jadwalIds && jadwalIds.length > 0) {
+        const ids = jadwalIds.map(j => j.id);
+        await supabase.from('petugas_ronda').delete().in('jadwal_id', ids);
+        await supabase.from('jadwal_ronda').delete().eq('periode_id', selectedPeriode.id);
+      }
+      setDraftData([]);
+      alert('✅ Draft berhasil dihapus. Silakan klik Generate Draft.');
+    } catch (err) { alert('Gagal: ' + err.message); } finally { setIsSaving(false); }
   };
 
   // ═══ FUNGSI ATURAN KHUSUS ═══
@@ -164,7 +193,8 @@ export default function SekretarisRonda() {
                 <p className="text-xs text-slate-400">Mulai {formatTanggal(selectedPeriode.tanggal_mulai)} • {selectedPeriode.jumlah_per_grup || 3} Org/Grup</p>
               </div>
             </div>
-            <div className="flex gap-2">
+            
+            <div className="flex flex-wrap gap-2">
               {!isPublished ? (
                 <>
                   <button onClick={handleGenerateDraft} disabled={isGenerating || draftData.length > 0} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg">
@@ -172,12 +202,20 @@ export default function SekretarisRonda() {
                   </button>
                   <button onClick={() => handleSimpanJadwal('draft')} disabled={isSaving || draftData.length === 0} className="bg-orange-600 hover:bg-orange-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg">💾 Simpan Draft</button>
                   <button onClick={() => handleSimpanJadwal('published')} disabled={isSaving || draftData.length === 0 || hasConflict} className={`font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg ${hasConflict ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}>🚀 Publish</button>
+                  
+                  {/* Tombol Hapus Draft hanya muncul jika ada data */}
+                  {draftData.length > 0 && (
+                    <button onClick={handleHapusDraft} disabled={isSaving} className="bg-rose-600/20 border border-rose-500/30 hover:bg-rose-600 hover:text-white text-rose-400 font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg">🗑️ Hapus Draft</button>
+                  )}
                 </>
               ) : (
-                <button onClick={() => alert('Fitur Batal Publish segera hadir.')} className="bg-rose-600/20 text-rose-400 font-semibold px-4 py-2.5 rounded-xl text-xs transition border border-rose-500/30">Batalkan Publish</button>
+                <button onClick={handleBatalPublish} disabled={isSaving} className="bg-rose-600/20 border border-rose-500/30 hover:bg-rose-600 hover:text-white text-rose-400 font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg">
+                  {isSaving ? 'Memproses...' : '🔓 Batalkan Publish'}
+                </button>
               )}
             </div>
           </div>
+          
           {hasConflict && <div className="bg-rose-950/40 border border-rose-500/50 rounded-xl p-3 text-xs text-rose-400 flex items-center gap-2"><span className="text-lg">⚠️</span> Terdapat jadwal yang bentrok. Silakan periksa nama berwarna merah.</div>}
           
           <TabelJadwal 
