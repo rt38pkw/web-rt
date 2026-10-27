@@ -50,7 +50,11 @@ export default function SekretarisRonda() {
     } catch (err) { alert('Gagal: ' + err.message); } finally { setProcessing(false); }
   };
 
-  const handleHapusPeriode = async (id, nama) => {
+  // ═══ PERBAIKAN: VALIDASI HAPUS PERIODE ═══
+  const handleHapusPeriode = async (id, nama, status) => {
+    if (status === 'published') {
+      return alert('❌ Gagal: Periode yang sudah di-publish tidak boleh dihapus! Silakan klik "Batalkan Publish" terlebih dahulu.');
+    }
     if (!confirm(`Hapus periode "${nama}" beserta seluruh jadwalnya?`)) return;
     setProcessing(true);
     try {
@@ -91,28 +95,23 @@ export default function SekretarisRonda() {
 
     setIsGenerating(true);
     try {
-      // 1. Ambil data penghuni aktif
       const { data: penghuni, error } = await supabase.from('penghuni').select('*, warga:warga_id(no_rumah)').eq('is_aktif', true).eq('status_verifikasi', 'approved').eq('ikut_ronda', true);
       if (error) throw error;
 
-      // 2. Ambil HISTORY MAP dari jadwal PUBLISHED sebelumnya
-      // Kita cari jadwal yang tanggalnya lebih kecil dari tanggal mulai periode baru
+      // Ambil History Map dari jadwal PUBLISHED sebelumnya
       const { data: historyData, error: histErr } = await supabase
         .from('jadwal_ronda')
         .select('tanggal, petugas:petugas_ronda(penghuni_id), periode:periode_id(status)')
         .lt('tanggal', selectedPeriode.tanggal_mulai)
-        .order('tanggal', { ascending: false }); // Urutkan dari yang paling baru
+        .order('tanggal', { ascending: false });
 
       if (histErr) throw histErr;
 
-      // 3. Susun History Map (Catatan Tanggal Terakhir)
       let historyMap = {};
       if (historyData) {
         historyData.forEach(j => {
-          // Hanya baca dari periode yang sudah PUBLISHED
           if (j.periode && j.periode.status === 'published' && j.petugas) {
             j.petugas.forEach(p => {
-              // Karena descending, data pertama yang ditemukan adalah tanggal terakhirnya
               if (!historyMap[p.penghuni_id]) {
                 historyMap[p.penghuni_id] = j.tanggal;
               }
@@ -121,7 +120,6 @@ export default function SekretarisRonda() {
         });
       }
       
-      // 4. Panggil Generator dengan membawa History Map
       const { draft, hasConflict } = generateJadwalRonda(penghuni, selectedPeriode, historyMap);
       
       setDraftData(draft);
@@ -279,7 +277,31 @@ export default function SekretarisRonda() {
                         <td className="p-4 text-slate-300">{formatTanggal(p.tanggal_mulai)} {p.tanggal_selesai ? ` - ${formatTanggal(p.tanggal_selesai)}` : `(3 Putaran)`}</td>
                         <td className="p-4 text-slate-300">{formatJam(p.jam_mulai)} - {formatJam(p.jam_selesai)} WIB<div className="text-[10px] text-indigo-400 mt-0.5">{p.jumlah_per_grup || 3} Orang / Grup</div></td>
                         <td className="p-4"><span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${p.status === 'published' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>{p.status}</span></td>
-                        <td className="p-4 text-right"><div className="flex justify-end gap-2"><button onClick={() => handleLihatDetail(p)} className="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-semibold transition">👁️ Lihat Detail</button><button onClick={() => handleHapusPeriode(p.id, p.nama_periode)} disabled={processing} className="bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-semibold transition">🗑️</button></div></td>
+                        <td className="p-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button onClick={() => handleLihatDetail(p)} className="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-semibold transition">👁️ Lihat Detail</button>
+                            
+                            {/* PERBAIKAN: Cek status sebelum menampilkan tombol hapus */}
+                            {p.status !== 'published' ? (
+                              <button 
+                                onClick={() => handleHapusPeriode(p.id, p.nama_periode, p.status)} 
+                                disabled={processing} 
+                                className="bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-semibold transition" 
+                                title="Hapus Draft"
+                              >
+                                🗑️
+                              </button>
+                            ) : (
+                              <button 
+                                disabled 
+                                className="bg-slate-800/50 text-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-semibold cursor-not-allowed" 
+                                title="Tidak bisa hapus periode yang sudah Publish. Batalkan Publish terlebih dahulu."
+                              >
+                                🔒
+                              </button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
