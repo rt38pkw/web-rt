@@ -15,8 +15,11 @@ export default function RondaWarga() {
   const [leaderboard, setLeaderboard] = useState([]); 
   const [uploadingId, setUploadingId] = useState(null);
   
-  // State untuk Pop-up Leaderboard
-  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  // State untuk Pop-up Rekap Kehadiran
+  const [showRekap, setShowRekap] = useState(false);
+  
+  // State untuk Catatan Absen (Menyimpan ketikan sementara per jadwal_id)
+  const [catatanMap, setCatatanMap] = useState({});
 
   useEffect(() => {
     const savedUser = localStorage.getItem('warga_session');
@@ -40,7 +43,7 @@ export default function RondaWarga() {
       if (penghuniIds.length > 0) {
         const { data: myJadwal } = await supabase
           .from('petugas_ronda')
-          .select('id, jadwal_id, status_hadir, foto_bukti, jadwal:jadwal_id(tanggal, status, periode:periode_id(jam_mulai, jam_selesai))')
+          .select('id, jadwal_id, status_hadir, foto_bukti, catatan, jadwal:jadwal_id(tanggal, status, periode:periode_id(jam_mulai, jam_selesai))')
           .in('penghuni_id', penghuniIds)
           .order('jadwal(tanggal)', { ascending: true });
         setJadwalSaya(myJadwal || []);
@@ -86,9 +89,18 @@ export default function RondaWarga() {
     setUploadingId(jadwalId);
     try {
       const publicUrl = await uploadBuktiRonda(file, jadwalId);
+      
+      // Ambil catatan dari state jika ada
+      const catatanTeks = catatanMap[jadwalId] || null;
+
       const { error } = await supabase
         .from('petugas_ronda')
-        .update({ status_hadir: 'pending', foto_bukti: publicUrl, waktu_absen: new Date().toISOString() })
+        .update({ 
+          status_hadir: 'pending', 
+          foto_bukti: publicUrl, 
+          waktu_absen: new Date().toISOString(),
+          catatan: catatanTeks // Simpan catatan (misal: "Pak Z gantikan Pak C")
+        })
         .eq('jadwal_id', jadwalId); 
 
       if (error) throw error;
@@ -134,14 +146,14 @@ export default function RondaWarga() {
             <p className="text-[11px] text-slate-400">RT 38 Puri Kencana Wagir</p>
           </div>
           <button 
-            onClick={() => setShowLeaderboard(true)}
-            className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition"
+            onClick={() => setShowRekap(true)}
+            className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition"
           >
-            🏆 Peringkat
+            📊 Rekap Kehadiran
           </button>
         </div>
 
-        {/* ═══ BAGIAN 1: ABSENSI SAYA (PALING ATAS) ═══ */}
+        {/* ═══ BAGIAN 1: ABSENSI SAYA ═══ */}
         <div>
           <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
             📸 Tugas Ronda Saya
@@ -158,7 +170,6 @@ export default function RondaWarga() {
                 
                 return (
                   <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg relative overflow-hidden flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                    {/* Garis status di pinggir kiri */}
                     <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
                       item.status_hadir === 'hadir' ? 'bg-emerald-500' : 
                       item.status_hadir === 'pending' ? 'bg-amber-500' : 
@@ -167,14 +178,14 @@ export default function RondaWarga() {
 
                     <div className="flex-1 pl-2">
                       <div className="font-bold text-white text-sm">{formatTanggal(item.jadwal.tanggal)}</div>
-                      <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+                      <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1 mb-2">
                         🕒 {item.jadwal.periode?.jam_mulai?.substring(0,5)} - {item.jadwal.periode?.jam_selesai?.substring(0,5)} WIB
                       </div>
-                      
+
                       {/* Tampilkan Foto jika ada */}
                       {item.foto_bukti && (
-                        <div className="mt-3 flex items-center gap-2">
-                          <img src={item.foto_bukti} alt="Bukti" className="w-12 h-12 rounded-lg object-cover border border-slate-700" />
+                        <div className="mt-3 flex items-center gap-2 bg-slate-950/50 p-2 rounded-xl border border-slate-800">
+                          <img src={item.foto_bukti} alt="Bukti" className="w-10 h-10 rounded-lg object-cover border border-slate-700" />
                           <div>
                             <div className={`text-[10px] font-bold ${
                               item.status_hadir === 'hadir' ? 'text-emerald-400' : 
@@ -182,29 +193,36 @@ export default function RondaWarga() {
                             }`}>
                               {item.status_hadir === 'hadir' ? '✅ Terverifikasi' : item.status_hadir === 'pending' ? '⏳ Menunggu Cek' : '❌ Alpa'}
                             </div>
-                            <div className="text-[9px] text-slate-500">Bukti terkirim</div>
+                            {item.catatan && <div className="text-[9px] text-slate-400 italic mt-0.5">" {item.catatan} "</div>}
                           </div>
                         </div>
                       )}
                     </div>
 
-                    <div className="w-full sm:w-auto mt-2 sm:mt-0">
+                    <div className="w-full sm:w-auto mt-2 sm:mt-0 flex flex-col gap-2">
                       {!item.foto_bukti ? (
                         statusWaktu === 'open' ? (
                           <>
+                            <input 
+                              type="text" 
+                              placeholder="Catatan (misal: Pak Z ganti Pak C)" 
+                              className="w-full sm:w-64 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder:text-slate-600 focus:border-indigo-500"
+                              value={catatanMap[item.jadwal_id] || ''}
+                              onChange={(e) => setCatatanMap({ ...catatanMap, [item.jadwal_id]: e.target.value })}
+                            />
                             <input type="file" accept="image/*" capture="environment" id={`up-${item.jadwal_id}`} className="hidden" onChange={(e) => handleUploadBukti(e, item.jadwal_id)} />
-                            <label htmlFor={`up-${item.jadwal_id}`} className={`w-full sm:w-auto flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-2.5 rounded-xl text-xs cursor-pointer transition shadow-lg ${uploadingId === item.jadwal_id ? 'opacity-50' : ''}`}>
-                              {uploadingId === item.jadwal_id ? 'Upload...' : '📸 Absen'}
+                            <label htmlFor={`up-${item.jadwal_id}`} className={`w-full flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-2.5 rounded-xl text-xs cursor-pointer transition shadow-lg ${uploadingId === item.jadwal_id ? 'opacity-50' : ''}`}>
+                              {uploadingId === item.jadwal_id ? 'Mengupload...' : '📸 Upload Bukti'}
                             </label>
                           </>
                         ) : (
                           <div className="w-full sm:w-auto text-center bg-rose-500/10 border border-rose-500/20 text-rose-400 font-semibold px-4 py-2.5 rounded-xl text-xs">
-                            Waktu Habis
+                            Waktu Absen Habis
                           </div>
                         )
                       ) : (
-                         <div className="w-full sm:w-auto text-center text-slate-500 text-[10px] font-semibold px-4">
-                           Selesai
+                         <div className="w-full sm:w-auto text-center text-slate-500 text-[10px] font-semibold px-4 py-2 border border-slate-800 rounded-lg">
+                           Absensi Selesai
                          </div>
                       )}
                     </div>
@@ -218,11 +236,12 @@ export default function RondaWarga() {
         {/* ═══ BAGIAN 2: JADWAL LENGKAP (LIST VIEW) ═══ */}
         <div className="pt-2">
           <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
-            📅 Jadwal Ronda RT (Terdekat)
+            📅 Jadwal Ronda RT
           </h2>
           
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
-            {jadwalFull.slice(0, 15).map((j, idx) => {
+          {/* Kotak ini yang diberi tinggi max dan overflow-y-auto agar bisa di-scroll */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg max-h-[450px] overflow-y-auto custom-scrollbar">
+            {jadwalFull.map((j, idx) => {
               const myPetugasData = jadwalSaya.find(ms => ms.jadwal_id === j.id);
               const isMySchedule = !!myPetugasData;
               
@@ -254,23 +273,23 @@ export default function RondaWarga() {
 
       </div>
 
-      {/* ═══ POP-UP MODAL LEADERBOARD ═══ */}
-      {showLeaderboard && (
-        <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowLeaderboard(false)}>
+      {/* ═══ POP-UP MODAL REKAP KEHADIRAN ═══ */}
+      {showRekap && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowRekap(false)}>
           <div 
             className="bg-slate-900 border-t sm:border border-slate-700 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-in slide-in-from-bottom-10 sm:zoom-in-95" 
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">🏆 Papan Kehadiran</h3>
-              <button onClick={() => setShowLeaderboard(false)} className="text-slate-400 hover:text-white bg-slate-800 p-1.5 rounded-full">✕</button>
+              <h3 className="text-base font-bold text-white flex items-center gap-2">📊 Rekap Kehadiran Warga</h3>
+              <button onClick={() => setShowRekap(false)} className="text-slate-400 hover:text-white bg-slate-800 p-1.5 rounded-full">✕</button>
             </div>
             
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1 custom-scrollbar">
               {leaderboard.length === 0 ? (
-                <div className="text-center text-xs text-slate-500 py-6">Belum ada data kehadiran.</div>
+                <div className="text-center text-xs text-slate-500 py-6">Belum ada data kehadiran yang diverifikasi.</div>
               ) : (
-                leaderboard.slice(0, 10).map((lb, index) => (
+                leaderboard.map((lb, index) => (
                   <div key={lb.id} className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
                       index === 0 ? 'bg-amber-400 text-amber-900 shadow-[0_0_10px_rgba(251,191,36,0.3)]' : 
@@ -287,7 +306,7 @@ export default function RondaWarga() {
                 ))
               )}
             </div>
-            <p className="text-center text-[9px] text-slate-500 mt-4">Berdasarkan verifikasi Sekretaris RT.</p>
+            <p className="text-center text-[9px] text-slate-500 mt-4">Data ini berdasarkan verifikasi Sekretaris RT.</p>
           </div>
         </div>
       )}
