@@ -6,23 +6,27 @@ export default function ModalDetailRumah({
   if (!detailRumah) return null;
 
   return (
-    // Tambahkan onClick di background luar agar bisa ditutup
+    // Background luar (Klik area sini untuk menutup)
     <div 
-      className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"
       onClick={() => setShowDetailRumah(false)}
     >
-      {/* stopPropagation agar klik di dalam kotak tidak menutup modal */}
+      {/* Kotak Modal (Klik area ini tidak akan menutup) */}
       <div 
-        className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4"
+        className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <h3 className="text-base font-bold text-white">🏠 Detail Data Rumah</h3>
-          {/* Tombol X diperbaiki dengan tipe button */}
+          
+          {/* Tombol X diperbesar & diberikan z-index tinggi */}
           <button 
             type="button" 
-            onClick={() => setShowDetailRumah(false)} 
-            className="text-slate-400 hover:text-white bg-slate-800 hover:bg-rose-500/20 p-1.5 rounded-lg transition"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowDetailRumah(false);
+            }} 
+            className="relative z-10 text-slate-400 hover:text-white bg-slate-800 hover:bg-rose-500/20 w-8 h-8 flex items-center justify-center rounded-full transition cursor-pointer"
           >
             ✕
           </button>
@@ -75,6 +79,15 @@ export default function ModalDetailRumah({
             🗑️ Hapus Data Rumah
           </button>
         </div>
+        
+        {/* Tombol Tutup Tambahan di Bawah */}
+        <button 
+          onClick={() => setShowDetailRumah(false)} 
+          className="w-full mt-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl text-xs transition"
+        >
+          Tutup
+        </button>
+
       </div>
     </div>
   );
