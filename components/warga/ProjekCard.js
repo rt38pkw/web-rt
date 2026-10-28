@@ -1,13 +1,10 @@
 // components/warga/ProfileCard.js
-export default function ProfileCard({ warga, penghuniData, roleLogin, modeAkses, tarifBulanan, isUsaha, onUbahPin }) {
+export default function ProfileCard({ warga, penghuniData, roleLogin, modeAkses, tarifBulanan, isUsaha, onUbahPin, isProfileComplete }) {
   if (!warga) return null;
 
   const isPenyewa = roleLogin === 'penyewa';
   const isModePantau = modeAkses === 'pantau';
   
-  // ═══ CEK APAKAH AKUN SUDAH DIVERIFIKASI ═══
-  const isVerified = penghuniData?.status_verifikasi === 'approved';
-
   let namaTampil = warga.nama_lengkap;
   let subNama = null;
 
@@ -74,8 +71,8 @@ export default function ProfileCard({ warga, penghuniData, roleLogin, modeAkses,
             {badgeText}
           </div>
 
-          {/* ═══ TOMBOL UBAH PIN (HANYA PEMILIK & SUDAH VERIFIED) ═══ */}
-          {!isPenyewa && isVerified && onUbahPin && (
+          {/* ═══ TOMBOL UBAH PIN (HANYA PEMILIK & PROFIL LENGKAP) ═══ */}
+          {!isPenyewa && isProfileComplete && onUbahPin && (
             <button 
               onClick={onUbahPin} 
               className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl font-medium flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-black/20"
