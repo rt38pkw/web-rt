@@ -200,10 +200,13 @@ export default function DashboardWargaIuran() {
     } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
   };
 
+  // ═══ LOGIKA BANNER & KELENGKAPAN PROFIL ═══
   const statusPenghuni = penghuniData?.status_verifikasi;
   const alasanReject = penghuniData?.alasan_reject;
+  
   const punyaNik = !!penghuniData?.nik && penghuniData.nik !== '0';
   const punyaKK = !!penghuniData?.url_kk;
+  
   const isBelumLengkap = !penghuniData || statusPenghuni === 'belum' || (statusPenghuni === 'approved' && (!punyaNik || !punyaKK));
   const isPending = statusPenghuni === 'pending';
   const isRejected = statusPenghuni === 'rejected';
@@ -219,9 +222,11 @@ export default function DashboardWargaIuran() {
           modeAkses={sessionData.mode_akses} 
           tarifBulanan={tarifBulanan} 
           isUsaha={usaha} 
-          onUbahPin={() => setShowModalUbahPin(true)} // PASSING PROP
+          onUbahPin={() => setShowModalUbahPin(true)}
+          isProfileComplete={!isBelumLengkap} // PROP BARU UNTUK SEMBUNYIKAN TOMBOL PIN
         />
 
+        {/* BANNER: BELUM LENGKAP / DATA KOSONG */}
         {isBelumLengkap && (
           <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
             <div className="flex items-start gap-3">
@@ -235,6 +240,7 @@ export default function DashboardWargaIuran() {
           </div>
         )}
 
+        {/* BANNER: PENDING */}
         {isPending && (
           <div className="bg-blue-950/40 border border-blue-500/30 rounded-2xl p-4 flex items-start gap-3">
             <span className="text-xl">⏳</span>
@@ -245,6 +251,7 @@ export default function DashboardWargaIuran() {
           </div>
         )}
 
+        {/* BANNER: REJECTED */}
         {isRejected && (
           <div className="bg-gradient-to-r from-rose-950/60 to-slate-900 border border-rose-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
             <div className="flex items-start gap-3">
@@ -330,6 +337,7 @@ export default function DashboardWargaIuran() {
         onSuccess={() => refreshDataRumah(warga.id)} 
       />
 
+      {/* MODAL UBAH PIN BARU */}
       <ModalUbahPin 
         show={showModalUbahPin} 
         onClose={() => setShowModalUbahPin(false)} 
