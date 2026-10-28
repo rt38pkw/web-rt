@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { useState, useEffect } from 'react';
 
 const MENU = [
-  { key: 'dashboard', i: '🏠', l: 'Dashboard', path: '/sekretaris' }, // TAMBAHAN MENU DASHBOARD
+  { key: 'dashboard', i: '🏠', l: 'Dashboard', path: '/sekretaris' },
   { key: 'data-warga', i: '👥', l: 'Data Warga', path: '/sekretaris/data-warga' },
   { key: 'verifikasi', i: '✅', l: 'Verifikasi', path: '/sekretaris/verifikasi' },
   { key: 'surat', i: '📄', l: 'Surat', path: '/sekretaris/surat' },
@@ -21,7 +21,6 @@ export default function Layout({ children }) {
   const [pendingVerifCount, setPendingVerifCount] = useState(0);
   const [pendingRondaCount, setPendingRondaCount] = useState(0);
   
-  // Cari activeKey (kecuali kalau di halaman utama /sekretaris, anggap 'dashboard')
   const activeKey = MENU.find((m) => router.pathname === m.path || (m.key !== 'dashboard' && router.pathname.startsWith(m.path)))?.key;
 
   useEffect(() => {
@@ -122,12 +121,24 @@ export default function Layout({ children }) {
             <h1 className="text-base sm:text-lg font-bold text-white truncate">📝 Dashboard Sekretariat</h1>
             <p className="text-[11px] text-slate-400">{user?.nama ? `${user.nama} — ${user.role}` : 'RT 38 Puri Kencana Wagir'}</p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {user && <NotifToggle userId={user.id} userType="pengurus" />}
-            <button onClick={handleLogout} className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-2 rounded-lg border border-rose-500/20 font-medium">🚪 Keluar</button>
+            
+            {/* TOMBOL KEMBALI KE ADMIN (Hanya muncul untuk Ketua agar tidak dobel dengan menu Sekretaris) */}
+            {user.role === 'ketua' && (
+              <Link href="/admin" className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2 rounded-lg font-medium transition active:scale-95 flex items-center gap-1">
+                ← Admin
+              </Link>
+            )}
+
+            <button onClick={handleLogout} className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-2 rounded-lg border border-rose-500/20 font-medium transition active:scale-95">
+              🚪 <span className="hidden sm:inline">Keluar</span>
+            </button>
           </div>
         </div>
       </div>
+      
       <div className="max-w-7xl mx-auto p-4 space-y-4">
         <div className="grid grid-cols-2 sm:flex sm:gap-2 sm:overflow-x-auto sm:pb-1 sm:scrollbar-none">
           {MENU.map((t) => {
