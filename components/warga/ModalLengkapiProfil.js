@@ -1,3 +1,4 @@
+// components/warga/ModalLengkapiProfil.js
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { uploadKK } from '../../lib/iuran/storage';
@@ -76,7 +77,15 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
       if (!nik || nik.length !== 16) { alert('NIK wajib diisi 16 digit!'); return; }
       if (!noKk || noKk.length !== 16) { alert('No. KK wajib diisi 16 digit!'); return; }
       if (!noWa.trim()) { alert('No WhatsApp wajib diisi!'); return; }
-      if (!isPenyewa && password && password !== confirmPassword) { alert('Password tidak cocok!'); return; }
+      
+      // ═══ VALIDASI PASSWORD WAJIB (HANYA PEMILIK) ═══
+      if (!isPenyewa) {
+        if (!password.trim()) { alert('Password Baru wajib diisi untuk keamanan akun!'); return; }
+        if (password.length < 6) { alert('Password minimal 6 karakter!'); return; }
+        if (password === '123456') { alert('Password tidak boleh 123456 (default).'); return; }
+        if (password !== confirmPassword) { alert('Konfirmasi Password tidak cocok!'); return; }
+      }
+      
       setStep(2);
     } else if (step === 2) {
       if (newNama.trim() !== '' || newNik.trim() !== '') {
@@ -140,12 +149,12 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
         await supabase.from('penghuni').insert([dataPenghuni]);
       }
 
-      // 2. Update data warga (Pemilik) jika perlu
+      // 2. Update data warga (Pemilik)
       if (!isPenyewa) {
         const updateWarga = {
-          nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_kk: noKk.trim(), no_wa: noWa.trim()
+          nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_kk: noKk.trim(), no_wa: noWa.trim(),
+          password_pending: password.trim() // Selalu simpan ke pending
         };
-        if (password.trim()) updateWarga.password_pending = password.trim();
         await supabase.from('warga').update(updateWarga).eq('id', warga.id);
       }
 
@@ -219,15 +228,16 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
             </div>
             
             {!isPenyewa && (
-              <div className="pt-3 border-t border-slate-800">
-                <label className="block text-xs text-slate-300 mb-1">Password Baru (Opsional)</label>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white mb-2" />
+              <div className="pt-3 border-t border-slate-800 bg-slate-900/50 p-3 rounded-xl border border-indigo-500/20">
+                <label className="block text-xs text-indigo-300 font-semibold mb-1">Password Baru (Wajib) *</label>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white mb-2" placeholder="Minimal 6 karakter" />
                 {password.length > 0 && (
                   <div>
-                    <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="Ulangi password" />
+                    <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="Ulangi password baru" />
                     {confirmPassword && confirmPassword !== password && <p className="text-[10px] text-rose-400 mt-1">Password tidak cocok!</p>}
                   </div>
                 )}
+                <p className="text-[9px] text-slate-400 mt-1">Ganti password default Anda demi keamanan akun.</p>
               </div>
             )}
           </div>
