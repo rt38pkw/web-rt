@@ -1,3 +1,4 @@
+// components/proyek/TabVerifikasi.js
 import { useState } from 'react';
 import { formatRupiahProyek, formatTanggalProyek } from '../../lib/proyek/constants';
 
@@ -53,7 +54,18 @@ export default function TabVerifikasi({ proyekList = [], iuranProyekList = [], w
                       <td className="p-3 text-slate-300 text-[11px]">{p?.nama || '-'}</td>
                       <td className="p-3 text-right font-mono font-bold text-amber-400">{formatRupiahProyek(item.jumlah)}</td>
                       <td className="p-3">
-                        {bukti.length > 0 ? (<div className="flex gap-1">{bukti.map((u, i) => (<a key={i} href={u} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline text-[10px] bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">📎{i + 1}</a>))}</div>) : (<span className="text-slate-600">-</span>)}
+                        {/* ═══ PERBAIKAN: CEK URL 'DIHAPUS' ═══ */}
+                        {bukti.length > 0 ? (
+                          <div className="flex gap-1">
+                            {bukti.map((u, i) => (
+                              u === 'DIHAPUS' ? (
+                                <span key={i} className="text-slate-500 italic text-[10px] px-1.5 py-0.5 bg-slate-800/50 rounded border border-slate-700">Terhapus</span>
+                              ) : (
+                                <a key={i} href={u} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline text-[10px] bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">📎{i + 1}</a>
+                              )
+                            ))}
+                          </div>
+                        ) : (<span className="text-slate-600">-</span>)}
                       </td>
                       <td className="p-3 text-slate-400 text-[10px] max-w-[200px] truncate">
                         {isRevisi ? (<span className="text-blue-300 font-semibold bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">🔄 Revisi</span>) : (item.catatan || '-')}
