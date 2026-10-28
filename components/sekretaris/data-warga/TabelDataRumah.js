@@ -21,21 +21,18 @@ export default function TabelDataRumah({
     }
   }, [blokRumah, nomorRumah, setNoRumah]);
 
-  // Hanya izinkan angka maksimal 2 digit
   const handleNomorChange = (e) => {
     let val = e.target.value.replace(/\D/g, '');
     if (val.length > 2) val = val.slice(0, 2);
     setNomorRumah(val);
   };
 
-  // Auto-padding saat user pindah dari kotak nomor
   const handleNomorBlur = () => {
     if (nomorRumah.length === 1) {
       setNomorRumah('0' + nomorRumah);
     }
   };
 
-  // Auto-padding saat submit
   const onSubmit = (e) => {
     e.preventDefault();
     let finalNomor = nomorRumah;
@@ -47,7 +44,6 @@ export default function TabelDataRumah({
     const combinedNoRumah = `${blokRumah.trim().toUpperCase()} - ${finalNomor}`;
     handleTambahWarga(e, combinedNoRumah);
     
-    // Reset form
     setBlokRumah('');
     setNomorRumah('');
     setShowForm(false);
@@ -79,26 +75,10 @@ export default function TabelDataRumah({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <input type="text" required placeholder="Nama Lengkap Pemilik *" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={namaLengkap} onChange={(e) => setNamaLengkap(e.target.value)} />
               
-              {/* INPUT TERPISAH */}
               <div className="flex gap-2 items-center">
-                <input 
-                  type="text" 
-                  required 
-                  placeholder="Blok (Cth: A1) *" 
-                  className="w-1/2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white uppercase" 
-                  value={blokRumah} 
-                  onChange={(e) => setBlokRumah(e.target.value.toUpperCase())} 
-                />
+                <input type="text" required placeholder="Blok (A1)" className="w-1/2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white uppercase" value={blokRumah} onChange={(e) => setBlokRumah(e.target.value.toUpperCase())} />
                 <span className="text-slate-500 font-bold">-</span>
-                <input 
-                  type="text" 
-                  required 
-                  placeholder="No. (Cth: 06) *" 
-                  className="w-1/2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" 
-                  value={nomorRumah} 
-                  onChange={handleNomorChange} 
-                  onBlur={handleNomorBlur}
-                />
+                <input type="text" required placeholder="No. (06)" className="w-1/2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={nomorRumah} onChange={handleNomorChange} onBlur={handleNomorBlur} />
               </div>
             </div>
 
@@ -127,8 +107,41 @@ export default function TabelDataRumah({
         </div>
       )}
 
-      {/* TABEL DATA RUMAH */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+      {/* ═══ TAMPILAN MOBILE (KOTAK-KOTAK / CARD) ═══ */}
+      <div className="block md:hidden space-y-3">
+        {filteredWarga.length === 0 ? (
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 text-center text-xs text-slate-500">
+            Data rumah tidak ditemukan.
+          </div>
+        ) : (
+          filteredWarga.map(w => (
+            <div key={w.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="font-bold text-white text-sm">{w.nama_lengkap}</div>
+                  <div className="text-[11px] text-teal-400 font-mono mt-1">🏠 {w.no_rumah}</div>
+                </div>
+                <span className={`px-2 py-1 rounded text-[9px] font-bold uppercase border ${
+                  w.status_huni === 'sewa' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 
+                  w.status_huni === 'kosong' ? 'bg-slate-500/10 text-slate-400 border-slate-500/20' :
+                  'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                }`}>
+                  {w.status_huni}
+                </span>
+              </div>
+              <button 
+                onClick={() => openDetailRumah(w)} 
+                className="w-full bg-slate-800 hover:bg-slate-700 text-white py-2 rounded-xl text-[10px] font-semibold transition"
+              >
+                👁️ Lihat Detail Rumah
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* ═══ TAMPILAN DESKTOP (TABEL) ═══ */}
+      <div className="hidden md:block bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto w-full">
           <table className="w-full text-left text-xs min-w-[500px]">
             <thead className="bg-slate-950 text-slate-400">
@@ -139,29 +152,25 @@ export default function TabelDataRumah({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {filteredWarga.length === 0 ? (
-                <tr><td colSpan="3" className="p-8 text-center text-slate-500">Data rumah tidak ditemukan.</td></tr>
-              ) : (
-                filteredWarga.map(w => (
-                  <tr key={w.id} className="hover:bg-slate-800/40">
-                    <td className="p-4 align-top">
-                      <div className="font-semibold text-white">{w.nama_lengkap}</div>
-                      <div className="text-[10px] text-teal-400 font-mono">{w.no_rumah}</div>
-                    </td>
-                    <td className="p-4 align-top">
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${
-                        w.status_huni === 'sewa' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 
-                        w.status_huni === 'kosong' ? 'bg-slate-500/10 text-slate-400 border-slate-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                      }`}>{w.status_huni}</span>
-                    </td>
-                    <td className="p-4 text-right align-top">
-                      <button onClick={() => openDetailRumah(w)} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-[10px] whitespace-nowrap transition inline-flex items-center gap-1">
-                        👁️ Lihat Detail
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
+              {filteredWarga.map(w => (
+                <tr key={w.id} className="hover:bg-slate-800/40">
+                  <td className="p-4 align-top">
+                    <div className="font-semibold text-white">{w.nama_lengkap}</div>
+                    <div className="text-[10px] text-teal-400 font-mono">{w.no_rumah}</div>
+                  </td>
+                  <td className="p-4 align-top">
+                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                      w.status_huni === 'sewa' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 
+                      w.status_huni === 'kosong' ? 'bg-slate-500/10 text-slate-400 border-slate-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                    }`}>{w.status_huni}</span>
+                  </td>
+                  <td className="p-4 text-right align-top">
+                    <button onClick={() => openDetailRumah(w)} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-[10px] whitespace-nowrap transition inline-flex items-center gap-1">
+                      👁️ Lihat Detail
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
