@@ -1,6 +1,8 @@
+// pages/keuangan/dashboard.js
 import KeuanganLayout from '../../components/keuangan/Layout';
 import TabDashboard from '../../components/keuangan/TabDashboard';
 import { useKeuanganData, getPendingBatches } from '../../lib/keuangan/hooks';
+import { exportLaporanKeuangan } from '../../lib/keuangan/exportExcel'; // Import fungsi export
 
 export default function PageDashboard() {
   const {
@@ -10,7 +12,7 @@ export default function PageDashboard() {
     pemasukanLain = [],
     depositList = [],
     loading,
-  } = useKeuanganData(); // ProyekList & IuranProyekList tidak perlu diambil lagi
+  } = useKeuanganData();
 
   if (typeof window === 'undefined') return null;
 
@@ -53,14 +55,40 @@ export default function PageDashboard() {
 
   const pendingBatches = getPendingBatches(iuranList);
 
+  // Handler Tombol Export
+  const handleExport = () => {
+    exportLaporanKeuangan({
+      iuranList,
+      pengeluaranList: pengeluaranSafe,
+      pemasukanLainList: pemasukanSafe,
+      saldoKasBebas,
+      totalPemasukan: totalIuranBulanan + totalPemasukanLain,
+      totalPengeluaran: totalPengeluaranUmum,
+    });
+  };
+
   return (
     <KeuanganLayout user={user} pendingCount={pendingBatches.length}>
+      {/* TOMBOL EXPORT DI ATAS DASHBOARD */}
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h2 className="text-lg font-bold text-white">Ringkasan Keuangan</h2>
+          <p className="text-xs text-slate-400">Pantau arus kas RT secara transparan</p>
+        </div>
+        <button 
+          onClick={handleExport}
+          className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs transition shadow-lg shadow-emerald-600/20 flex items-center gap-2"
+        >
+          📥 Export Excel
+        </button>
+      </div>
+
       <TabDashboard
         saldoKasBebas={saldoKasBebas}
         saldoDepositTotal={saldoDepositTotal}
         totalUangRekening={totalUangRekening}
         totalPemasukan={totalIuranBulanan + totalPemasukanLain}
-        totalPengeluaran={totalPengeluaranUmum} // Pengeluaran umum aja
+        totalPengeluaran={totalPengeluaranUmum}
         totalIuranApproved={totalIuranBulanan}
         totalPemasukanLain={totalPemasukanLain}
         pendingBatches={pendingBatches}
