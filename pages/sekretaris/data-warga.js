@@ -4,7 +4,6 @@ import { supabase } from '../../lib/supabase';
 import { uploadKK } from '../../lib/iuran/storage';
 import Layout from '../../components/sekretaris/Layout';
 
-// Import komponen-komponen yang sudah dipecah
 import TabelPenghuni from '../../components/sekretaris/data-warga/TabelPenghuni';
 import TabelDataRumah from '../../components/sekretaris/data-warga/TabelDataRumah';
 import ModalDetailRumah from '../../components/sekretaris/data-warga/ModalDetailRumah';
@@ -24,7 +23,7 @@ export default function SekretarisDataWarga() {
   // State Form Tambah Data Rumah
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [namaLengkap, setNamaLengkap] = useState('');
-  const [noRumah, setNoRumah] = useState(''); // State ini akan diisi otomatis oleh TabelDataRumah
+  const [noRumah, setNoRumah] = useState('');
   const [nik, setNik] = useState('');
   const [noKk, setNoKk] = useState('');
   const [noWa, setNoWa] = useState('');
@@ -32,9 +31,8 @@ export default function SekretarisDataWarga() {
   const [password, setPassword] = useState('123456');
   const [statusHuni, setStatusHuni] = useState('pemilik');
 
-  // State Modal Detail & Edit Rumah
-  const [showDetailRumah, setShowDetailRumah] = useState(false);
-  const [detailRumah, setDetailRumah] = useState(null);
+  // ═══ STATE MODAL DETAIL & EDIT (HANYA 1 STATE UNTUK DETAIL) ═══
+  const [detailRumah, setDetailRumah] = useState(null); // Jika ada isinya, modal detail muncul
   const [showEditModal, setShowEditModal] = useState(false);
   const [editId, setEditId] = useState(null);
   const [editNama, setEditNama] = useState('');
@@ -123,16 +121,15 @@ export default function SekretarisDataWarga() {
   };
 
   const openDetailRumah = (w) => {
-    setDetailRumah(w);
-    setShowDetailRumah(true);
+    setDetailRumah(w); // Cukup set data warga, modal akan otomatis terbuka
   };
 
   const openEditModal = (w) => {
-    setShowDetailRumah(false); 
+    setDetailRumah(null); // Tutup modal detail
     setEditId(w.id); setEditNama(w.nama_lengkap || ''); setEditNoRumah(w.no_rumah || '');
     setEditNik(w.nik?.length === 16 ? w.nik : ''); setEditNoKk(w.no_kk?.length === 16 ? w.no_kk : ''); 
     setEditNoWa(w.no_wa || ''); setEditKategori(w.kategori || 'Warga'); setEditStatusHuni(w.status_huni || 'pemilik');
-    setShowEditModal(true);
+    setShowEditModal(true); // Buka modal edit
   };
 
   const handleUpdateWarga = async (e, overrideNoRumah) => {
@@ -156,7 +153,7 @@ export default function SekretarisDataWarga() {
     const { error } = await supabase.from('warga').update({ password: '123456', password_pending: null }).eq('id', w.id);
     setProcessingId(null);
     if (error) alert('Gagal: ' + error.message);
-    else { alert('✅ Password berhasil direset ke 123456.'); setShowDetailRumah(false); }
+    else { alert('✅ Password berhasil direset ke 123456.'); setDetailRumah(null); }
   };
 
   const handleSelesaikanSewa = async (w) => {
@@ -177,7 +174,7 @@ export default function SekretarisDataWarga() {
         }]);
       }
       alert('✅ Sewa selesai. Rumah kosong, penyewa diarsipkan, Pemilik diaktifkan.');
-      setShowDetailRumah(false);
+      setDetailRumah(null);
       fetchWarga(); fetchPenghuni();
     } catch (err) { alert('Gagal: ' + err.message); } finally { setProcessingId(null); }
   };
@@ -187,7 +184,7 @@ export default function SekretarisDataWarga() {
     setProcessingId(w.id);
     try {
       await supabase.from('warga').delete().eq('id', w.id);
-      setShowDetailRumah(false);
+      setDetailRumah(null);
       fetchWarga();
     } catch (err) { alert('Gagal: ' + err.message); } finally { setProcessingId(null); }
   };
@@ -351,14 +348,18 @@ export default function SekretarisDataWarga() {
         )}
       </div>
 
-      {/* RENDER SEMUA MODAL */}
+      {/* RENDER MODAL DETAIL RUMAH */}
       <ModalDetailRumah 
-        detailRumah={detailRumah} setShowDetailRumah={setShowDetailRumah} 
-        openEditModal={openEditModal} handleResetPassword={handleResetPassword} 
-        handleSelesaikanSewa={handleSelesaikanSewa} handleHapusWarga={handleHapusWarga} 
+        detailRumah={detailRumah} 
+        setDetailRumah={setDetailRumah} // GUNAKAN setDetailRumah, BUKAN setShowDetailRumah
+        openEditModal={openEditModal} 
+        handleResetPassword={handleResetPassword} 
+        handleSelesaikanSewa={handleSelesaikanSewa} 
+        handleHapusWarga={handleHapusWarga} 
         processingId={processingId} 
       />
 
+      {/* RENDER MODAL EDIT RUMAH */}
       <ModalEditRumah 
         showEditModal={showEditModal} setShowEditModal={setShowEditModal} 
         handleUpdateWarga={handleUpdateWarga} editNama={editNama} setEditNama={setEditNama} 
@@ -368,6 +369,7 @@ export default function SekretarisDataWarga() {
         handleAngkaChange={handleAngkaChange} processingId={processingId} editId={editId} 
       />
 
+      {/* RENDER MODAL KK */}
       <ModalKK 
         showKKModal={showKKModal} setShowKKModal={setShowKKModal} selectedKKWarga={selectedKKWarga} 
         kkData={kkData} isAddingNewKK={isAddingNewKK} isKelolaMode={isKelolaMode} setIsKelolaMode={setIsKelolaMode} 
