@@ -15,6 +15,7 @@ export default function SekretarisVerifikasi() {
   useEffect(() => {
     fetchAntrean();
     
+    // Realtime listener
     const channel = supabase
       .channel('realtime-verifikasi-sekretaris')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'penghuni' }, () => fetchAntrean())
@@ -91,7 +92,7 @@ export default function SekretarisVerifikasi() {
         await supabase.from('warga').update(updateWarga).eq('id', item.warga_id);
       }
 
-      alert('✅ Data berhasil disetujui! (Password warga telah diperbarui).');
+      alert('✅ Data berhasil disetujui!');
       fetchAntrean();
     } catch (err) {
       alert('Gagal approve: ' + err.message);
@@ -122,8 +123,14 @@ export default function SekretarisVerifikasi() {
     }
   };
 
-  const openPreview = (data) => {
-    setPreviewData(data);
+  // ═══ PERBAIKAN: KIRIM SELURUH ANGGOTA KELUARGA KE MODAL ═══
+  const openPreview = (anggotaList, tipe) => {
+    const kk = anggotaList.find(a => a.hubungan === 'Kepala Keluarga');
+    setPreviewData({ 
+      imageUrl: kk.url_kk, 
+      tipe: tipe,
+      anggota: anggotaList // Kirim semua anggota
+    });
     setIsZoomed(false);
   };
 
@@ -131,12 +138,11 @@ export default function SekretarisVerifikasi() {
     <Layout>
       <div className="max-w-5xl mx-auto space-y-4">
         
-        {/* MODAL SPLIT-SCREEN DENGAN TOMBOL CLOSE MELAYANG */}
+        {/* MODAL SPLIT-SCREEN PEDIA COCOKAN DATA */}
         {previewData && (
           <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 animate-in fade-in">
             <div className="bg-slate-900 sm:border sm:border-slate-700 w-full max-w-6xl h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:rounded-3xl flex flex-col md:flex-row overflow-hidden shadow-2xl relative">
               
-              {/* TOMBOL TUTUP (MELAYANG DI POJOK KANAN ATAS) */}
               <button 
                 onClick={() => setPreviewData(null)} 
                 className="absolute top-3 right-3 z-[150] bg-rose-600 hover:bg-rose-500 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-xl border border-rose-400/50 transition active:scale-90"
@@ -151,23 +157,21 @@ export default function SekretarisVerifikasi() {
                     {previewData.tipe === 'pemilik' ? 'Pemilik' : 'Penyewa'}
                   </span>
                 </div>
+                
                 <div className="space-y-4">
-                  <div>
-                    <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">Nama Lengkap</div>
-                    <div className="text-lg font-bold text-white leading-tight">{previewData.nama}</div>
-                  </div>
-                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                    <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">NIK (Cocokkan dengan KK)</div>
-                    <div className="text-xl font-mono font-bold text-amber-400 tracking-wider break-all">{previewData.nik || '-'}</div>
-                  </div>
-                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                    <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">No. KK (Cocokkan dengan KK)</div>
-                    <div className="text-xl font-mono font-bold text-blue-400 tracking-wider break-all">{previewData.noKk || '-'}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">No WhatsApp</div>
-                    <div className="text-sm text-slate-300">{previewData.wa || '-'}</div>
-                  </div>
+                  {/* LOOPING SELURUH ANGGOTA KELUARGA */}
+                  {previewData.anggota.map((a, i) => (
+                    <div key={i} className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                      <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">{a.hubungan}</div>
+                      <div className="text-sm font-bold text-white mb-2">{a.nama_lengkap}</div>
+                      
+                      <div className="space-y-1">
+                        <div className="text-[9px] text-slate-400">NIK: <span className="text-amber-400 font-mono font-bold text-xs">{a.nik || '-'}</span></div>
+                        {a.no_kk && <div className="text-[9px] text-slate-400">No. KK: <span className="text-blue-400 font-mono font-bold text-xs">{a.no_kk}</span></div>}
+                        {a.no_hp && <div className="text-[9px] text-slate-400">WA: <span className="text-slate-300">{a.no_hp}</span></div>}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
               
@@ -227,7 +231,7 @@ export default function SekretarisVerifikasi() {
                             <div className="text-[10px] text-slate-400 mt-0.5 break-all">WA: {kepalaKeluarga.no_hp || '-'}</div>
                           </div>
                           {kepalaKeluarga.url_kk && (
-                            <div className="relative group cursor-pointer w-full sm:w-24 h-32 sm:h-24 shrink-0 mt-2 sm:mt-0" onClick={() => openPreview({ imageUrl: kepalaKeluarga.url_kk, nama: kepalaKeluarga.nama_lengkap, nik: kepalaKeluarga.nik, noKk: kepalaKeluarga.no_kk, wa: kepalaKeluarga.no_hp, tipe: tipePenghuni })}>
+                            <div className="relative group cursor-pointer w-full sm:w-24 h-32 sm:h-24 shrink-0 mt-2 sm:mt-0" onClick={() => openPreview(item.anggota, tipePenghuni)}>
                               <img src={kepalaKeluarga.url_kk} alt="KK" className="w-full h-full object-cover rounded-lg border border-slate-700" />
                               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition"><span className="text-white text-[10px] font-semibold">🔍 Zoom</span></div>
                             </div>
@@ -256,7 +260,6 @@ export default function SekretarisVerifikasi() {
                       </div>
                     )}
 
-                    {/* TOMBOL AKSI: Di HP menumpuk vertikal, di Laptop berjejer */}
                     {activeTab === 'pending' && (
                       <div className="flex flex-col-reverse sm:flex-row gap-2 pt-3 border-t border-slate-800/60">
                         <button onClick={() => handleReject(item)} disabled={processing} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-[11px] sm:text-xs font-semibold py-3 sm:py-2.5 rounded-xl transition">✗ Tolak Data</button>
