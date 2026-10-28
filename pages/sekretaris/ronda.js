@@ -4,12 +4,11 @@ import { supabase } from '../../lib/supabase';
 import Layout from '../../components/sekretaris/Layout';
 import { generateJadwalRonda } from '../../lib/ronda/generator';
 import { simpanJadwalRonda } from '../../lib/ronda/rpc';
-import { hapusBuktiRonda } from '../../lib/ronda/storage'; // IMPORT FUNGSI HAPUS
+import { hapusBuktiRonda } from '../../lib/ronda/storage'; 
 import ModalBuatPeriode from '../../components/ronda/ModalBuatPeriode';
 import ModalSetupOtomatis from '../../components/ronda/ModalSetupOtomatis';
 import ModalImportExcel from '../../components/ronda/ModalImportExcel';
 import TabelJadwal from '../../components/ronda/TabelJadwal';
-import TabelAturanKhusus from '../../components/ronda/TabelAturanKhusus';
 
 export default function SekretarisRonda() {
   const [activeTab, setActiveTab] = useState('jadwal'); 
@@ -29,9 +28,9 @@ export default function SekretarisRonda() {
   const [isPublished, setIsPublished] = useState(false);
   const [hasConflict, setHasConflict] = useState(false);
 
+  // Data Warga untuk Aturan Khusus
   const [wargaList, setWargaList] = useState([]);
   const [loadingWarga, setLoadingWarga] = useState(false);
-  const [searchWarga, setSearchWarga] = useState('');
 
   const [verifikasiData, setVerifikasiData] = useState([]);
   const [loadingVerifikasi, setLoadingVerifikasi] = useState(false);
@@ -40,7 +39,7 @@ export default function SekretarisRonda() {
 
   useEffect(() => {
     fetchPeriode();
-    fetchWargaRonda();
+    fetchWargaRonda(); // Load data warga di awal agar siap dipakai di Modal
   }, []);
 
   useEffect(() => {
@@ -107,7 +106,6 @@ export default function SekretarisRonda() {
     }
   }
 
-  // ═══ PERBAIKAN: HAPUS FOTO SETELAH VERIFIKASI ═══
   const handleSimpanVerifikasi = async (jadwalId, petugasList, fotoUrl) => {
     if (!confirm('Simpan hasil verifikasi? Foto bukti akan dihapus otomatis untuk menghemat kuota.')) return;
     setProcessing(true);
@@ -115,7 +113,6 @@ export default function SekretarisRonda() {
       const savedUser = JSON.parse(localStorage.getItem('pengurusSession'));
       const verifierId = savedUser?.id || null;
 
-      // 1. Update Status Semua Petugas
       for (const p of petugasList) {
         const newStatus = verifikasiEdits[p.id];
         const { error } = await supabase
@@ -123,18 +120,17 @@ export default function SekretarisRonda() {
           .update({ 
             status_hadir: newStatus, 
             verified_by: verifierId,
-            foto_bukti: fotoUrl ? 'DIHAPUS' : null // Ganti URL dengan teks "DIHAPUS"
+            foto_bukti: fotoUrl ? 'DIHAPUS' : null 
           })
           .eq('id', p.id);
         if (error) throw error;
       }
 
-      // 2. Hapus File Fisik dari Supabase Storage
       if (fotoUrl && fotoUrl !== 'DIHAPUS') {
         await hapusBuktiRonda(fotoUrl);
       }
 
-      alert('✅ Verifikasi berhasil! Foto bukti telah dibersihkan.');
+      alert('✅ Verifikasi berhasil!');
       fetchVerifikasiRonda(); 
     } catch (err) {
       alert('Gagal memverifikasi: ' + err.message);
@@ -285,7 +281,16 @@ export default function SekretarisRonda() {
             <TabelJadwal draftData={draftData} selectedPeriode={selectedPeriode} isPublished={isPublished} onToggleLibur={handleToggleLibur} />
           )}
         </div>
-        <ModalSetupOtomatis isOpen={showSetupOtomatis} onClose={() => setShowSetupOtomatis(false)} onGenerate={handleGenerateDraft} isGenerating={isGenerating} />
+        
+        <ModalSetupOtomatis 
+          isOpen={showSetupOtomatis} 
+          onClose={() => setShowSetupOtomatis(false)} 
+          onGenerate={handleGenerateDraft} 
+          isGenerating={isGenerating} 
+          wargaList={wargaList}
+          loadingWarga={loadingWarga}
+          onUpdateAturan={handleUpdateAturan}
+        />
         <ModalImportExcel isOpen={showImportExcel} onClose={() => setShowImportExcel(false)} onSave={handleSaveExcelToDraft} wargaList={wargaList} isSaving={isSaving} />
       </Layout>
     );
@@ -297,7 +302,6 @@ export default function SekretarisRonda() {
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-2 flex gap-2 overflow-x-auto">
           <button onClick={() => setActiveTab('jadwal')} className={`flex-1 py-2.5 px-4 text-xs font-semibold rounded-xl whitespace-nowrap ${activeTab === 'jadwal' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>📅 Jadwal Ronda</button>
           <button onClick={() => setActiveTab('verifikasi')} className={`flex-1 py-2.5 px-4 text-xs font-semibold rounded-xl whitespace-nowrap ${activeTab === 'verifikasi' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>✅ Verifikasi & Alpa</button>
-          <button onClick={() => setActiveTab('aturan')} className={`flex-1 py-2.5 px-4 text-xs font-semibold rounded-xl whitespace-nowrap ${activeTab === 'aturan' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>⚙️ Aturan Khusus</button>
         </div>
         
         {activeTab === 'jadwal' && (
@@ -412,8 +416,6 @@ export default function SekretarisRonda() {
             )}
           </div>
         )}
-
-        {activeTab === 'aturan' && <TabelAturanKhusus wargaList={wargaList} loading={loadingWarga} search={searchWarga} setSearch={setSearchWarga} onUpdateAturan={handleUpdateAturan} />}
       </div>
 
       <ModalBuatPeriode isOpen={showModalPeriode} onClose={() => setShowModalPeriode(false)} onSave={handleBuatPeriode} processing={processing} />
