@@ -12,7 +12,7 @@ export default function RondaWarga() {
   
   const [jadwalSaya, setJadwalSaya] = useState([]); 
   const [jadwalFull, setJadwalFull] = useState([]); 
-  const [alpaList, setAlpaList] = useState([]); // Ganti nama state jadi alpaList
+  const [alpaList, setAlpaList] = useState([]); 
   const [uploadingId, setUploadingId] = useState(null);
   
   const [showRekap, setShowRekap] = useState(false);
@@ -27,10 +27,19 @@ export default function RondaWarga() {
     const parsedUser = JSON.parse(savedUser);
     setUser(parsedUser);
     fetchData(parsedUser.id);
+
+    const channel = supabase
+      .channel('realtime-ronda-warga')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'petugas_ronda' }, (payload) => {
+        fetchData(parsedUser.id, true); 
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
   }, [router]);
 
-  async function fetchData(wargaId) {
-    setLoading(true);
+  async function fetchData(wargaId, isSilent = false) {
+    if (!isSilent) setLoading(true);
     try {
       const { data: penghuniData } = await supabase
         .from('penghuni').select('id').eq('warga_id', wargaId).eq('is_aktif', true);
@@ -62,11 +71,10 @@ export default function RondaWarga() {
         .order('tanggal', { ascending: true });
       setJadwalFull(fullJadwal || []);
 
-      // ═══ LOGIKA BARU: HITUNG TOTAL ALPA ═══
       const { data: allAlpa } = await supabase
         .from('petugas_ronda')
         .select('penghuni_id, jadwal:jadwal_id!inner(periode:periode_id!inner(status)), penghuni:penghuni_id(nama_lengkap, warga:warga_id(no_rumah))')
-        .eq('status_hadir', 'tidak_hadir') // HANYA AMBIL YANG ALPA
+        .eq('status_hadir', 'tidak_hadir')
         .eq('jadwal.periode.status', 'published');
 
       const tally = {};
@@ -77,29 +85,36 @@ export default function RondaWarga() {
         }
         tally[pid].total_alpa += 1;
       });
-      
-      // Urutkan dari yang paling sering alpa
       const sortedAlpa = Object.values(tally).sort((a, b) => b.total_alpa - a.total_alpa);
       setAlpaList(sortedAlpa);
 
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }
 
-  const handleUploadBukti = async (e, jadwalId) => {
+  const handleUploadBukti = async (e, jadwalId, tanggal) => {
     const file = e.target.files[0];
     if (!file) return;
     setUploadingId(jadwalId);
     try {
       const publicUrl = await uploadBuktiRonda(file, jadwalId);
       const catatanTeks = catatanMap[jadwalId] || null;
+      
       const { error } = await supabase.from('petugas_ronda').update({ status_hadir: 'pending', foto_bukti: publicUrl, waktu_absen: new Date().toISOString(), catatan: catatanTeks }).eq('jadwal_id', jadwalId); 
       if (error) throw error;
+      
+      const namaWarga = user?.penghuni_data?.nama_lengkap || user?.nama_lengkap || 'Warga';
+      fetch('/api/push/notify-ronda-pending', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nama_warga: namaWarga, tanggal: tanggal })
+      }).catch(err => console.log('Gagal kirim notif', err));
+
       alert('✅ Absen berhasil dikirim!');
-      fetchData(user.id); 
+      fetchData(user.id, true); 
     } catch (err) {
       alert('Gagal upload: ' + err.message);
     } finally {
@@ -115,19 +130,31 @@ export default function RondaWarga() {
 
   const formatTanggal = (dateStr) => dateStr ? new Intl.DateTimeFormat('id-ID', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(dateStr)) : '-';
   
-  const cekStatusWaktu = (tanggalJadwal, jamSelesai) => {
-    if (!tanggalJadwal || !jamSelesai) return 'closed';
-    const now = new Date();
-    const deadline = new Date(`${tanggalJadwal}T${jamSelesai}`);
-    const jam = parseInt(jamSelesai.split(':')[0]);
-    if (jam < 12) deadline.setDate(deadline.getDate() + 1); 
-    deadline.setHours(deadline.getHours() + 2);
-    const startDate = new Date(tanggalJadwal);
-    startDate.setDate(startDate.getDate() - 1);
-    startDate.setHours(12, 0, 0, 0); 
+  // ═══ PERBAIKAN BUG: PARSING TANGGAL YANG KEBAL ═══
+  const cekStatusWaktu = (tanggalJadwal, jamMulai, jamSelesai) => {
+    if (!tanggalJadwal || !jamMulai || !jamSelesai) return 'closed';
+    
+    // 1. Ambil hanya YYYY-MM-DD (jika ada string T dari database, buang)
+    const dateStr = tanggalJadwal.split('T')[0]; 
+    
+    // 2. Pisahkan Jam, Menit, Detik
+    const [mulaiH, mulaiM] = jamMulai.split(':');
+    const [selesaiH, selesaiM] = jamSelesai.split(':');
 
-    if (now > deadline) return 'closed';
-    if (now < startDate) return 'wait';
+    // 3. Buat Objek Date Lokal
+    const startDateTime = new Date(`${dateStr}T${mulaiH}:${mulaiM}:00`);
+    let endDateTime = new Date(`${dateStr}T${selesaiH}:${selesaiM}:00`);
+    
+    // 4. Jika selesai lebih kecil dari mulai (lewat tengah malam), tambah 1 hari
+    if (endDateTime < startDateTime) {
+      endDateTime.setDate(endDateTime.getDate() + 1);
+    }
+
+    const now = new Date();
+
+    // 5. Evaluasi
+    if (now < startDateTime) return 'wait';
+    if (now > endDateTime) return 'closed';
     return 'open'; 
   };
 
@@ -217,7 +244,7 @@ export default function RondaWarga() {
             ) : (
               <div className="flex overflow-x-auto w-full snap-x snap-mandatory custom-scrollbar">
                 {sortedJadwalSaya.map((item) => {
-                  const statusWaktu = cekStatusWaktu(item.jadwal.tanggal, item.jadwal.periode?.jam_selesai);
+                  const statusWaktu = cekStatusWaktu(item.jadwal.tanggal, item.jadwal.periode?.jam_mulai, item.jadwal.periode?.jam_selesai);
                   const isDone = !!item.foto_bukti;
                   
                   return (
@@ -244,7 +271,7 @@ export default function RondaWarga() {
                               value={catatanMap[item.jadwal_id] || ''}
                               onChange={(e) => setCatatanMap({ ...catatanMap, [item.jadwal_id]: e.target.value })}
                             />
-                            <input type="file" accept="image/*" capture="environment" id={`up-${item.jadwal_id}`} className="hidden" onChange={(e) => handleUploadBukti(e, item.jadwal_id)} />
+                            <input type="file" accept="image/*" capture="environment" id={`up-${item.jadwal_id}`} className="hidden" onChange={(e) => handleUploadBukti(e, item.jadwal_id, item.jadwal.tanggal)} />
                             <label htmlFor={`up-${item.jadwal_id}`} className={`bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-1.5 rounded-lg text-[10px] whitespace-nowrap cursor-pointer transition shadow ${uploadingId === item.jadwal_id ? 'opacity-50' : ''}`}>
                               {uploadingId === item.jadwal_id ? '...' : '📸 Absen'}
                             </label>
@@ -281,7 +308,6 @@ export default function RondaWarga() {
         </div>
       )}
 
-      {/* ═══ POP-UP MODAL DAFTAR ALPA (DIPERBARUI) ═══ */}
       {showRekap && (
         <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowRekap(false)}>
           <div className="bg-slate-900 border-t sm:border border-rose-500/30 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-in slide-in-from-bottom-10 sm:zoom-in-95" onClick={(e) => e.stopPropagation()}>
@@ -314,10 +340,6 @@ export default function RondaWarga() {
                 ))
               )}
             </div>
-            
-            {alpaList.length > 0 && (
-              <p className="text-center text-[9px] text-slate-500 mt-4">Mohon tingkatkan kedisiplinan ronda. Terima kasih.</p>
-            )}
           </div>
         </div>
       )}
