@@ -135,19 +135,32 @@ export default function RondaWarga() {
     return { icon: '⚪', text: 'Belum', color: 'text-slate-400 bg-slate-800 border-slate-700' };
   };
 
+  // ═══ LOGIKA SORTIR TUGAS (YANG BELUM SELESAI DI DEPAN) ═══
+  const sortedJadwalSaya = [...jadwalSaya].sort((a, b) => {
+    // Bobot: 0 = Belum Absen, 1 = Pending, 2 = Selesai (Hadir/Alpa)
+    const getWeight = (item) => {
+      if (item.status_hadir === 'hadir' || item.status_hadir === 'tidak_hadir') return 2;
+      if (item.foto_bukti) return 1;
+      return 0;
+    };
+    
+    const weightA = getWeight(a);
+    const weightB = getWeight(b);
+    
+    // Jika bobot beda, taruh yang bobotnya kecil di depan (kiri)
+    if (weightA !== weightB) return weightA - weightB;
+    
+    // Jika bobot sama, urutkan berdasarkan tanggal terdekat
+    return new Date(a.jadwal.tanggal) - new Date(b.jadwal.tanggal);
+  });
+
   if (loading) return <div className="min-h-screen bg-slate-950 text-white flex justify-center p-10">Memuat data ronda...</div>;
   if (!user) return null;
 
   return (
     <Layout warga={user} onLogout={handleLogout}>
-      {/* 
-        LAYOUT APP-LIKE: 
-        h-[calc(100dvh-140px)] memaksa tinggi pas di layar HP.
-        flex-col agar isinya berderet dari atas ke bawah.
-      */}
       <div className="flex flex-col h-[calc(100dvh-140px)] gap-2 pb-2">
         
-        {/* ═══ HEADER COMPACT ═══ */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex justify-between items-center shadow-sm shrink-0">
           <div>
             <h1 className="text-sm font-bold text-white">Ronda RT 38</h1>
@@ -155,7 +168,6 @@ export default function RondaWarga() {
           <button onClick={() => setShowRekap(true)} className="bg-blue-500/10 text-blue-400 border border-blue-500/30 font-bold px-2.5 py-1.5 rounded-lg text-[10px] flex items-center gap-1 transition">📊 Rekap</button>
         </div>
 
-        {/* ═══ BAGIAN 1: JADWAL FULL RT (MENGISI SISA RUANG) ═══ */}
         <div className="flex-1 flex flex-col min-h-0 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
           <div className="p-2 border-b border-slate-800 bg-slate-950/50 flex justify-between items-center shrink-0">
             <h2 className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">📅 Jadwal Ronda RT</h2>
@@ -166,7 +178,6 @@ export default function RondaWarga() {
             </div>
           </div>
           
-          {/* Kotak ini yang akan scroll sendiri jika isinya banyak */}
           <div className="flex-1 overflow-y-auto custom-scrollbar">
             {jadwalFull.length === 0 ? (
               <div className="p-4 text-center text-[10px] text-slate-500">Belum ada jadwal.</div>
@@ -198,14 +209,14 @@ export default function RondaWarga() {
           </div>
         </div>
 
-        {/* ═══ BAGIAN 2: TUGAS SAYA (PIPIH DI BAWAH) ═══ */}
+        {/* ═══ BAGIAN 2: TUGAS SAYA (MENGGUNAKAN DATA YANG SUDAH DISORTIR) ═══ */}
         <div className="shrink-0 bg-slate-900 border border-indigo-500/30 rounded-xl overflow-hidden shadow-lg flex">
           {jadwalSaya.length === 0 ? (
              <div className="w-full p-3 text-center text-[10px] text-slate-400">Tidak ada tugas ronda untuk Anda.</div>
           ) : (
-            // Jika tugas lebih dari 1, bisa digeser ke samping (horizontal scroll)
             <div className="flex overflow-x-auto w-full snap-x snap-mandatory custom-scrollbar">
-              {jadwalSaya.map((item) => {
+              {/* Gunakan sortedJadwalSaya di sini */}
+              {sortedJadwalSaya.map((item) => {
                 const statusWaktu = cekStatusWaktu(item.jadwal.tanggal, item.jadwal.periode?.jam_selesai);
                 const isDone = !!item.foto_bukti;
                 
@@ -223,7 +234,6 @@ export default function RondaWarga() {
                       )}
                     </div>
 
-                    {/* Baris Input & Tombol (Sangat Compact) */}
                     {!isDone ? (
                       statusWaktu === 'open' ? (
                         <div className="flex gap-2 items-center mt-1">
@@ -251,11 +261,11 @@ export default function RondaWarga() {
                       </div>
                     )}
                     
-                    {/* Indikator Slider jika ada > 1 tugas */}
+                    {/* Indikator Slider */}
                     {jadwalSaya.length > 1 && (
                       <div className="flex justify-center gap-1 mt-1">
-                        {jadwalSaya.map((_, idx) => (
-                          <div key={idx} className={`w-1.5 h-1.5 rounded-full ${item.id === jadwalSaya[idx].id ? 'bg-indigo-500' : 'bg-slate-700'}`} />
+                        {sortedJadwalSaya.map((_, idx) => (
+                          <div key={idx} className={`w-1.5 h-1.5 rounded-full ${item.id === sortedJadwalSaya[idx].id ? 'bg-indigo-500' : 'bg-slate-700'}`} />
                         ))}
                       </div>
                     )}
@@ -267,7 +277,6 @@ export default function RondaWarga() {
         </div>
       </div>
 
-      {/* POP-UP MODAL REKAP KEHADIRAN (Sama seperti sebelumnya) */}
       {showRekap && (
         <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowRekap(false)}>
           <div className="bg-slate-900 border-t sm:border border-slate-700 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-in slide-in-from-bottom-10 sm:zoom-in-95" onClick={(e) => e.stopPropagation()}>
