@@ -1,6 +1,6 @@
 // components/sekretaris/data-warga/ModalDetailRumah.js
 export default function ModalDetailRumah({ 
-  detailRumah, setShowDetailRumah, openEditModal, handleResetPassword, 
+  detailRumah, setDetailRumah, openEditModal, handleResetPassword, 
   handleSelesaikanSewa, handleHapusWarga, processingId 
 }) {
   if (!detailRumah) return null;
@@ -8,19 +8,19 @@ export default function ModalDetailRumah({
   return (
     <div 
       className="fixed inset-0 z-[999] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"
-      onClick={() => setShowDetailRumah(false)}
+      onClick={() => setDetailRumah(null)} // TUTUP MODAL JIKA KLIK AREA LUAR
     >
       <div 
         className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()} // CEGAH TUTUP JIKA KLIK DI DALAM KOTAK
       >
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <h3 className="text-base font-bold text-white">🏠 Detail Data Rumah</h3>
           
-          {/* TOMBOL X YANG DIPERBAIKI */}
+          {/* TOMBOL X */}
           <button 
             type="button" 
-            onClick={() => setShowDetailRumah(false)} 
+            onClick={() => setDetailRumah(null)} // UBAH KE setDetailRumah
             className="relative z-[1000] text-slate-400 hover:text-white bg-slate-800 hover:bg-rose-500/20 w-8 h-8 flex items-center justify-center rounded-full transition cursor-pointer text-lg"
           >
             ✕
@@ -75,9 +75,10 @@ export default function ModalDetailRumah({
           </button>
         </div>
         
+        {/* TOMBOL TUTUP BAWAH */}
         <button 
           type="button"
-          onClick={() => setShowDetailRumah(false)} 
+          onClick={() => setDetailRumah(null)} // UBAH KE setDetailRumah
           className="w-full mt-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl text-xs transition border border-slate-700"
         >
           Tutup
