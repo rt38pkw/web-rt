@@ -1,3 +1,4 @@
+// components/keuangan/TabVerifikasi.js
 import { formatRupiah, formatTanggal } from '../../lib/keuangan/helpers';
 
 export default function TabVerifikasi({ pendingBatches, iuran, filterVerif, setFilterVerif, handleApprove, handleReject }) {
@@ -48,7 +49,18 @@ export default function TabVerifikasi({ pendingBatches, iuran, filterVerif, setF
                       <td className="p-3 font-mono">{formatRupiah(total)}</td>
                       <td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 uppercase">{metode}</span></td>
                       <td className="p-3">
-                        {bukti.length > 0 ? (<div className="flex gap-1">{bukti.map((u, i) => (<a key={i} href={u} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline text-[10px]">📎{i + 1}</a>))}</div>) : (<span className="text-slate-600">-</span>)}
+                        {/* ═══ PERBAIKAN: CEK URL 'DIHAPUS' ═══ */}
+                        {bukti.length > 0 ? (
+                          <div className="flex gap-1">
+                            {bukti.map((u, i) => (
+                              u === 'DIHAPUS' ? (
+                                <span key={i} className="text-slate-500 italic text-[10px] px-1.5 py-0.5 bg-slate-800/50 rounded border border-slate-700">Terhapus</span>
+                              ) : (
+                                <a key={i} href={u} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline text-[10px]">📎{i + 1}</a>
+                              )
+                            ))}
+                          </div>
+                        ) : (<span className="text-slate-600">-</span>)}
                       </td>
                       <td className="p-3">
                         <div className="flex flex-col items-start gap-1">
