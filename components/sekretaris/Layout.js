@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+// components/sekretaris/Layout.js
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import NotifToggle from '../NotifToggle';
 import { supabase } from '../../lib/supabase';
+import { useState, useEffect } from 'react';
 
 const MENU = [
   { key: 'data-warga', i: '👥', l: 'Data Warga', path: '/sekretaris/data-warga' },
@@ -15,11 +16,10 @@ export default function Layout({ children }) {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingVerifCount, setPendingVerifCount] = useState(0);
   
   const activeKey = MENU.find((m) => router.pathname.startsWith(m.path))?.key;
 
-  // ═══ LOGIKA AUTH ═══
   useEffect(() => {
     const savedUser = localStorage.getItem('pengurusSession');
     if (!savedUser) {
@@ -35,22 +35,14 @@ export default function Layout({ children }) {
     setLoading(false);
   }, [router]);
 
-  // ═══ LOGIKA BADGE & PWA BADGE ═══
   useEffect(() => {
     if (!user) return;
     
     const fetchPendingCount = async () => {
       try {
-        const { data: wPending } = await supabase
-          .from('warga')
-          .select('id')
-          .eq('status_verifikasi_profil', 'pending');
-        
-        const { data: pPending } = await supabase
-          .from('penghuni')
-          .select('warga_id')
-          .eq('status_verifikasi', 'pending')
-          .eq('is_aktif', true);
+        // Hanya hitung yang pending untuk data warga/penghuni
+        const { data: wPending } = await supabase.from('warga').select('id').eq('status_verifikasi_profil', 'pending');
+        const { data: pPending } = await supabase.from('penghuni').select('warga_id').eq('status_verifikasi', 'pending').eq('is_aktif', true);
         
         const uniqueRumahIds = new Set([
           ...(wPending || []).map(w => w.id),
@@ -58,14 +50,12 @@ export default function Layout({ children }) {
         ]);
         
         const total = uniqueRumahIds.size;
-        setPendingCount(total);
+        setPendingVerifCount(total);
 
+        // Update PWA Badge
         if ('setAppBadge' in navigator) {
-          if (total > 0) {
-            await navigator.setAppBadge(total);
-          } else if ('clearAppBadge' in navigator) {
-            await navigator.clearAppBadge();
-          }
+          if (total > 0) await navigator.setAppBadge(total);
+          else if ('clearAppBadge' in navigator) await navigator.clearAppBadge();
         }
       } catch (err) {
         console.error('Badge error:', err);
@@ -74,6 +64,7 @@ export default function Layout({ children }) {
     
     fetchPendingCount();
     
+    // Realtime listener agar badge langsung update saat ada warga isi form
     const channel = supabase
       .channel('realtime-badge-sekretaris')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'warga' }, () => fetchPendingCount())
@@ -82,17 +73,13 @@ export default function Layout({ children }) {
     
     return () => {
       supabase.removeChannel(channel);
-      if ('clearAppBadge' in navigator) {
-        navigator.clearAppBadge().catch(() => {});
-      }
+      if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(() => {});
     };
   }, [user]);
 
   const handleLogout = () => {
     if (!confirm('Keluar dari akun pengurus?')) return;
-    if ('clearAppBadge' in navigator) {
-      navigator.clearAppBadge().catch(() => {});
-    }
+    if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(() => {});
     localStorage.removeItem('pengurusSession');
     window.location.replace('/admin');
   };
@@ -111,7 +98,6 @@ export default function Layout({ children }) {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {user && <NotifToggle userId={user.id} userType="pengurus" />}
-            {/* TOMBOL ADMIN SUDAH DIHAPUS */}
             <button onClick={handleLogout} className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-2 rounded-lg border border-rose-500/20 font-medium">🚪 Keluar</button>
           </div>
         </div>
@@ -127,9 +113,9 @@ export default function Layout({ children }) {
               <span className="text-base sm:text-sm leading-none">{t.i}</span>
               <span className="leading-tight">{t.l}</span>
               
-              {t.key === 'verifikasi' && pendingCount > 0 && (
+              {t.key === 'verifikasi' && pendingVerifCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-lg animate-pulse">
-                  {pendingCount}
+                  {pendingVerifCount}
                 </span>
               )}
             </Link>
