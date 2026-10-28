@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import Layout from '../../components/sekretaris/Layout';
 import { generateJadwalRonda } from '../../lib/ronda/generator';
 import { simpanJadwalRonda } from '../../lib/ronda/rpc';
+import { hapusBuktiRonda } from '../../lib/ronda/storage'; // IMPORT FUNGSI HAPUS
 import ModalBuatPeriode from '../../components/ronda/ModalBuatPeriode';
 import ModalSetupOtomatis from '../../components/ronda/ModalSetupOtomatis';
 import ModalImportExcel from '../../components/ronda/ModalImportExcel';
@@ -53,7 +54,6 @@ export default function SekretarisRonda() {
     setLoading(false);
   }
 
-  // ═══ PERBAIKAN: FILTER VERIFIKASI HANYA YANG PENDING ═══
   async function fetchVerifikasiRonda() {
     setLoadingVerifikasi(true);
     try {
@@ -64,8 +64,8 @@ export default function SekretarisRonda() {
           jadwal:jadwal_id!inner ( tanggal, periode:periode_id!inner(nama_periode, jam_selesai, status) ),
           penghuni:penghuni_id ( nama_lengkap, warga:warga_id(no_rumah) )
         `)
-        .eq('status_hadir', 'pending') // Hanya tarik yang masih pending
-        .eq('jadwal.periode.status', 'published') // Hanya dari periode yang sudah publish
+        .eq('status_hadir', 'pending')
+        .eq('jadwal.periode.status', 'published')
         .order('jadwal(tanggal)', { ascending: true });
 
       if (error) throw error;
@@ -77,7 +77,7 @@ export default function SekretarisRonda() {
             tanggal: curr.jadwal.tanggal,
             periode: curr.jadwal.periode.nama_periode,
             jam_selesai: curr.jadwal.periode.jam_selesai,
-            foto_bukti: curr.foto_bukti, // Ambil foto dari salah satu petugas di grup
+            foto_bukti: curr.foto_bukti, 
             catatan: curr.catatan,
             petugas: []
           };
@@ -86,7 +86,6 @@ export default function SekretarisRonda() {
         return acc;
       }, {});
 
-      // Filter: Hanya tampilkan yang tanggalnya HARI INI atau MASA LALU
       const today = new Date();
       today.setHours(0,0,0,0);
       
@@ -97,7 +96,6 @@ export default function SekretarisRonda() {
 
       setVerifikasiData(filteredGroups);
 
-      // Inisialisasi edit: default hadir
       const initialEdits = {};
       (data || []).forEach(p => { initialEdits[p.id] = 'hadir'; });
       setVerifikasiEdits(initialEdits);
@@ -109,23 +107,34 @@ export default function SekretarisRonda() {
     }
   }
 
-  const handleSimpanVerifikasi = async (jadwalId, petugasList) => {
-    if (!confirm('Simpan hasil verifikasi untuk grup ini?')) return;
+  // ═══ PERBAIKAN: HAPUS FOTO SETELAH VERIFIKASI ═══
+  const handleSimpanVerifikasi = async (jadwalId, petugasList, fotoUrl) => {
+    if (!confirm('Simpan hasil verifikasi? Foto bukti akan dihapus otomatis untuk menghemat kuota.')) return;
     setProcessing(true);
     try {
       const savedUser = JSON.parse(localStorage.getItem('pengurusSession'));
       const verifierId = savedUser?.id || null;
 
+      // 1. Update Status Semua Petugas
       for (const p of petugasList) {
         const newStatus = verifikasiEdits[p.id];
         const { error } = await supabase
           .from('petugas_ronda')
-          .update({ status_hadir: newStatus, verified_by: verifierId })
+          .update({ 
+            status_hadir: newStatus, 
+            verified_by: verifierId,
+            foto_bukti: fotoUrl ? 'DIHAPUS' : null // Ganti URL dengan teks "DIHAPUS"
+          })
           .eq('id', p.id);
         if (error) throw error;
       }
 
-      alert('✅ Verifikasi berhasil disimpan!');
+      // 2. Hapus File Fisik dari Supabase Storage
+      if (fotoUrl && fotoUrl !== 'DIHAPUS') {
+        await hapusBuktiRonda(fotoUrl);
+      }
+
+      alert('✅ Verifikasi berhasil! Foto bukti telah dibersihkan.');
       fetchVerifikasiRonda(); 
     } catch (err) {
       alert('Gagal memverifikasi: ' + err.message);
@@ -389,11 +398,11 @@ export default function SekretarisRonda() {
                         </div>
 
                         <button 
-                          onClick={() => handleSimpanVerifikasi(group.jadwal_id, group.petugas)}
+                          onClick={() => handleSimpanVerifikasi(group.jadwal_id, group.petugas, group.foto_bukti)}
                           disabled={processing}
                           className={`w-full mt-2 text-white font-bold py-2.5 rounded-xl text-xs transition ${!hasPhoto ? 'bg-rose-600 hover:bg-rose-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}
                         >
-                          {processing ? 'Menyimpan...' : !hasPhoto ? 'Simpan Verifikasi Manual' : 'Simpan Verifikasi'}
+                          {processing ? 'Menyimpan...' : !hasPhoto ? 'Simpan Verifikasi Manual' : 'Simpan & Hapus Foto'}
                         </button>
                       </div>
                     </div>
