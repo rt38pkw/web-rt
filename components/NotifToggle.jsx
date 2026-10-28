@@ -1,4 +1,6 @@
+// components/NotifToggle.js
 import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase'; // IMPORT SUPABASE
 import {
   isPushSupported,
   getPermissionStatus,
@@ -12,14 +14,40 @@ export default function NotifToggle({ userId, userType = 'warga' }) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    checkStatus();
-  }, [userId]);
+    if (userId) {
+      checkStatus();
+    }
+  }, [userId, userType]); // Pantau perubahan userId & userType
 
   async function checkStatus() {
     if (!isPushSupported()) return setStatus('unsupported');
     if (getPermissionStatus() === 'denied') return setStatus('denied');
-    const subbed = await isSubscribed();
-    setStatus(subbed ? 'subscribed' : 'not-subscribed');
+    
+    try {
+      // 1. Cek apakah browser HP ini punya token push
+      const subbed = await isSubscribed();
+      if (!subbed) return setStatus('not-subscribed');
+
+      // 2. Cek apakah userId ini terdaftar di database Supabase
+      const col = userType === 'pengurus' ? 'pengurus_id' : 'warga_id';
+      const { data, error } = await supabase
+        .from('push_subscriptions')
+        .select('id')
+        .eq(col, userId)
+        .limit(1);
+
+      if (error) throw error;
+
+      // Jika ada di database, berarti benar-benar aktif
+      if (data && data.length > 0) {
+        setStatus('subscribed');
+      } else {
+        // Browser punya token, tapi bukan milik akun ini (sisa akun sebelumnya)
+        setStatus('not-subscribed');
+      }
+    } catch (err) {
+      setStatus('not-subscribed');
+    }
   }
 
   async function handleToggle() {
