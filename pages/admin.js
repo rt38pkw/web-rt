@@ -1,3 +1,4 @@
+// pages/admin.js
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import Link from 'next/link';
@@ -8,9 +9,11 @@ export default function AdminDashboard() {
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // State Data Ringkasan
   const [stats, setStats] = useState({
     warga: 0,
-    pengumuman: 0,
+    saldoKasBebas: 0,
     pendingIuran: 0,
     pendingProyek: 0,
   });
@@ -41,7 +44,7 @@ export default function AdminDashboard() {
         return;
       }
       if (parsedUser.role === 'sekretaris') {
-        window.location.replace('/sekretaris/data-warga');
+        window.location.replace('/sekretaris');
         return;
       }
 
@@ -68,7 +71,6 @@ export default function AdminDashboard() {
       return;
     }
 
-    // SIMPAN DATA TANPA PASSWORD (AMAN)
     const { password: _, ...profilAman } = data;
     setUser(profilAman);
     localStorage.setItem('pengurusSession', JSON.stringify(profilAman));
@@ -82,7 +84,7 @@ export default function AdminDashboard() {
       return;
     }
     if (data.role === 'sekretaris') {
-      window.location.replace('/sekretaris/data-warga');
+      window.location.replace('/sekretaris');
       return;
     }
 
@@ -91,7 +93,7 @@ export default function AdminDashboard() {
 
   const handleLogout = () => {
     if (!confirm('Keluar dari akun pengurus?')) return;
-    localStorage.removeItem('pengurusSession'); // Hapus dari localStorage
+    localStorage.removeItem('pengurusSession');
     window.location.replace('/admin');
   };
 
@@ -99,24 +101,40 @@ export default function AdminDashboard() {
     try {
       const [
         { count: wargaCount },
-        { count: pengumumanCount },
+        { data: iuranData },
+        { data: pemasukanLainData },
+        { data: pengeluaranData },
         { count: pendingIuranCount },
         { count: pendingProyekCount },
       ] = await Promise.all([
-        supabase.from('warga').select('*', { count: 'exact', head: true }),
-        supabase.from('pengumuman').select('*', { count: 'exact', head: true }),
+        // 1. Hitung Warga dari tabel PENGHUNI (Aktif)
+        supabase.from('penghuni').select('*', { count: 'exact', head: true }).eq('is_aktif', true),
+        
+        // 2. Ambil Data Keuangan untuk Saldo Kas Bebas
+        supabase.from('iuran').select('jumlah').eq('status', 'approved'),
+        supabase.from('pemasukan_lain').select('nominal'),
+        supabase.from('pengeluaran').select('nominal'),
+
+        // 3. Hitung Pending Iuran & Proyek
         supabase.from('iuran').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('iuran_proyek').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       ]);
 
+      // Hitung Saldo Kas Bebas
+      const totalIuran = (iuranData || []).reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
+      const totalPemasukanLain = (pemasukanLainData || []).reduce((acc, curr) => acc + Number(curr.nominal || 0), 0);
+      const totalPengeluaran = (pengeluaranData || []).reduce((acc, curr) => acc + Number(curr.nominal || 0), 0);
+      
+      const saldoKasBebas = (totalIuran + totalPemasukanLain) - totalPengeluaran;
+
       setStats({
         warga: wargaCount || 0,
-        pengumuman: pengumumanCount || 0,
+        saldoKasBebas: saldoKasBebas,
         pendingIuran: pendingIuranCount || 0,
         pendingProyek: pendingProyekCount || 0,
       });
     } catch (err) {
-      console.error(err);
+      console.error('Gagal memuat stats:', err);
     }
   }
 
@@ -156,7 +174,6 @@ export default function AdminDashboard() {
     } else {
       alert('Profil/Password berhasil diperbarui! Gunakan kredensial baru saat login berikutnya.');
       
-      // Update local state dan localStorage (tanpa password)
       const updatedUser = { ...user };
       if (updateData.username) updatedUser.username = updateData.username;
       
@@ -298,23 +315,30 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* ═══ KARTU RINGKASAN (WARGA & KAS) ═══ */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8">
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Warga</span>
-              <span className="p-2 bg-blue-500/10 text-blue-400 rounded-xl text-lg">👥</span>
+          {/* Kartu 1: Total Warga */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg relative overflow-hidden">
+            <div className="absolute -right-4 -bottom-4 text-7xl opacity-5">👥</div>
+            <div className="flex items-center justify-between mb-3 relative z-10">
+              <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Warga (Jiwa)</span>
+              <span className="p-2 bg-blue-500/10 text-blue-400 rounded-xl text-lg border border-blue-500/20">👥</span>
             </div>
-            <div className="text-3xl font-extrabold text-white">{stats.warga}</div>
-            <p className="text-[11px] text-slate-500 mt-1">Terdaftar dalam sistem</p>
+            <div className="text-3xl font-extrabold text-white relative z-10">{stats.warga}</div>
+            <p className="text-[11px] text-slate-500 mt-1 relative z-10">Terdaftar aktif sebagai penghuni</p>
           </div>
 
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Pengumuman</span>
-              <span className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl text-lg">📢</span>
+          {/* Kartu 2: Saldo Kas Bebas (Baru) */}
+          <div className="bg-slate-900/80 border border-emerald-500/30 rounded-2xl p-5 shadow-lg relative overflow-hidden">
+            <div className="absolute -right-4 -bottom-4 text-7xl opacity-5">💰</div>
+            <div className="flex items-center justify-between mb-3 relative z-10">
+              <span className="text-xs font-medium text-emerald-400 uppercase tracking-wider">Saldo Kas Bebas</span>
+              <span className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl text-lg border border-emerald-500/20">💰</span>
             </div>
-            <div className="text-3xl font-extrabold text-white">{stats.pengumuman}</div>
-            <p className="text-[11px] text-slate-500 mt-1">Informasi dipublikasi</p>
+            <div className="text-3xl font-extrabold text-white relative z-10">
+              Rp {stats.saldoKasBebas.toLocaleString('id-ID')}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1 relative z-10">Total pemasukan bersih RT</p>
           </div>
         </div>
 
@@ -322,7 +346,7 @@ export default function AdminDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {canAccessKeuangan ? (
-            <Link href="/keuangan" className="relative group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-blue-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
+            <Link href="/keuangan/dashboard" className="relative group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-blue-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
               {stats.pendingIuran > 0 && (
                 <span className="absolute top-3 right-3 inline-flex items-center justify-center bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
                   {stats.pendingIuran}
@@ -344,7 +368,7 @@ export default function AdminDashboard() {
           )}
 
           {canAccessSekretariat ? (
-            <Link href="/sekretaris/data-warga" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-teal-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
+            <Link href="/sekretaris" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-teal-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
               <div>
                 <div className="w-12 h-12 bg-teal-500/10 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition mb-4 text-teal-400">📝</div>
                 <h4 className="text-lg font-bold text-white group-hover:text-teal-400 transition">Sekretariat</h4>
