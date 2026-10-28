@@ -28,7 +28,6 @@ export default function SekretarisRonda() {
   const [isPublished, setIsPublished] = useState(false);
   const [hasConflict, setHasConflict] = useState(false);
 
-  // Data Warga untuk Aturan Khusus
   const [wargaList, setWargaList] = useState([]);
   const [loadingWarga, setLoadingWarga] = useState(false);
 
@@ -39,11 +38,22 @@ export default function SekretarisRonda() {
 
   useEffect(() => {
     fetchPeriode();
-    fetchWargaRonda(); // Load data warga di awal agar siap dipakai di Modal
+    fetchWargaRonda(); 
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'verifikasi') fetchVerifikasiRonda();
+    if (activeTab === 'verifikasi') {
+      fetchVerifikasiRonda();
+      
+      const channel = supabase
+        .channel('realtime-ronda-sekretaris')
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'petugas_ronda' }, (payload) => {
+          fetchVerifikasiRonda(true);
+        })
+        .subscribe();
+
+      return () => supabase.removeChannel(channel);
+    }
   }, [activeTab]);
 
   async function fetchPeriode() {
@@ -53,8 +63,28 @@ export default function SekretarisRonda() {
     setLoading(false);
   }
 
-  async function fetchVerifikasiRonda() {
-    setLoadingVerifikasi(true);
+  // ═══ PERBAIKAN: CEK JAM SELESAI ═══
+  const isTimePassed = (tanggal, jamSelesai) => {
+    if (!tanggal || !jamSelesai) return false;
+    
+    // Ambil YYYY-MM-DD dan pisahkan jam
+    const dateStr = tanggal.split('T')[0];
+    const [selesaiH, selesaiM] = jamSelesai.split(':');
+
+    let endDateTime = new Date(`${dateStr}T${selesaiH}:${selesaiM}:00`);
+    const startDateTime = new Date(`${dateStr}T00:00:00`);
+    
+    // Jika jam selesai dini hari (misal 02:00), berarti besok harinya
+    if (endDateTime < startDateTime || parseInt(selesaiH) < 12) {
+       endDateTime.setDate(endDateTime.getDate() + 1);
+    }
+
+    const now = new Date();
+    return now > endDateTime; // True jika waktu sudah habis
+  };
+
+  async function fetchVerifikasiRonda(isSilent = false) {
+    if (!isSilent) setLoadingVerifikasi(true);
     try {
       const { data, error } = await supabase
         .from('petugas_ronda')
@@ -85,12 +115,13 @@ export default function SekretarisRonda() {
         return acc;
       }, {});
 
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      
+      // Filter: Tampilkan jika (Ada Foto) ATAU (Waktu sudah lewat dan tidak ada foto)
       const filteredGroups = Object.values(grouped).filter(group => {
-        const jadwalDate = new Date(group.tanggal);
-        return jadwalDate <= today; 
+        // 1. Jika sudah ada foto, PASTI tampilkan (untuk diverifikasi)
+        if (group.foto_bukti) return true;
+        
+        // 2. Jika tidak ada foto, cek apakah waktu ronda sudah lewat?
+        return isTimePassed(group.tanggal, group.jam_selesai);
       });
 
       setVerifikasiData(filteredGroups);
@@ -102,7 +133,7 @@ export default function SekretarisRonda() {
     } catch (err) {
       console.error(err);
     } finally {
-      setLoadingVerifikasi(false);
+      if (!isSilent) setLoadingVerifikasi(false);
     }
   }
 
@@ -131,7 +162,7 @@ export default function SekretarisRonda() {
       }
 
       alert('✅ Verifikasi berhasil!');
-      fetchVerifikasiRonda(); 
+      fetchVerifikasiRonda(true); 
     } catch (err) {
       alert('Gagal memverifikasi: ' + err.message);
     } finally {
@@ -242,7 +273,6 @@ export default function SekretarisRonda() {
   };
 
   const formatTanggal = (dateStr) => dateStr ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(dateStr)) : '-';
-  const formatJam = (timeStr) => timeStr ? timeStr.substring(0, 5) : '-';
 
   if (viewMode === 'detail' && selectedPeriode) {
     return (
