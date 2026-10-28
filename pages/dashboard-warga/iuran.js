@@ -1,3 +1,4 @@
+// pages/dashboard-warga/iuran.js
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
@@ -10,6 +11,7 @@ import ModalRekap from '../../components/warga/ModalRekap';
 import ModalDetailBulan from '../../components/warga/ModalDetailBulan';
 import ModalKasRT from '../../components/warga/ModalKasRT';
 import ModalLengkapiProfil from '../../components/warga/ModalLengkapiProfil'; 
+import ModalUbahPin from '../../components/warga/ModalUbahPin'; // IMPORT MODAL BARU
 
 import { getPeriodeBulan, TAHUN_TERSEDIA, getTahunSekarang, isWargaUsaha } from '../../lib/iuran/constants';
 import { getInfoBulan, hitungBelumLunas, formatTanggal } from '../../lib/iuran/calculations';
@@ -36,6 +38,7 @@ export default function DashboardWargaIuran() {
   const [showRekapModal, setShowRekapModal] = useState(false);
   const [showKasRTModal, setShowKasRTModal] = useState(false);
   const [showModalProfil, setShowModalProfil] = useState(false); 
+  const [showModalUbahPin, setShowModalUbahPin] = useState(false); // STATE BARU
   
   const [kasRTIuranList, setKasRTIuranList] = useState([]);
   const [pengeluaranList, setPengeluaranList] = useState([]);
@@ -197,17 +200,11 @@ export default function DashboardWargaIuran() {
     } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
   };
 
-  // ═══ LOGIKA BANNER YANG DISEMPURNAKAN ═══
   const statusPenghuni = penghuniData?.status_verifikasi;
   const alasanReject = penghuniData?.alasan_reject;
-  
-  // Cek apakah NIK dan Foto KK sudah terisi
   const punyaNik = !!penghuniData?.nik && penghuniData.nik !== '0';
   const punyaKK = !!penghuniData?.url_kk;
-  
-  // Banner Kuning: Muncul jika 'belum' ATAU (status 'approved' tapi data NIK/KK kosong)
   const isBelumLengkap = !penghuniData || statusPenghuni === 'belum' || (statusPenghuni === 'approved' && (!punyaNik || !punyaKK));
-  
   const isPending = statusPenghuni === 'pending';
   const isRejected = statusPenghuni === 'rejected';
 
@@ -222,9 +219,9 @@ export default function DashboardWargaIuran() {
           modeAkses={sessionData.mode_akses} 
           tarifBulanan={tarifBulanan} 
           isUsaha={usaha} 
+          onUbahPin={() => setShowModalUbahPin(true)} // PASSING PROP
         />
 
-        {/* BANNER: BELUM LENGKAP / DATA KOSONG */}
         {isBelumLengkap && (
           <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
             <div className="flex items-start gap-3">
@@ -238,7 +235,6 @@ export default function DashboardWargaIuran() {
           </div>
         )}
 
-        {/* BANNER: PENDING */}
         {isPending && (
           <div className="bg-blue-950/40 border border-blue-500/30 rounded-2xl p-4 flex items-start gap-3">
             <span className="text-xl">⏳</span>
@@ -249,7 +245,6 @@ export default function DashboardWargaIuran() {
           </div>
         )}
 
-        {/* BANNER: REJECTED */}
         {isRejected && (
           <div className="bg-gradient-to-r from-rose-950/60 to-slate-900 border border-rose-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
             <div className="flex items-start gap-3">
@@ -333,6 +328,12 @@ export default function DashboardWargaIuran() {
         dataPenyewaAktif={penghuniData} 
         alasanReject={alasanReject} 
         onSuccess={() => refreshDataRumah(warga.id)} 
+      />
+
+      <ModalUbahPin 
+        show={showModalUbahPin} 
+        onClose={() => setShowModalUbahPin(false)} 
+        wargaId={warga.id} 
       />
     </>
   );
