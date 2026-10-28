@@ -65,7 +65,6 @@ export default function SekretarisVerifikasi() {
     try {
       const kepalaKeluarga = item.anggota.find(a => a.hubungan === 'Kepala Keluarga' && a.tipe_penghuni === 'pemilik');
 
-      // 1. Update status penghuni
       const { error: errPenghuni } = await supabase
         .from('penghuni')
         .update({ status_verifikasi: 'approved', alasan_reject: null })
@@ -74,15 +73,9 @@ export default function SekretarisVerifikasi() {
       
       if (errPenghuni) throw errPenghuni;
 
-      // 2. Sinkronisasi data ke tabel warga + PIN
       if (kepalaKeluarga) {
-        // Ambil data password_pending dari tabel warga
-        const { data: wargaData } = await supabase
-          .from('warga')
-          .select('password_pending')
-          .eq('id', item.warga_id)
-          .single();
-
+        const { data: wargaData } = await supabase.from('warga').select('password_pending').eq('id', item.warga_id).single();
+        
         const updateWarga = {
           nama_lengkap: kepalaKeluarga.nama_lengkap,
           nik: kepalaKeluarga.nik,
@@ -90,7 +83,6 @@ export default function SekretarisVerifikasi() {
           no_wa: kepalaKeluarga.no_hp
         };
 
-        // ═══ PINDAHKAN PASSWORD PENDING KE PASSWORD UTAMA ═══
         if (wargaData?.password_pending) {
           updateWarga.password = wargaData.password_pending;
           updateWarga.password_pending = null;
@@ -99,7 +91,7 @@ export default function SekretarisVerifikasi() {
         await supabase.from('warga').update(updateWarga).eq('id', item.warga_id);
       }
 
-      alert('✅ Data berhasil disetujui! (Password warga telah diperbarui jika ada).');
+      alert('✅ Data berhasil disetujui! (Password warga telah diperbarui).');
       fetchAntrean();
     } catch (err) {
       alert('Gagal approve: ' + err.message);
@@ -121,7 +113,7 @@ export default function SekretarisVerifikasi() {
         .eq('status_verifikasi', 'pending');
       
       if (error) throw error;
-      alert('❌ Data ditolak. Warga dapat memperbaiki datanya.');
+      alert('❌ Data ditolak.');
       fetchAntrean();
     } catch (err) {
       alert('Gagal menolak: ' + err.message);
@@ -139,45 +131,48 @@ export default function SekretarisVerifikasi() {
     <Layout>
       <div className="max-w-5xl mx-auto space-y-4">
         
-        {/* MODAL SPLIT-SCREEN (Dioptimalkan untuk Mobile) */}
+        {/* MODAL SPLIT-SCREEN DENGAN TOMBOL CLOSE MELAYANG */}
         {previewData && (
           <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 animate-in fade-in">
-            <div className="bg-slate-900 border sm:border-slate-700 w-full max-w-6xl h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:rounded-3xl flex flex-col md:flex-row overflow-hidden shadow-2xl">
+            <div className="bg-slate-900 sm:border sm:border-slate-700 w-full max-w-6xl h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:rounded-3xl flex flex-col md:flex-row overflow-hidden shadow-2xl relative">
               
-              {/* Sisi Kiri: Data (Scrollable di HP) */}
-              <div className="w-full md:w-1/3 bg-slate-900 p-5 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-800 shrink-0 overflow-y-auto max-h-[40vh] md:max-h-full">
-                <div>
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Pencocokan Data</h3>
-                    <span className={`text-[10px] px-2 py-1 rounded font-bold border ${previewData.tipe === 'pemilik' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>
-                      {previewData.tipe === 'pemilik' ? 'Pemilik' : 'Penyewa'}
-                    </span>
+              {/* TOMBOL TUTUP (MELAYANG DI POJOK KANAN ATAS) */}
+              <button 
+                onClick={() => setPreviewData(null)} 
+                className="absolute top-3 right-3 z-[150] bg-rose-600 hover:bg-rose-500 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-xl border border-rose-400/50 transition active:scale-90"
+              >
+                <span className="text-lg font-bold">✕</span>
+              </button>
+
+              <div className="w-full md:w-1/3 bg-slate-900 p-5 flex flex-col border-b md:border-b-0 md:border-r border-slate-800 shrink-0 overflow-y-auto max-h-[45vh] md:max-h-full">
+                <div className="flex items-center justify-between mb-6 pr-12">
+                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Pencocokan Data</h3>
+                  <span className={`text-[10px] px-2 py-1 rounded font-bold border ${previewData.tipe === 'pemilik' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>
+                    {previewData.tipe === 'pemilik' ? 'Pemilik' : 'Penyewa'}
+                  </span>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">Nama Lengkap</div>
+                    <div className="text-lg font-bold text-white leading-tight">{previewData.nama}</div>
                   </div>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">Nama Lengkap</div>
-                      <div className="text-lg font-bold text-white leading-tight">{previewData.nama}</div>
-                    </div>
-                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                      <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">NIK</div>
-                      <div className="text-xl font-mono font-bold text-amber-400 tracking-wider break-all">{previewData.nik || '-'}</div>
-                    </div>
-                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                      <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">No. KK</div>
-                      <div className="text-xl font-mono font-bold text-blue-400 tracking-wider break-all">{previewData.noKk || '-'}</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">No WhatsApp</div>
-                      <div className="text-sm text-slate-300">{previewData.wa || '-'}</div>
-                    </div>
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">NIK (Cocokkan dengan KK)</div>
+                    <div className="text-xl font-mono font-bold text-amber-400 tracking-wider break-all">{previewData.nik || '-'}</div>
+                  </div>
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">No. KK (Cocokkan dengan KK)</div>
+                    <div className="text-xl font-mono font-bold text-blue-400 tracking-wider break-all">{previewData.noKk || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">No WhatsApp</div>
+                    <div className="text-sm text-slate-300">{previewData.wa || '-'}</div>
                   </div>
                 </div>
-                <button onClick={() => setPreviewData(null)} className="mt-6 w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl transition shrink-0">✕ Tutup Pratinjau</button>
               </div>
               
-              {/* Sisi Kanan: Gambar */}
               <div className="w-full md:w-2/3 bg-black/50 relative flex flex-col flex-1 overflow-hidden">
-                <div className="absolute top-4 right-4 z-10 bg-slate-900/80 border border-slate-700 text-white text-[10px] px-3 py-1.5 rounded-lg pointer-events-none">{isZoomed ? '🔍 Klik gambar untuk perkecil' : '🔍 Klik gambar untuk Zoom'}</div>
+                <div className="absolute top-4 left-4 z-10 bg-slate-900/80 border border-slate-700 text-white text-[10px] px-3 py-1.5 rounded-lg pointer-events-none">{isZoomed ? '🔍 Klik gambar untuk perkecil' : '🔍 Klik gambar untuk Zoom'}</div>
                 <div className={`flex-1 p-2 sm:p-6 overflow-auto flex ${isZoomed ? 'items-start justify-start' : 'items-center justify-center'} ${isZoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'}`} onClick={() => setIsZoomed(!isZoomed)}>
                   <img src={previewData.imageUrl} alt="Preview KK" className={`rounded-lg shadow-lg transition-all duration-200 ${isZoomed ? 'w-auto h-auto max-w-none max-h-none' : 'max-w-full max-h-full object-contain'}`} />
                 </div>
@@ -187,8 +182,8 @@ export default function SekretarisVerifikasi() {
         )}
 
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-2 flex gap-2">
-          <button onClick={() => setActiveTab('pending')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'pending' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>⏳ Menunggu</button>
-          <button onClick={() => setActiveTab('rejected')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'rejected' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>✗ Ditolak</button>
+          <button onClick={() => setActiveTab('pending')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'pending' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>⏳ Menunggu Verifikasi</button>
+          <button onClick={() => setActiveTab('rejected')} className={`flex-1 py-2.5 text-xs font-semibold rounded-xl transition ${activeTab === 'rejected' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>✗ Riwayat Ditolak</button>
         </div>
 
         {loading ? (
@@ -221,7 +216,6 @@ export default function SekretarisVerifikasi() {
                   <div className="p-4 space-y-4">
                     {kepalaKeluarga && (
                       <div className={`rounded-xl p-4 space-y-4 border ${isPemilik ? 'bg-blue-950/10 border-blue-500/20' : 'bg-orange-950/10 border-orange-500/20'}`}>
-                        {/* Mobile Fix: Gunakan flex-col jika layar kecil, flex-row jika besar */}
                         <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
                           <div className="w-full">
                             <h4 className={`text-xs font-semibold uppercase tracking-wider mb-1 ${isPemilik ? 'text-blue-400' : 'text-orange-400'}`}>
@@ -262,7 +256,7 @@ export default function SekretarisVerifikasi() {
                       </div>
                     )}
 
-                    {/* Mobile Fix: Tombol Aksi Menumpuk Vertikal di HP, Horizontal di Desktop */}
+                    {/* TOMBOL AKSI: Di HP menumpuk vertikal, di Laptop berjejer */}
                     {activeTab === 'pending' && (
                       <div className="flex flex-col-reverse sm:flex-row gap-2 pt-3 border-t border-slate-800/60">
                         <button onClick={() => handleReject(item)} disabled={processing} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-[11px] sm:text-xs font-semibold py-3 sm:py-2.5 rounded-xl transition">✗ Tolak Data</button>
