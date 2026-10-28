@@ -1,25 +1,21 @@
-export default function ProfileCard({ warga, penghuniData, roleLogin, modeAkses, tarifBulanan, isUsaha }) {
+// components/warga/ProfileCard.js
+export default function ProfileCard({ warga, penghuniData, roleLogin, modeAkses, tarifBulanan, isUsaha, onUbahPin }) {
   if (!warga) return null;
 
   const isPenyewa = roleLogin === 'penyewa';
   const isModePantau = modeAkses === 'pantau';
   
-  // Tentukan nama yang ditampilkan
-  let namaTampil = warga.nama_lengkap; // Default nama pemilik
+  let namaTampil = warga.nama_lengkap;
   let subNama = null;
 
   if (penghuniData) {
-    // Jika ada data penghuni aktif
     if (isPenyewa) {
-      // Jika penyewa, tampilkan: Pemilik / Penyewa
       namaTampil = warga.nama_lengkap;
       subNama = ` / ${penghuniData.nama_lengkap} (Penyewa)`;
     } else {
-      // Jika pemilik yang menghuni, cukup tampilkan nama pemilik (dari penghuni_data)
       namaTampil = penghuniData.nama_lengkap;
     }
   } else if (isPenyewa) {
-    // Kasus edge: status sewa tapi data penghuni tidak ada
     namaTampil = warga.nama_lengkap;
     subNama = ` / Penyewa`;
   }
@@ -54,7 +50,7 @@ export default function ProfileCard({ warga, penghuniData, roleLogin, modeAkses,
           )}
         </div>
 
-        <div className="flex flex-wrap gap-2 text-xs">
+        <div className="flex flex-wrap gap-2 text-xs items-center">
           <div className="bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
             <span className="text-slate-400">Rumah:</span>
             <strong className="text-white font-semibold">{warga.no_rumah}</strong>
@@ -74,6 +70,17 @@ export default function ProfileCard({ warga, penghuniData, roleLogin, modeAkses,
           <div className={`px-3 py-1.5 rounded-xl font-bold border ${badgeClass}`}>
             {badgeText}
           </div>
+
+          {/* ═══ TOMBOL UBAH PIN (HANYA PEMILIK) ═══ */}
+          {!isPenyewa && onUbahPin && (
+            <button 
+              onClick={onUbahPin} 
+              className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl font-medium flex items-center gap-1.5 transition active:scale-95"
+              title="Ubah PIN Akun"
+            >
+              🔐 Ubah PIN
+            </button>
+          )}
         </div>
       </div>
     </section>
