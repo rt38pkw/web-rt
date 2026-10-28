@@ -35,25 +35,26 @@ export default function SekretarisRonda() {
   const [loadingVerifikasi, setLoadingVerifikasi] = useState(false);
   const [verifikasiEdits, setVerifikasiEdits] = useState({}); 
   const [zoomImage, setZoomImage] = useState(null);
+  
+  // ═══ STATE BARU UNTUK BADGE ═══
+  const [pendingRondaCount, setPendingRondaCount] = useState(0);
 
   useEffect(() => {
     fetchPeriode();
     fetchWargaRonda(); 
-  }, []);
+    checkPendingCount(); // Panggil saat pertama kali dimuat
 
-  useEffect(() => {
-    if (activeTab === 'verifikasi') {
-      fetchVerifikasiRonda();
-      
-      const channel = supabase
-        .channel('realtime-ronda-sekretaris')
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'petugas_ronda' }, (payload) => {
-          fetchVerifikasiRonda(true);
-        })
-        .subscribe();
+    // Realtime untuk update badge secara langsung
+    const channel = supabase
+      .channel('realtime-badge-ronda')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'petugas_ronda' }, () => {
+        checkPendingCount();
+        // Jika sedang di tab verifikasi, refresh datanya juga
+        if (activeTab === 'verifikasi') fetchVerifikasiRonda(true);
+      })
+      .subscribe();
 
-      return () => supabase.removeChannel(channel);
-    }
+    return () => supabase.removeChannel(channel);
   }, [activeTab]);
 
   async function fetchPeriode() {
@@ -63,24 +64,58 @@ export default function SekretarisRonda() {
     setLoading(false);
   }
 
-  // ═══ PERBAIKAN: CEK JAM SELESAI ═══
+  // ═══ FUNGSI HITUNG BADGE ═══
+  async function checkPendingCount() {
+    try {
+      // Cari yang statusnya pending dan periodenya published
+      const { data, error } = await supabase
+        .from('petugas_ronda')
+        .select(`
+          id, jadwal:jadwal_id!inner(tanggal, periode:periode_id!inner(jam_selesai, status))
+        `)
+        .eq('status_hadir', 'pending')
+        .eq('jadwal.periode.status', 'published');
+        
+      if (error) throw error;
+      
+      // Filter berdasarkan waktu (apakah sudah lewat atau ada foto)
+      // (Karena query bersarang cukup rumit, kita filter di JS)
+      const { data: rawData } = await supabase
+        .from('petugas_ronda')
+        .select('id, foto_bukti, jadwal:jadwal_id!inner(tanggal, periode:periode_id!inner(jam_selesai, status))')
+        .eq('status_hadir', 'pending')
+        .eq('jadwal.periode.status', 'published');
+      
+      const filtered = (rawData || []).filter(item => {
+        const tgl = item.jadwal.tanggal;
+        const jamSelesai = item.jadwal.periode.jam_selesai;
+        
+        if (!tgl || !jamSelesai) return false;
+
+        const dateStr = tgl.split('T')[0];
+        const [selesaiH, selesaiM] = jamSelesai.split(':');
+        let endDateTime = new Date(`${dateStr}T${selesaiH}:${selesaiM}:00`);
+        const startDateTime = new Date(`${dateStr}T00:00:00`);
+        if (endDateTime < startDateTime || parseInt(selesaiH) < 12) endDateTime.setDate(endDateTime.getDate() + 1);
+        
+        const isPassed = new Date() > endDateTime;
+        return item.foto_bukti || isPassed; // Hitung jika ada foto (pending) ATAU waktu sudah habis (alpa)
+      });
+
+      setPendingRondaCount(filtered.length);
+    } catch (err) {
+      console.error('Gagal cek count', err);
+    }
+  }
+
   const isTimePassed = (tanggal, jamSelesai) => {
     if (!tanggal || !jamSelesai) return false;
-    
-    // Ambil YYYY-MM-DD dan pisahkan jam
     const dateStr = tanggal.split('T')[0];
     const [selesaiH, selesaiM] = jamSelesai.split(':');
-
     let endDateTime = new Date(`${dateStr}T${selesaiH}:${selesaiM}:00`);
     const startDateTime = new Date(`${dateStr}T00:00:00`);
-    
-    // Jika jam selesai dini hari (misal 02:00), berarti besok harinya
-    if (endDateTime < startDateTime || parseInt(selesaiH) < 12) {
-       endDateTime.setDate(endDateTime.getDate() + 1);
-    }
-
-    const now = new Date();
-    return now > endDateTime; // True jika waktu sudah habis
+    if (endDateTime < startDateTime || parseInt(selesaiH) < 12) endDateTime.setDate(endDateTime.getDate() + 1);
+    return new Date() > endDateTime; 
   };
 
   async function fetchVerifikasiRonda(isSilent = false) {
@@ -115,12 +150,8 @@ export default function SekretarisRonda() {
         return acc;
       }, {});
 
-      // Filter: Tampilkan jika (Ada Foto) ATAU (Waktu sudah lewat dan tidak ada foto)
       const filteredGroups = Object.values(grouped).filter(group => {
-        // 1. Jika sudah ada foto, PASTI tampilkan (untuk diverifikasi)
         if (group.foto_bukti) return true;
-        
-        // 2. Jika tidak ada foto, cek apakah waktu ronda sudah lewat?
         return isTimePassed(group.tanggal, group.jam_selesai);
       });
 
@@ -163,6 +194,7 @@ export default function SekretarisRonda() {
 
       alert('✅ Verifikasi berhasil!');
       fetchVerifikasiRonda(true); 
+      checkPendingCount(); // Update badge setelah verifikasi
     } catch (err) {
       alert('Gagal memverifikasi: ' + err.message);
     } finally {
@@ -170,6 +202,8 @@ export default function SekretarisRonda() {
     }
   };
 
+  // ... (Fungsi handleBuatPeriode, handleHapusPeriode, handleLihatDetail, handleGenerateDraft, dll TETAP SAMA seperti sebelumnya)
+  
   const handleBuatPeriode = async (formData) => {
     setProcessing(true);
     try {
@@ -274,6 +308,8 @@ export default function SekretarisRonda() {
 
   const formatTanggal = (dateStr) => dateStr ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(dateStr)) : '-';
 
+  // ... (SISA RENDER / RETURN SAMA SEPERTI SEBELUMNYA, TAPI TAMBAHKAN BADGE DI TOMBOL VERIFIKASI)
+
   if (viewMode === 'detail' && selectedPeriode) {
     return (
       <Layout>
@@ -331,7 +367,16 @@ export default function SekretarisRonda() {
       <div className="max-w-6xl mx-auto space-y-4">
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-2 flex gap-2 overflow-x-auto">
           <button onClick={() => setActiveTab('jadwal')} className={`flex-1 py-2.5 px-4 text-xs font-semibold rounded-xl whitespace-nowrap ${activeTab === 'jadwal' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>📅 Jadwal Ronda</button>
-          <button onClick={() => setActiveTab('verifikasi')} className={`flex-1 py-2.5 px-4 text-xs font-semibold rounded-xl whitespace-nowrap ${activeTab === 'verifikasi' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>✅ Verifikasi & Alpa</button>
+          
+          {/* ═══ TOMBOL DENGAN BADGE ═══ */}
+          <button onClick={() => setActiveTab('verifikasi')} className={`relative flex-1 py-2.5 px-4 text-xs font-semibold rounded-xl whitespace-nowrap ${activeTab === 'verifikasi' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>
+            ✅ Verifikasi & Alpa
+            {pendingRondaCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-lg animate-pulse">
+                {pendingRondaCount}
+              </span>
+            )}
+          </button>
         </div>
         
         {activeTab === 'jadwal' && (
