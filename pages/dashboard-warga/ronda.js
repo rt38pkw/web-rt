@@ -17,6 +17,9 @@ export default function RondaWarga() {
   
   const [showRekap, setShowRekap] = useState(false);
   const [catatanMap, setCatatanMap] = useState({});
+  
+  // ═══ TAMBAHAN: STATE UNTUK TIMER REALTIME ═══
+  const [tick, setTick] = useState(Date.now());
 
   useEffect(() => {
     const savedUser = localStorage.getItem('warga_session');
@@ -28,14 +31,26 @@ export default function RondaWarga() {
     setUser(parsedUser);
     fetchData(parsedUser.id);
 
+    // ═══ REALTIME SUPABASE ═══
     const channel = supabase
       .channel('realtime-ronda-warga')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'petugas_ronda' }, (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'petugas_ronda' }, () => {
+        fetchData(parsedUser.id, true); 
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jadwal_ronda' }, () => {
         fetchData(parsedUser.id, true); 
       })
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
+    // ═══ TIMER (Detak Jantung) SETIAP 10 DETIK ═══
+    const timer = setInterval(() => {
+      setTick(Date.now()); 
+    }, 10000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(timer);
+    };
   }, [router]);
 
   async function fetchData(wargaId, isSilent = false) {
@@ -130,29 +145,25 @@ export default function RondaWarga() {
 
   const formatTanggal = (dateStr) => dateStr ? new Intl.DateTimeFormat('id-ID', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(dateStr)) : '-';
   
-  // ═══ PERBAIKAN BUG: PARSING TANGGAL YANG KEBAL ═══
+  // ═══ FUNGSI WAKTU (Dipanggil ulang setiap kali `tick` berubah) ═══
   const cekStatusWaktu = (tanggalJadwal, jamMulai, jamSelesai) => {
     if (!tanggalJadwal || !jamMulai || !jamSelesai) return 'closed';
     
-    // 1. Ambil hanya YYYY-MM-DD (jika ada string T dari database, buang)
     const dateStr = tanggalJadwal.split('T')[0]; 
     
-    // 2. Pisahkan Jam, Menit, Detik
     const [mulaiH, mulaiM] = jamMulai.split(':');
     const [selesaiH, selesaiM] = jamSelesai.split(':');
 
-    // 3. Buat Objek Date Lokal
     const startDateTime = new Date(`${dateStr}T${mulaiH}:${mulaiM}:00`);
     let endDateTime = new Date(`${dateStr}T${selesaiH}:${selesaiM}:00`);
     
-    // 4. Jika selesai lebih kecil dari mulai (lewat tengah malam), tambah 1 hari
     if (endDateTime < startDateTime) {
       endDateTime.setDate(endDateTime.getDate() + 1);
     }
 
-    const now = new Date();
+    // Gunakan `new Date()` yang baru agar bergantung pada `tick`
+    const now = new Date(); 
 
-    // 5. Evaluasi
     if (now < startDateTime) return 'wait';
     if (now > endDateTime) return 'closed';
     return 'open'; 
