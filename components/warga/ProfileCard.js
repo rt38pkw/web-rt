@@ -5,6 +5,12 @@ export default function ProfileCard({ warga, penghuniData, roleLogin, modeAkses,
   const isPenyewa = roleLogin === 'penyewa';
   const isModePantau = modeAkses === 'pantau';
   
+  // ═══ CEK KELENGKAPAN PROFIL SECARA MANDIRI ═══
+  const statusPenghuni = penghuniData?.status_verifikasi;
+  const punyaNik = !!penghuniData?.nik && penghuniData.nik !== '0';
+  const punyaKK = !!penghuniData?.url_kk;
+  const isProfileComplete = statusPenghuni === 'approved' && punyaNik && punyaKK;
+
   let namaTampil = warga.nama_lengkap;
   let subNama = null;
 
@@ -71,11 +77,11 @@ export default function ProfileCard({ warga, penghuniData, roleLogin, modeAkses,
             {badgeText}
           </div>
 
-          {/* ═══ TOMBOL UBAH PIN (HANYA PEMILIK) ═══ */}
-          {!isPenyewa && onUbahPin && (
+          {/* ═══ TOMBOL UBAH PIN (HANYA JIKA PROFIL LENGKAP) ═══ */}
+          {!isPenyewa && isProfileComplete && onUbahPin && (
             <button 
               onClick={onUbahPin} 
-              className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl font-medium flex items-center gap-1.5 transition active:scale-95"
+              className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl font-medium flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-black/20"
               title="Ubah PIN Akun"
             >
               🔐 Ubah PIN
