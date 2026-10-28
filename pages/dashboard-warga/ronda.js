@@ -12,7 +12,7 @@ export default function RondaWarga() {
   
   const [jadwalSaya, setJadwalSaya] = useState([]); 
   const [jadwalFull, setJadwalFull] = useState([]); 
-  const [leaderboard, setLeaderboard] = useState([]); 
+  const [alpaList, setAlpaList] = useState([]); // Ganti nama state jadi alpaList
   const [uploadingId, setUploadingId] = useState(null);
   
   const [showRekap, setShowRekap] = useState(false);
@@ -62,22 +62,25 @@ export default function RondaWarga() {
         .order('tanggal', { ascending: true });
       setJadwalFull(fullJadwal || []);
 
-      const { data: allPetugas } = await supabase
+      // ═══ LOGIKA BARU: HITUNG TOTAL ALPA ═══
+      const { data: allAlpa } = await supabase
         .from('petugas_ronda')
         .select('penghuni_id, jadwal:jadwal_id!inner(periode:periode_id!inner(status)), penghuni:penghuni_id(nama_lengkap, warga:warga_id(no_rumah))')
-        .eq('status_hadir', 'hadir')
+        .eq('status_hadir', 'tidak_hadir') // HANYA AMBIL YANG ALPA
         .eq('jadwal.periode.status', 'published');
 
       const tally = {};
-      (allPetugas || []).forEach(p => {
+      (allAlpa || []).forEach(p => {
         const pid = p.penghuni_id;
         if (!tally[pid]) {
-          tally[pid] = { id: pid, nama: p.penghuni?.nama_lengkap, no_rumah: p.penghuni?.warga?.no_rumah, total_hadir: 0 };
+          tally[pid] = { id: pid, nama: p.penghuni?.nama_lengkap, no_rumah: p.penghuni?.warga?.no_rumah, total_alpa: 0 };
         }
-        tally[pid].total_hadir += 1;
+        tally[pid].total_alpa += 1;
       });
-      const sortedLeaderboard = Object.values(tally).sort((a, b) => b.total_hadir - a.total_hadir);
-      setLeaderboard(sortedLeaderboard);
+      
+      // Urutkan dari yang paling sering alpa
+      const sortedAlpa = Object.values(tally).sort((a, b) => b.total_alpa - a.total_alpa);
+      setAlpaList(sortedAlpa);
 
     } catch (err) {
       console.error(err);
@@ -147,27 +150,24 @@ export default function RondaWarga() {
     return new Date(a.jadwal.tanggal) - new Date(b.jadwal.tanggal);
   });
 
-  // Cegah halaman berkedip putih jika user belum ter-load, tapi redirect sudah berjalan
   if (!user && !loading) return null;
 
   return (
     <Layout warga={user} onLogout={handleLogout}>
       
-      {/* ═══ TAMPILAN LOADING (DI DALAM LAYOUT) ═══ */}
       {loading ? (
         <div className="flex flex-col items-center justify-center h-[50vh] space-y-3">
           <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
           <div className="text-slate-400 text-xs animate-pulse">Memuat data ronda...</div>
         </div>
       ) : (
-        /* ═══ KONTEN ASLI (JIKA TIDAK LOADING) ═══ */
         <div className="flex flex-col h-[calc(100dvh-140px)] gap-2 pb-2 animate-in fade-in">
           
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex justify-between items-center shadow-sm shrink-0">
             <div>
               <h1 className="text-sm font-bold text-white">Ronda RT 38</h1>
             </div>
-            <button onClick={() => setShowRekap(true)} className="bg-blue-500/10 text-blue-400 border border-blue-500/30 font-bold px-2.5 py-1.5 rounded-lg text-[10px] flex items-center gap-1 transition">📊 Rekap</button>
+            <button onClick={() => setShowRekap(true)} className="bg-rose-500/10 text-rose-400 border border-rose-500/30 font-bold px-2.5 py-1.5 rounded-lg text-[10px] flex items-center gap-1 transition">⚠️ Daftar Alpa</button>
           </div>
 
           <div className="flex-1 flex flex-col min-h-0 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
@@ -281,30 +281,43 @@ export default function RondaWarga() {
         </div>
       )}
 
-      {/* POP-UP MODAL REKAP KEHADIRAN */}
+      {/* ═══ POP-UP MODAL DAFTAR ALPA (DIPERBARUI) ═══ */}
       {showRekap && (
         <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowRekap(false)}>
-          <div className="bg-slate-900 border-t sm:border border-slate-700 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-in slide-in-from-bottom-10 sm:zoom-in-95" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-slate-900 border-t sm:border border-rose-500/30 w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl animate-in slide-in-from-bottom-10 sm:zoom-in-95" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">📊 Rekap Kehadiran Warga</h3>
+              <h3 className="text-base font-bold text-rose-400 flex items-center gap-2">⚠️ Daftar Warga Alpa</h3>
               <button onClick={() => setShowRekap(false)} className="text-slate-400 hover:text-white bg-slate-800 p-1.5 rounded-full">✕</button>
             </div>
+            
             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1 custom-scrollbar">
-              {leaderboard.length === 0 ? (
-                <div className="text-center text-xs text-slate-500 py-6">Belum ada data kehadiran yang diverifikasi.</div>
+              {alpaList.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-3">🎉</div>
+                  <div className="text-sm font-bold text-emerald-400">Luar Biasa!</div>
+                  <div className="text-xs text-slate-400 mt-1">Tidak ada warga yang alpa. Semua disiplin!</div>
+                </div>
               ) : (
-                leaderboard.map((lb, index) => (
-                  <div key={lb.id} className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${index === 0 ? 'bg-amber-400 text-amber-900 shadow-[0_0_10px_rgba(251,191,36,0.3)]' : index === 1 ? 'bg-slate-300 text-slate-800' : index === 2 ? 'bg-amber-700 text-white' : 'bg-slate-800 text-slate-400'}`}>{index + 1}</div>
+                alpaList.map((lb, index) => (
+                  <div key={lb.id} className="flex items-center gap-3 bg-slate-950/50 p-2 rounded-xl border border-slate-800">
+                    <div className="w-6 h-6 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-bold text-[10px] shrink-0">
+                      {index + 1}
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-white truncate">{lb.nama}</div>
+                      <div className="text-xs font-bold text-white truncate">{lb.nama}</div>
                       <div className="text-[10px] text-slate-500 font-mono">{lb.no_rumah}</div>
                     </div>
-                    <div className="bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-400 shrink-0">{lb.total_hadir} x</div>
+                    <div className="bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg text-[10px] font-bold text-rose-400 shrink-0">
+                      {lb.total_alpa} x Alpa
+                    </div>
                   </div>
                 ))
               )}
             </div>
+            
+            {alpaList.length > 0 && (
+              <p className="text-center text-[9px] text-slate-500 mt-4">Mohon tingkatkan kedisiplinan ronda. Terima kasih.</p>
+            )}
           </div>
         </div>
       )}
