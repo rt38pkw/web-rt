@@ -6,12 +6,10 @@ export default function ModalDetailRumah({
   if (!detailRumah) return null;
 
   return (
-    // Background luar (Klik area sini untuk menutup)
     <div 
-      className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"
+      className="fixed inset-0 z-[999] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"
       onClick={() => setShowDetailRumah(false)}
     >
-      {/* Kotak Modal (Klik area ini tidak akan menutup) */}
       <div 
         className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95"
         onClick={(e) => e.stopPropagation()}
@@ -19,14 +17,11 @@ export default function ModalDetailRumah({
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <h3 className="text-base font-bold text-white">🏠 Detail Data Rumah</h3>
           
-          {/* Tombol X diperbesar & diberikan z-index tinggi */}
+          {/* TOMBOL X YANG DIPERBAIKI */}
           <button 
             type="button" 
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowDetailRumah(false);
-            }} 
-            className="relative z-10 text-slate-400 hover:text-white bg-slate-800 hover:bg-rose-500/20 w-8 h-8 flex items-center justify-center rounded-full transition cursor-pointer"
+            onClick={() => setShowDetailRumah(false)} 
+            className="relative z-[1000] text-slate-400 hover:text-white bg-slate-800 hover:bg-rose-500/20 w-8 h-8 flex items-center justify-center rounded-full transition cursor-pointer text-lg"
           >
             ✕
           </button>
@@ -64,26 +59,26 @@ export default function ModalDetailRumah({
         </div>
 
         <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-800">
-          <button onClick={() => openEditModal(detailRumah)} className="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1">
+          <button type="button" onClick={() => openEditModal(detailRumah)} className="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1">
             ✏️ Edit Data
           </button>
-          <button onClick={() => handleResetPassword(detailRumah)} disabled={processingId === detailRumah.id} className="bg-amber-600/20 hover:bg-amber-600 text-amber-400 hover:text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1">
+          <button type="button" onClick={() => handleResetPassword(detailRumah)} disabled={processingId === detailRumah.id} className="bg-amber-600/20 hover:bg-amber-600 text-amber-400 hover:text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1">
             🔑 Reset Sandi
           </button>
           {detailRumah.status_huni === 'sewa' && (
-            <button onClick={() => handleSelesaikanSewa(detailRumah)} disabled={processingId === detailRumah.id} className="col-span-2 bg-purple-600/20 hover:bg-purple-600 text-purple-400 hover:text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1">
+            <button type="button" onClick={() => handleSelesaikanSewa(detailRumah)} disabled={processingId === detailRumah.id} className="col-span-2 bg-purple-600/20 hover:bg-purple-600 text-purple-400 hover:text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1">
               🚪 Selesaikan Sewa
             </button>
           )}
-          <button onClick={() => handleHapusWarga(detailRumah)} disabled={processingId === detailRumah.id} className="col-span-2 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1">
+          <button type="button" onClick={() => handleHapusWarga(detailRumah)} disabled={processingId === detailRumah.id} className="col-span-2 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1">
             🗑️ Hapus Data Rumah
           </button>
         </div>
         
-        {/* Tombol Tutup Tambahan di Bawah */}
         <button 
+          type="button"
           onClick={() => setShowDetailRumah(false)} 
-          className="w-full mt-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl text-xs transition"
+          className="w-full mt-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl text-xs transition border border-slate-700"
         >
           Tutup
         </button>
