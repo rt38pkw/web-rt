@@ -4,12 +4,28 @@ export default function ModalDetailRumah({
   handleSelesaikanSewa, handleHapusWarga, processingId 
 }) {
   if (!detailRumah) return null;
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4">
+    // Tambahkan onClick di background luar agar bisa ditutup
+    <div 
+      className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={() => setShowDetailRumah(false)}
+    >
+      {/* stopPropagation agar klik di dalam kotak tidak menutup modal */}
+      <div 
+        className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <h3 className="text-base font-bold text-white">🏠 Detail Data Rumah</h3>
-          <button onClick={() => setShowDetailRumah(false)} className="text-slate-400 hover:text-white">✕</button>
+          {/* Tombol X diperbaiki dengan tipe button */}
+          <button 
+            type="button" 
+            onClick={() => setShowDetailRumah(false)} 
+            className="text-slate-400 hover:text-white bg-slate-800 hover:bg-rose-500/20 p-1.5 rounded-lg transition"
+          >
+            ✕
+          </button>
         </div>
         
         <div className="space-y-3 text-sm">
