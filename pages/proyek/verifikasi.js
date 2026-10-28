@@ -1,3 +1,4 @@
+// pages/proyek/verifikasi.js
 import { supabase } from '../../lib/supabase';
 import Layout from '../../components/proyek/Layout';
 import TabVerifikasi from '../../components/proyek/TabVerifikasi';
@@ -11,13 +12,26 @@ export default function PageProyekVerifikasi() {
   async function handleApprove(item) {
     try {
       const today = new Date().toISOString().split('T')[0];
+      
+      // 1. Update status
       const { error: errUpdate } = await supabase.from('iuran_proyek').update({ status: 'approved', tanggal_transaksi: today }).eq('id', item.id);
       if (errUpdate) throw errUpdate;
+      
+      // 2. Hapus file fisik
       const bukti = item.bukti_urls || [];
       if (bukti.length > 0) {
-        try { await hapusBuktiProyek(bukti); await supabase.from('iuran_proyek').update({ bukti_urls: null }).eq('id', item.id); } catch (errHapus) { console.warn('Gagal hapus bukti:', errHapus); }
+        try { 
+          await hapusBuktiProyek(bukti); 
+          // 3. Ubah URL di database menjadi ['DIHAPUS']
+          await supabase.from('iuran_proyek').update({ bukti_urls: ['DIHAPUS'] }).eq('id', item.id); 
+        } catch (errHapus) { 
+          console.warn('Gagal hapus bukti:', errHapus); 
+        }
       }
-      alert('✅ Cicilan berhasil di-approve!'); invalidateProyekCache(); refetch();
+      
+      alert('✅ Cicilan berhasil di-approve & foto dibersihkan!'); 
+      invalidateProyekCache(); 
+      refetch();
     } catch (err) { alert('Gagal: ' + err.message); }
   }
 
