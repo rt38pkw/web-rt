@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
-export default function ModalUbahPin({ show, onClose, wargaId, currentPassword }) {
+export default function ModalUbahPin({ show, onClose, wargaId }) {
   const [oldPin, setOldPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -15,10 +15,6 @@ export default function ModalUbahPin({ show, onClose, wargaId, currentPassword }
     e.preventDefault();
     setError('');
 
-    // 1. Validasi Input
-    if (oldPin !== currentPassword) {
-      return setError('PIN Lama tidak sesuai.');
-    }
     if (newPin.length < 6) {
       return setError('PIN Baru minimal 6 karakter.');
     }
@@ -29,9 +25,22 @@ export default function ModalUbahPin({ show, onClose, wargaId, currentPassword }
       return setError('PIN Baru tidak boleh 123456 (PIN default).');
     }
 
-    // 2. Update ke Database
     setLoading(true);
     try {
+      // 1. Cek PIN Lama ke Database
+      const { data: wargaData, error: errWarga } = await supabase
+        .from('warga')
+        .select('password')
+        .eq('id', wargaId)
+        .single();
+
+      if (errWarga) throw errWarga;
+
+      if (wargaData.password !== oldPin) {
+        throw new Error('PIN Lama salah.');
+      }
+
+      // 2. Update PIN Baru
       const { error: errUpdate } = await supabase
         .from('warga')
         .update({ password: newPin })
@@ -40,9 +49,10 @@ export default function ModalUbahPin({ show, onClose, wargaId, currentPassword }
       if (errUpdate) throw errUpdate;
 
       alert('✅ PIN berhasil diubah! Silakan gunakan PIN baru saat login berikutnya.');
+      setOldPin(''); setNewPin(''); setConfirmPin('');
       onClose();
     } catch (err) {
-      setError('Gagal mengubah PIN: ' + err.message);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -75,7 +85,7 @@ export default function ModalUbahPin({ show, onClose, wargaId, currentPassword }
           <div className="flex gap-2 pt-3 border-t border-slate-800 mt-4">
             <button type="button" onClick={onClose} className="w-1/3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs">Batal</button>
             <button type="submit" disabled={loading} className="w-2/3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl text-xs transition">
-              {loading ? 'Menyimpan...' : 'Simpan PIN Baru'}
+              {loading ? 'Menyimpan...' : 'Simpan PIN'}
             </button>
           </div>
         </form>
