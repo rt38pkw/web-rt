@@ -1,3 +1,4 @@
+// pages/keuangan/verifikasi.js
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import KeuanganLayout from '../../components/keuangan/Layout';
@@ -19,14 +20,23 @@ export default function PageVerifikasi() {
     if (!confirm('Approve pembayaran ini?')) return;
     try {
       const today = new Date().toISOString().split('T')[0];
+      
+      // 1. Update status iuran
       await supabase.from('iuran').update({ status: 'approved', tanggal_transaksi: today, metode: 'qris' }).eq('batch_id', batch.batchId);
+      
+      // 2. Hapus file fisik di storage
       const urls = batch.items[0]?.bukti_urls || [];
       const paths = urls.map(getPathFromUrl).filter(Boolean);
+      
       if (paths.length > 0) {
         await supabase.storage.from('bukti-transfer').remove(paths);
-        await supabase.from('iuran').update({ bukti_urls: null }).eq('batch_id', batch.batchId);
+        // 3. Ubah URL di database menjadi ['DIHAPUS'] agar UI tidak error
+        await supabase.from('iuran').update({ bukti_urls: ['DIHAPUS'] }).eq('batch_id', batch.batchId);
       }
-      alert('✅ Berhasil di-approve.'); invalidateKeuanganCache(); refetch();
+      
+      alert('✅ Berhasil di-approve & foto dibersihkan.'); 
+      invalidateKeuanganCache(); 
+      refetch();
     } catch (err) { alert('Gagal approve: ' + err.message); }
   }
 
