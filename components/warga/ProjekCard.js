@@ -10,6 +10,7 @@ export default function ProjekCard({
   donasiWarga,
   onBayar,
   onLihatRekap,
+  onLihatKas, // PROP BARU
 }) {
   if (!proyek) return null;
 
@@ -59,30 +60,25 @@ export default function ProjekCard({
           ></div>
         </div>
 
-        {/* TAMBAHAN: INFO NOMINAL DONASI */}
         {donasiWarga > 0 && (
           <div className="bg-purple-950/20 border border-purple-500/20 rounded-lg px-3 py-1.5 flex items-center justify-between mt-2">
-            <span className="text-[10px] text-purple-300 font-semibold flex items-center gap-1">
-              💚 Total Donasi Anda
-            </span>
-            <strong className="text-[11px] text-purple-400 font-mono">
-              + {formatRupiahProyek(donasiWarga)}
-            </strong>
+            <span className="text-[10px] text-purple-300 font-semibold flex items-center gap-1">💚 Total Donasi Anda</span>
+            <strong className="text-[11px] text-purple-400 font-mono">+ {formatRupiahProyek(donasiWarga)}</strong>
           </div>
         )}
       </div>
 
-      {/* FOOTER & AKSI */}
+      {/* FOOTER & AKSI (3 TOMBOL) */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-2 border-t border-slate-800/60">
         <div className="text-[10px] text-slate-500">
           {proyek.deadline ? `Tenggat: ${formatTanggalProyek(proyek.deadline)}` : 'Tanpa tenggat waktu'}
         </div>
         
         <div className="flex gap-2 w-full sm:w-auto">
-          <button 
-            onClick={onLihatRekap}
-            className="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-[10px] font-semibold transition"
-          >
+          <button onClick={onLihatKas} className="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-[10px] font-semibold transition">
+            💰 Kas
+          </button>
+          <button onClick={onLihatRekap} className="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-[10px] font-semibold transition">
             📊 Rekap
           </button>
           
@@ -96,7 +92,7 @@ export default function ProjekCard({
                   : 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/20'
               }`}
             >
-              {adaPending ? '⏳ Menunggu Verifikasi' : '💳 Bayar Cicilan'}
+              {adaPending ? '⏳ Pending' : '💳 Bayar'}
             </button>
           )}
         </div>
