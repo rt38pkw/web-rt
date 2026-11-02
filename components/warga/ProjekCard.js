@@ -43,20 +43,33 @@ export default function ProjekCard({
         </div>
       </div>
 
-      {/* PROGRESS BAR */}
-      <div className="space-y-1.5">
+      {/* PROGRESS BAR & NOMINAL DONASI */}
+      <div className="space-y-2">
         <div className="flex justify-between text-xs">
           <span className="text-slate-400">Terkumpul: <strong className="text-white">{formatRupiahProyek(terbayar)}</strong></span>
           <span className={`font-bold ${statusWarga === 'lunas' ? 'text-emerald-400' : 'text-orange-400'}`}>
             {statusWarga === 'lunas' ? '✅ Lunas' : statusWarga === 'kurang' ? '⏳ Belum Lunas' : '⚪ Belum Bayar'}
           </span>
         </div>
+        
         <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
           <div 
             className={`h-full rounded-full transition-all duration-500 ${statusWarga === 'lunas' ? 'bg-emerald-500' : 'bg-amber-500'}`}
             style={{ width: `${progress}%` }}
           ></div>
         </div>
+
+        {/* TAMBAHAN: INFO NOMINAL DONASI */}
+        {donasiWarga > 0 && (
+          <div className="bg-purple-950/20 border border-purple-500/20 rounded-lg px-3 py-1.5 flex items-center justify-between mt-2">
+            <span className="text-[10px] text-purple-300 font-semibold flex items-center gap-1">
+              💚 Total Donasi Anda
+            </span>
+            <strong className="text-[11px] text-purple-400 font-mono">
+              + {formatRupiahProyek(donasiWarga)}
+            </strong>
+          </div>
+        )}
       </div>
 
       {/* FOOTER & AKSI */}
