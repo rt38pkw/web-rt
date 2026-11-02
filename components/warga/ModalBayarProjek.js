@@ -1,3 +1,4 @@
+// components/warga/ModalBayarProjek.js
 import { useState, useEffect } from 'react';
 import { ALLOWED_TYPES, MAX_FILE_SIZE } from '../../lib/iuran/constants';
 import { formatRupiahProyek } from '../../lib/proyek/constants';
@@ -123,13 +124,13 @@ export default function ModalBayarProjek({
           </div>
         </div>
 
-        {/* QRIS */}
+        {/* QRIS PROYEK (Sudah Diubah) */}
         <div className="bg-white rounded-2xl p-3 flex flex-col items-center">
-          <img src="/qris.png" alt="QRIS RT 38" className="w-40 h-40 object-contain" />
-          <p className="text-[10px] text-slate-600 mt-1 font-medium">Scan untuk bayar cicilan</p>
+          <img src="/qris-proyek.png" alt="QRIS Proyek RT 38" className="w-40 h-40 object-contain" />
+          <p className="text-[10px] text-slate-600 mt-1 font-medium">Scan untuk bayar cicilan proyek</p>
           <a
-            href="/qris.png"
-            download="QRIS-RT38.png"
+            href="/qris-proyek.png"
+            download="QRIS-Proyek-RT38.png"
             className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition"
           >
             ⬇️ Download QRIS
