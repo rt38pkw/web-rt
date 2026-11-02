@@ -45,10 +45,8 @@ export default function DashboardWargaProjek() {
     loadData(userData.id);
   }, []);
 
-  // Realtime
   useEffect(() => {
     if (!warga?.id) return;
-
     const channel = supabase
       .channel('warga-proyek-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran_proyek' }, () => {
@@ -58,7 +56,6 @@ export default function DashboardWargaProjek() {
         loadData(warga.id);
       })
       .subscribe();
-
     return () => {
       supabase.removeChannel(channel);
     };
@@ -67,10 +64,11 @@ export default function DashboardWargaProjek() {
   const loadData = async (wargaId) => {
     setLoading(true);
     try {
-      const [resProyek, resIuran, resKas] = await Promise.all([
+      const [resProyek, resIuran, resKas, resWarga] = await Promise.all([
         supabase.from('proyek').select('*').in('status', ['aktif', 'selesai']).order('created_at', { ascending: false }),
         supabase.from('iuran_proyek').select('*').eq('warga_id', wargaId).order('created_at', { ascending: false }),
         supabase.from('kas_proyek').select('*').order('tanggal', { ascending: false }),
+        supabase.from('warga').select('id, nama_lengkap, no_rumah'), // Fetch list warga untuk nama donatur
       ]);
       
       const proyekValid = (resProyek.data || []).filter(p => p && p.id && p.nominal_per_warga);
@@ -78,6 +76,7 @@ export default function DashboardWargaProjek() {
       setProyekList(proyekValid);
       setIuranProyekList(resIuran.data || []);
       setKasProyekList(resKas.data || []); 
+      setAllWargaList(resWarga.data || []);
     } catch (err) {
       console.error('Gagal load data proyek:', err);
     } finally {
@@ -164,17 +163,8 @@ export default function DashboardWargaProjek() {
   const handleLihatRekap = async (proyek) => {
     setLoadingRekap(true);
     try {
-      if (allWargaList.length === 0) {
-        const [resWarga, resIuran] = await Promise.all([
-          supabase.from('warga').select('*').order('no_rumah'),
-          supabase.from('iuran_proyek').select('*').eq('proyek_id', proyek.id),
-        ]);
-        setAllWargaList(resWarga.data || []);
-        setAllIuranList(resIuran.data || []);
-      } else {
-        const { data } = await supabase.from('iuran_proyek').select('*').eq('proyek_id', proyek.id);
-        setAllIuranList(data || []);
-      }
+      const { data } = await supabase.from('iuran_proyek').select('*').eq('proyek_id', proyek.id);
+      setAllIuranList(data || []);
       setRekapProyek(proyek);
       setShowRekap(true);
     } catch (err) {
@@ -364,6 +354,7 @@ export default function DashboardWargaProjek() {
         proyek={kasProyekDipilih}
         iuranList={iuranProyekList}
         kasList={kasProyekList}
+        wargaList={allWargaList}
       />
     </>
   );
