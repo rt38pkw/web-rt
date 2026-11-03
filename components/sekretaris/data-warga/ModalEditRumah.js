@@ -5,10 +5,12 @@ export default function ModalEditRumah({
   showEditModal, setShowEditModal, handleUpdateWarga, editNama, setEditNama, 
   editNoRumah, setEditNoRumah, editStatusHuni, setEditStatusHuni, 
   editKategori, setEditKategori, editNik, setEditNik, editNoKk, setEditNoKk, 
-  editNoWa, setEditNoWa, handleAngkaChange, processingId, editId 
+  editNoWa, setEditNoWa, handleAngkaChange, processingId, editId,
+  originalKategori // PROP BARU: Untuk mendeteksi apakah kategori berubah
 }) {
   const [blokRumah, setBlokRumah] = useState('');
   const [nomorRumah, setNomorRumah] = useState('');
+  const [editKategoriDate, setEditKategoriDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Pisahkan data saat modal dibuka
   useEffect(() => {
@@ -54,10 +56,14 @@ export default function ModalEditRumah({
     if (!blokRumah.trim()) return alert('Blok rumah wajib diisi!');
     if (!finalNomor) return alert('Nomor rumah wajib diisi!');
     const combinedNoRumah = `${blokRumah.trim().toUpperCase()} - ${finalNomor}`;
-    handleUpdateWarga(e, combinedNoRumah);
+    
+    // Kirim tanggal berlaku kategori (jika berubah) ke parent
+    handleUpdateWarga(e, combinedNoRumah, editKategoriDate);
   };
 
   if (!showEditModal) return null;
+
+  const isKategoriBerubah = editKategori !== originalKategori;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -86,6 +92,24 @@ export default function ModalEditRumah({
               <option value="Usaha">Usaha</option>
             </select>
           </div>
+
+          {/* INPUT TANGGAL BERLAKU (MUNCUL HANYA JIKA KATEGORI BERUBAH) */}
+          {isKategoriBerubah && (
+            <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-3">
+              <label className="block text-[10px] font-semibold text-amber-300 uppercase mb-1">
+                Mulai Tanggal Berapa Status {editKategori} Ini Berlaku? *
+              </label>
+              <input 
+                type="date" 
+                value={editKategoriDate} 
+                onChange={(e) => setEditKategoriDate(e.target.value)} 
+                required 
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white [color-scheme:dark]" 
+              />
+              <p className="text-[9px] text-amber-400/80 mt-1">Sistem akan mencatat riwayat ini. Tagihan bulan lalu tidak akan berubah.</p>
+            </div>
+          )}
+
           <input type="text" inputMode="numeric" placeholder="NIK (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={editNik} onChange={(e) => handleAngkaChange(e, setEditNik)} />
           <input type="text" inputMode="numeric" placeholder="No. KK (16 digit)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={editNoKk} onChange={(e) => handleAngkaChange(e, setEditNoKk)} />
           <input type="text" placeholder="No. WhatsApp" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white" value={editNoWa} onChange={(e) => setEditNoWa(e.target.value)} />
