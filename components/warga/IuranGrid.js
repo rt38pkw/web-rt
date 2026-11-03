@@ -50,7 +50,6 @@ export default function IuranGrid({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
         {periodeBulan.map((bln, idx) => {
-          // Ambil tarif spesifik untuk bulan ini dari tarifMap, jika tidak ada fallback ke tarifBulanan
           const safeTarif = tarifMap[bln.kode] !== undefined ? tarifMap[bln.kode] : tarifBulanan;
           
           const info = getInfoBulan(iuranList, bln.kode, safeTarif);
@@ -61,6 +60,8 @@ export default function IuranGrid({
           const isKosong = info.recs.length === 0;
           const isJatuhTempo = bln.kode <= bulanSekarang;
 
+          // Cek apakah ini bulan yang harusnya ada tombol bayar
+          // (bulanTombolBayar dikirim dari parent iuran.js sebagai bulan pertama yg belum lunas)
           const isTombolBayar = !adaPending && !isPending && !isLunas && bln.kode === bulanTombolBayar && !isModePantau;
 
           let cardClass = 'bg-slate-950/60 border-slate-800/60 text-slate-400';
@@ -73,7 +74,6 @@ export default function IuranGrid({
           const label = isLunas ? '✓ Lunas' : isSebagian ? `- Rp ${info.kurang.toLocaleString('id-ID')}` : isPending ? '⏳ Menunggu' : isRejected ? '❌ Ditolak' : isJatuhTempo ? '⚠️ Telat' : 'Belum';
           const badgeClass = isLunas ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : isSebagian ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' : isPending ? 'bg-orange-500/10 text-orange-400 border-orange-500/30' : isRejected ? 'bg-rose-500/20 text-rose-400 border-rose-500/40' : isJatuhTempo ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' : 'bg-slate-800/80 text-slate-400 border-slate-700/60';
 
-          // Cari tanggal transaksi terakhir (jika ada)
           const lastTx = info.recs.find(r => r.status === 'approved' || r.status === 'pending');
           const tglTx = lastTx?.tanggal_transaksi 
             ? new Date(lastTx.tanggal_transaksi).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -90,7 +90,6 @@ export default function IuranGrid({
               </div>
 
               <div className="text-[11px] text-slate-400 flex flex-col gap-1">
-                {/* TAMPILAN NOMINAL & TANGGAL LANGSUNG */}
                 <div className="flex justify-between items-center">
                   <span>
                     {isLunas ? `Rp ${info.totalApproved.toLocaleString('id-ID')}` : 
@@ -105,6 +104,7 @@ export default function IuranGrid({
                 </div>
               </div>
 
+              {/* TOMBOL QRIS (HANYA MUNCUL 1 KALI DI BULAN YANG DITENTUKAN) */}
               {isTombolBayar && (
                 <button onClick={onBayar} className="mt-3 w-full bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold py-2 rounded-xl transition shadow-lg shadow-blue-600/20">
                   📱 Bayar via QRIS
