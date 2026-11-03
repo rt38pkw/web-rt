@@ -13,7 +13,8 @@ import ModalKasRT from '../../components/warga/ModalKasRT';
 import ModalLengkapiProfil from '../../components/warga/ModalLengkapiProfil'; 
 import ModalUbahPin from '../../components/warga/ModalUbahPin'; 
 
-import { getPeriodeBulan, TAHUN_TERSEDIA, getTahunSekarang, isWargaUsaha } from '../../lib/iuran/constants';
+// IMPORT YANG SUDAH DINAMIS
+import { getPeriodeBulan, getTahunTersedia, getTahunSekarang, isWargaUsaha } from '../../lib/iuran/constants';
 import { getInfoBulan, hitungBelumLunas, formatTanggal } from '../../lib/iuran/calculations';
 import { fetchWargaById, fetchIuranByWarga, fetchAllWarga, fetchAllIuran, insertPengajuanIuran, updatePengajuanIuran } from '../../lib/iuran/queries';
 import { uploadBukti } from '../../lib/iuran/storage';
@@ -27,7 +28,7 @@ export default function DashboardWargaIuran() {
   const [iuranList, setIuranList] = useState([]);
   const [depositList, setDepositList] = useState([]);
   const [tarifList, setTarifList] = useState([]);
-  const [riwayatList, setRiwayatList] = useState([]); // State baru untuk riwayat kategori
+  const [riwayatList, setRiwayatList] = useState([]); 
   
   const [allWargaList, setAllWargaList] = useState([]);
   const [allIuranList, setAllIuranList] = useState([]);
@@ -49,6 +50,8 @@ export default function DashboardWargaIuran() {
   const [showModalBayar, setShowModalBayar] = useState(false);
   const [bulanDipilih, setBulanDipilih] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  
+  // STATE TAHUN YANG DINAMIS
   const [tahunTerpilih, setTahunTerpilih] = useState(getTahunSekarang());
 
   const router = useRouter();
@@ -68,7 +71,7 @@ export default function DashboardWargaIuran() {
     loadIuran(parsed.id);
     loadDeposit(parsed.id);
     loadTarif();
-    loadRiwayatKategori(parsed.id); // Fetch riwayat
+    loadRiwayatKategori(parsed.id); 
     refreshDataRumah(parsed.id);
   }, []);
 
@@ -172,7 +175,7 @@ export default function DashboardWargaIuran() {
   const tarifBulanan = getTarifWarga(warga, tarifList, tahunTerpilih);
   const usaha = isWargaUsaha(warga);
 
-  // ═══ MEMBUAT KAMUS TARIF PER BULAN UNTUK TAHUN YANG DIPILIH ═══
+  // KAMUS TARIF PER BULAN UNTUK TAHUN YANG DIPILIH
   const tarifMap = {};
   periodeBulanAktif.forEach(bln => {
     tarifMap[bln.kode] = getTarifWarga(warga, tarifList, bln.kode, riwayatList);
@@ -185,8 +188,6 @@ export default function DashboardWargaIuran() {
   const adaPending = iuranList.some((i) => i.status === 'pending');
   const adaDitolak = iuranList.some((i) => i.status === 'rejected');
   
-  // Hitung belum lunas berdasarkan tarif tahun yang dipilih (menggunakan tarif tertinggi atau map)
-  // Agar akurat, kita gunakan hitungBelumLunas dengan tarif default (karena map diterapkan di grid)
   const belumLunasList = hitungBelumLunas(iuranList, periodeBulanAktif, tarifBulanan);
   const bulanTombolBayar = belumLunasList[0]?.kode || null;
 
@@ -210,7 +211,6 @@ export default function DashboardWargaIuran() {
       }
 
       for (const bln of bulanPilih) {
-        // Gunakan tarifMap agar tagihan sesuai tarif historis bulan tersebut
         const tarifSpesifik = tarifMap[bln] !== undefined ? tarifMap[bln] : tarifBulanan;
         const info = getInfoBulan(iuranList, bln, tarifSpesifik);
         
@@ -339,7 +339,7 @@ export default function DashboardWargaIuran() {
             isModePantau={isModePantau} 
             tahunTerpilih={tahunTerpilih}
             setTahunTerpilih={setTahunTerpilih}
-            tahunTersedia={TAHUN_TERSEDIA}
+            tahunTersedia={getTahunTersedia()}
           />
         )}
       </Layout>
@@ -361,7 +361,15 @@ export default function DashboardWargaIuran() {
       />
       
       {showRekapModal && (
-        <ModalRekap show={showRekapModal} onClose={() => setShowRekapModal(false)} allWargaList={allWargaList} allIuranList={allIuranList} allPenghuniList={allPenghuniList} tarifList={tarifList} />
+        <ModalRekap 
+          show={showRekapModal} 
+          onClose={() => setShowRekapModal(false)} 
+          allWargaList={allWargaList} 
+          allIuranList={allIuranList} 
+          allPenghuniList={allPenghuniList} 
+          tarifList={tarifList} 
+          tahunTerpilih={tahunTerpilih}
+        />
       )}
       
       <ModalKasRT show={showKasRTModal} onClose={() => setShowKasRTModal(false)} iuranList={kasRTIuranList} pemasukanLainList={pemasukanLainList} pengeluaranList={pengeluaranList} />
