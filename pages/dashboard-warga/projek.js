@@ -45,8 +45,10 @@ export default function DashboardWargaProjek() {
     loadData(userData.id);
   }, []);
 
+  // Realtime
   useEffect(() => {
     if (!warga?.id) return;
+
     const channel = supabase
       .channel('warga-proyek-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran_proyek' }, () => {
@@ -56,6 +58,7 @@ export default function DashboardWargaProjek() {
         loadData(warga.id);
       })
       .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
     };
@@ -84,7 +87,6 @@ export default function DashboardWargaProjek() {
     }
   };
 
-  // ═══ FUNGSI INI YANG TADI HILANG ═══
   const handleLogout = () => {
     if (!confirm('Keluar dari akun warga?')) return;
     localStorage.removeItem('warga_session');
@@ -243,6 +245,13 @@ export default function DashboardWargaProjek() {
                   const sisa = getSisaWarga(iuranProyekList, warga.id, proyek);
                   const adaPending = pending > 0;
 
+                  // ═══ LOGIKA CEK STATUS DITOLAK ═══
+                  const iuranWargaIni = iuranProyekList.filter(i => i.proyek_id === proyek.id && i.warga_id === warga.id);
+                  const rejectedData = iuranWargaIni.find(i => i.status === 'rejected');
+                  const adaDitolak = !!rejectedData;
+                  const catatanDitolak = rejectedData?.catatan || null;
+                  // ═════════════════════════════════
+
                   const donasiWarga = kasProyekList
                     .filter((k) => k.proyek_id === proyek.id && k.warga_id === warga.id && k.tipe === 'donasi')
                     .reduce((s, k) => s + Number(k.nominal), 0);
@@ -260,6 +269,8 @@ export default function DashboardWargaProjek() {
                       statusWarga={statusWarga}
                       adaPending={adaPending}
                       donasiWarga={donasiWarga}
+                      adaDitolak={adaDitolak}         // PROP BARU
+                      catatanDitolak={catatanDitolak} // PROP BARU
                       onBayar={() => handleBayar(proyek)}
                       onLihatRekap={() => handleLihatRekap(proyek)}
                       onLihatKas={() => handleLihatKas(proyek)}
@@ -305,6 +316,8 @@ export default function DashboardWargaProjek() {
                             <td className="p-3">
                               {r.status === 'approved' ? (
                                 <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">✓ Approved</span>
+                              ) : r.status === 'rejected' ? (
+                                <span className="text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded">❌ Ditolak</span>
                               ) : (
                                 <span className="text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded">⏳ Menunggu</span>
                               )}
