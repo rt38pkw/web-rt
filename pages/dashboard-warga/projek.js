@@ -367,8 +367,6 @@ export default function DashboardWargaProjek() {
           setKasProyekDipilih(null);
         }}
         proyek={kasProyekDipilih}
-        iuranList={iuranProyekList}
-        kasList={kasProyekList}
         wargaList={allWargaList}
       />
     </>
