@@ -60,8 +60,6 @@ export default function IuranGrid({
           const isKosong = info.recs.length === 0;
           const isJatuhTempo = bln.kode <= bulanSekarang;
 
-          // Cek apakah ini bulan yang harusnya ada tombol bayar
-          // (bulanTombolBayar dikirim dari parent iuran.js sebagai bulan pertama yg belum lunas)
           const isTombolBayar = !adaPending && !isPending && !isLunas && bln.kode === bulanTombolBayar && !isModePantau;
 
           let cardClass = 'bg-slate-950/60 border-slate-800/60 text-slate-400';
@@ -89,19 +87,23 @@ export default function IuranGrid({
                 <span className={`inline-block text-[10px] px-2.5 py-1 rounded-xl font-semibold border ${badgeClass}`}>{label}</span>
               </div>
 
-              <div className="text-[11px] text-slate-400 flex flex-col gap-1">
-                <div className="flex justify-between items-center">
-                  <span>
-                    {isLunas ? `Rp ${info.totalApproved.toLocaleString('id-ID')}` : 
-                     isSebagian ? `Terbayar Rp ${info.totalApproved.toLocaleString('id-ID')}` : 
-                     `Rp 0 / ${safeTarif.toLocaleString('id-ID')}`}
-                  </span>
-                  {tglTx && (
-                    <span className="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">
+              {/* TAMPILAN NOMINAL & TANGGAL TRANSAKSI */}
+              <div className="flex flex-col gap-1">
+                <div className="text-[11px] text-slate-400">
+                  {isLunas ? `Rp ${info.totalApproved.toLocaleString('id-ID')}` : 
+                   isSebagian ? `Terbayar Rp ${info.totalApproved.toLocaleString('id-ID')}` : 
+                   `Rp 0 / ${safeTarif.toLocaleString('id-ID')}`}
+                </div>
+                
+                {/* LABEL TANGGAL TRANSAKSI */}
+                {tglTx && (
+                  <div className="flex items-center gap-1 mt-1">
+                    <span className="text-[9px] text-slate-500">Tgl Transaksi:</span>
+                    <span className="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700 font-mono">
                       📅 {tglTx}
                     </span>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* TOMBOL QRIS (HANYA MUNCUL 1 KALI DI BULAN YANG DITENTUKAN) */}
