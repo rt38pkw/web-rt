@@ -1,12 +1,15 @@
+// pages/dashboard-warga/surat.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Layout from '../../components/warga/Layout';
 import ProfileCard from '../../components/warga/ProfileCard';
-import { getTarif, isWargaUsaha } from '../../lib/iuran/constants';
+import { isWargaUsaha } from '../../lib/iuran/constants';
+import { fetchTarifList, getTarifWarga } from '../../lib/iuran/tarif'; // IMPORT FUNGSI DATABASE
 
 export default function DashboardWargaSurat() {
   const [warga, setWarga] = useState(null);
+  const [tarifList, setTarifList] = useState([]); // STATE UNTUK MENYIMPAN TARIF DARI DB
   const router = useRouter();
 
   useEffect(() => {
@@ -16,6 +19,9 @@ export default function DashboardWargaSurat() {
       return;
     }
     setWarga(JSON.parse(savedSession));
+
+    // FETCH TARIF DARI DATABASE
+    fetchTarifList().then(data => setTarifList(data)).catch(console.error);
   }, []);
 
   const handleLogout = () => {
@@ -25,7 +31,8 @@ export default function DashboardWargaSurat() {
 
   if (!warga) return null;
 
-  const tarifBulanan = getTarif(warga);
+  // HITUNG TARIF BERDASARKAN DATA DARI DATABASE
+  const tarifBulanan = getTarifWarga(warga, tarifList, 2026);
   const usaha = isWargaUsaha(warga);
 
   return (
