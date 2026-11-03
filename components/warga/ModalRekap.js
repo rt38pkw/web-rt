@@ -1,14 +1,22 @@
 // components/warga/ModalRekap.js
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { getPeriodeBulan, isWargaUsaha } from '../../lib/iuran/constants';
+import { getPeriodeBulan, isWargaUsaha, getTahunSekarang } from '../../lib/iuran/constants'; // Import getTahunSekarang
 import { getTarifWarga } from '../../lib/iuran/tarif';
 
-export default function ModalRekap({ show, onClose, allWargaList, allIuranList, allPenghuniList = [], tarifList }) {
+// Tambahkan prop tahunTerpilih dengan default tahun sekarang
+export default function ModalRekap({ 
+  show, 
+  onClose, 
+  allWargaList, 
+  allIuranList, 
+  allPenghuniList = [], 
+  tarifList,
+  tahunTerpilih = getTahunSekarang() 
+}) {
   const [riwayatList, setRiwayatList] = useState([]);
   const [loadingRiwayat, setLoadingRiwayat] = useState(false);
 
-  // Fetch data riwayat saat modal dibuka
   useEffect(() => {
     if (show) {
       setLoadingRiwayat(true);
@@ -29,7 +37,9 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList, 
 
   const now = new Date();
   const bulanSekarang = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const periodeBulanAktif = getPeriodeBulan(2026);
+  
+  // GUNAKAN PROP tahunTerpilih, BUKAN HARCODE 2026
+  const periodeBulanAktif = getPeriodeBulan(tahunTerpilih);
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
@@ -37,8 +47,9 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList, 
         
         <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/60">
           <div className="min-w-0">
+            {/* JUDUL DINAMIS */}
             <h3 className="font-bold text-white text-xs sm:text-base truncate">
-              📋 Rekap Iuran RT 38 (2026)
+              📋 Rekap Iuran RT 38 ({tahunTerpilih})
             </h3>
             <p className="text-[10px] sm:text-[11px] text-slate-400">
               Transparansi kas dan status setoran warga
@@ -120,7 +131,6 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList, 
                       </td>
 
                       {periodeBulanAktif.map((bln, bIdx) => {
-                        // ═══ HITUNG TARIF SPESIFIK UNTUK BULAN INI (DENGAN RIWAYAT) ═══
                         const tarifBulanIni = getTarifWarga(w, tarifListSafe, bln.kode, riwayatList);
 
                         const recsBulan = iuranWarga.filter((i) => i && i.bulan_tahun === bln.kode);
