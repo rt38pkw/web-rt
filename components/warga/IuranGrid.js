@@ -1,26 +1,58 @@
+// components/warga/IuranGrid.js
 import { getInfoBulan } from '../../lib/iuran/calculations';
 
-export default function IuranGrid({ iuranList, tarifBulanan, adaPending, bulanTombolBayar, onKlikDetail, onBayar, periodeBulan = [], isModePantau = false }) {
+export default function IuranGrid({ 
+  iuranList, 
+  tarifBulanan, 
+  tarifMap = {}, 
+  adaPending, 
+  bulanTombolBayar, 
+  onBayar, 
+  periodeBulan = [], 
+  isModePantau = false,
+  tahunTerpilih,
+  setTahunTerpilih,
+  tahunTersedia = []
+}) {
   const now = new Date();
   const bulanSekarang = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const safeTarif = Number(tarifBulanan) || 0;
 
   return (
     <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-5 sm:p-6 shadow-xl">
-      <div className="flex justify-between items-center mb-5">
+      
+      {/* HEADER & FILTER TAHUN */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
         <div>
-          <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">Grid Iuran Bulanan {now.getFullYear()}</h3>
-          <p className="text-xs text-slate-400">Klik grid untuk detail tanggal</p>
+          <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">Grid Iuran Bulanan</h3>
+          <p className="text-xs text-slate-400">Riwayat lengkap pembayaran iuran Anda</p>
         </div>
-        <span className="text-xs bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/60 font-medium">{periodeBulan.length} Bulan</span>
+        
+        {/* DROPDOWN FILTER TAHUN */}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] uppercase font-bold text-slate-500">Tahun:</span>
+          <select 
+            value={tahunTerpilih} 
+            onChange={(e) => setTahunTerpilih(Number(e.target.value))}
+            className="bg-slate-950 border border-slate-700 text-white text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none focus:border-blue-500 cursor-pointer"
+          >
+            {tahunTersedia.map(thn => (
+              <option key={thn} value={thn}>{thn}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {adaPending && (
-        <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-xl text-xs text-orange-300">⏳ Ada pengajuan yang menunggu approve bendahara.</div>
+        <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-xl text-xs text-orange-300">
+          ⏳ Ada pengajuan yang menunggu approve bendahara.
+        </div>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
         {periodeBulan.map((bln, idx) => {
+          // Ambil tarif spesifik untuk bulan ini dari tarifMap, jika tidak ada fallback ke tarifBulanan
+          const safeTarif = tarifMap[bln.kode] !== undefined ? tarifMap[bln.kode] : tarifBulanan;
+          
           const info = getInfoBulan(iuranList, bln.kode, safeTarif);
           const isPending = info.adaPendingBulan;
           const isRejected = info.adaRejectedBulan;
@@ -38,26 +70,45 @@ export default function IuranGrid({ iuranList, tarifBulanan, adaPending, bulanTo
           else if (isRejected) cardClass = 'bg-rose-950/30 border-rose-500/40 text-rose-300';
           else if (isKosong && isJatuhTempo) cardClass = 'bg-rose-950/20 border-rose-500/30 text-rose-300';
 
-          const canClick = !isPending && !isRejected && !isKosong && info.totalApproved > 0;
-
           const label = isLunas ? '✓ Lunas' : isSebagian ? `- Rp ${info.kurang.toLocaleString('id-ID')}` : isPending ? '⏳ Menunggu' : isRejected ? '❌ Ditolak' : isJatuhTempo ? '⚠️ Telat' : 'Belum';
-          
           const badgeClass = isLunas ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : isSebagian ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' : isPending ? 'bg-orange-500/10 text-orange-400 border-orange-500/30' : isRejected ? 'bg-rose-500/20 text-rose-400 border-rose-500/40' : isJatuhTempo ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' : 'bg-slate-800/80 text-slate-400 border-slate-700/60';
 
+          // Cari tanggal transaksi terakhir (jika ada)
+          const lastTx = info.recs.find(r => r.status === 'approved' || r.status === 'pending');
+          const tglTx = lastTx?.tanggal_transaksi 
+            ? new Date(lastTx.tanggal_transaksi).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+            : null;
+
           return (
-            <div key={idx} onClick={() => { if (canClick) onKlikDetail({ namaBulan: bln.nama, jumlah: info.totalApproved, tanggal: info.recs.find((r) => r.status === 'approved')?.tanggal_transaksi }); }} className={`p-3.5 rounded-2xl border transition-all duration-200 ${cardClass} ${canClick ? 'cursor-pointer hover:scale-[1.01]' : ''}`}>
-              <div className="flex items-center justify-between">
+            <div key={idx} className={`p-3.5 rounded-2xl border transition-all duration-200 ${cardClass}`}>
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-white tracking-wide">{bln.nama}</span>
                   <span className="text-[10px] text-slate-400">{bln.kode.split('-')[0]}</span>
                 </div>
                 <span className={`inline-block text-[10px] px-2.5 py-1 rounded-xl font-semibold border ${badgeClass}`}>{label}</span>
               </div>
-              <div className="text-[11px] mt-1 text-slate-400">
-                {isLunas ? `Rp ${info.totalApproved.toLocaleString('id-ID')}` : isSebagian ? `Terbayar Rp ${info.totalApproved.toLocaleString('id-ID')}` : isPending ? `Rp ${info.totalApproved.toLocaleString('id-ID')}` : isRejected ? `Silakan perbaiki & bayar ulang` : `Rp 0 / ${safeTarif.toLocaleString('id-ID')}`}
+
+              <div className="text-[11px] text-slate-400 flex flex-col gap-1">
+                {/* TAMPILAN NOMINAL & TANGGAL LANGSUNG */}
+                <div className="flex justify-between items-center">
+                  <span>
+                    {isLunas ? `Rp ${info.totalApproved.toLocaleString('id-ID')}` : 
+                     isSebagian ? `Terbayar Rp ${info.totalApproved.toLocaleString('id-ID')}` : 
+                     `Rp 0 / ${safeTarif.toLocaleString('id-ID')}`}
+                  </span>
+                  {tglTx && (
+                    <span className="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">
+                      📅 {tglTx}
+                    </span>
+                  )}
+                </div>
               </div>
+
               {isTombolBayar && (
-                <button onClick={(e) => { e.stopPropagation(); onBayar(); }} className="mt-2.5 w-full bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold py-2 rounded-xl transition shadow-lg shadow-blue-600/20">📱 Bayar via QRIS</button>
+                <button onClick={onBayar} className="mt-3 w-full bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold py-2 rounded-xl transition shadow-lg shadow-blue-600/20">
+                  📱 Bayar via QRIS
+                </button>
               )}
             </div>
           );
