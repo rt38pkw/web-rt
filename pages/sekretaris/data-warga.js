@@ -31,8 +31,8 @@ export default function SekretarisDataWarga() {
   const [password, setPassword] = useState('123456');
   const [statusHuni, setStatusHuni] = useState('pemilik');
 
-  // ═══ STATE MODAL DETAIL & EDIT (HANYA 1 STATE UNTUK DETAIL) ═══
-  const [detailRumah, setDetailRumah] = useState(null); // Jika ada isinya, modal detail muncul
+  // ═══ STATE MODAL DETAIL & EDIT ═══
+  const [detailRumah, setDetailRumah] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editId, setEditId] = useState(null);
   const [editNama, setEditNama] = useState('');
@@ -42,6 +42,7 @@ export default function SekretarisDataWarga() {
   const [editNoWa, setEditNoWa] = useState('');
   const [editKategori, setEditKategori] = useState('Warga');
   const [editStatusHuni, setEditStatusHuni] = useState('pemilik');
+  const [originalKategori, setOriginalKategori] = useState('Warga'); // STATE BARU
 
   // State Modal KK
   const [showKKModal, setShowKKModal] = useState(false);
@@ -91,7 +92,6 @@ export default function SekretarisDataWarga() {
     setLoading(false);
   }
 
-  // ═══ FUNGSI DATA RUMAH ═══
   const handleTambahWarga = async (e, overrideNoRumah) => {
     e.preventDefault();
     const finalNoRumah = overrideNoRumah || noRumah;
@@ -107,13 +107,26 @@ export default function SekretarisDataWarga() {
       setIsSubmitting(false);
       return;
     }
-    const { error } = await supabase.from('warga').insert([{
+    
+    // Insert Warga Baru
+    const { data: newWarga, error } = await supabase.from('warga').insert([{
       nama_lengkap: namaLengkap.trim(), no_rumah: finalNoRumah.trim(), nik: nik.trim() || null, no_kk: noKk.trim() || null, no_wa: noWa.trim() || null,
       kategori, password: password.trim() || '123456', status_huni: statusHuni
-    }]);
+    }]).select().single();
+
     setIsSubmitting(false);
+    
     if (error) alert(`Gagal: ${error.message}`);
     else {
+      // CATAT RIWAYAT AWAL SAAT PENDAFTARAN
+      if (newWarga) {
+        await supabase.from('riwayat_kategori_warga').insert({
+          warga_id: newWarga.id,
+          kategori: kategori,
+          tanggal_mulai: new Date().toISOString().split('T')[0] // Berlaku hari ini
+        });
+      }
+      
       alert('✅ Data Rumah ditambahkan!');
       setNamaLengkap(''); setNoRumah(''); setNik(''); setNoKk(''); setNoWa('');
       fetchWarga();
@@ -121,27 +134,44 @@ export default function SekretarisDataWarga() {
   };
 
   const openDetailRumah = (w) => {
-    setDetailRumah(w); // Cukup set data warga, modal akan otomatis terbuka
+    setDetailRumah(w);
   };
 
   const openEditModal = (w) => {
-    setDetailRumah(null); // Tutup modal detail
+    setDetailRumah(null); 
     setEditId(w.id); setEditNama(w.nama_lengkap || ''); setEditNoRumah(w.no_rumah || '');
     setEditNik(w.nik?.length === 16 ? w.nik : ''); setEditNoKk(w.no_kk?.length === 16 ? w.no_kk : ''); 
-    setEditNoWa(w.no_wa || ''); setEditKategori(w.kategori || 'Warga'); setEditStatusHuni(w.status_huni || 'pemilik');
-    setShowEditModal(true); // Buka modal edit
+    setEditNoWa(w.no_wa || ''); 
+    
+    setEditKategori(w.kategori || 'Warga');
+    setOriginalKategori(w.kategori || 'Warga'); // Simpan kategori asli
+    setEditStatusHuni(w.status_huni || 'pemilik');
+    
+    setShowEditModal(true);
   };
 
-  const handleUpdateWarga = async (e, overrideNoRumah) => {
+  const handleUpdateWarga = async (e, overrideNoRumah, kategoriDate) => {
     e.preventDefault();
     const finalNoRumah = overrideNoRumah || editNoRumah;
     if (!finalNoRumah) { alert('Nomor rumah tidak valid!'); return; }
 
     setProcessingId(editId);
+    
+    // 1. Update data utama warga
     const { error } = await supabase.from('warga').update({
       nama_lengkap: editNama.trim(), no_rumah: finalNoRumah.trim(), nik: editNik.trim() || null, no_kk: editNoKk.trim() || null,
       no_wa: editNoWa.trim() || null, kategori: editKategori, status_huni: editStatusHuni,
     }).eq('id', editId);
+    
+    // 2. Jika kategori berubah, catat ke riwayat
+    if (!error && editKategori !== originalKategori) {
+      await supabase.from('riwayat_kategori_warga').insert([{
+        warga_id: editId,
+        kategori: editKategori,
+        tanggal_mulai: kategoriDate || new Date().toISOString().split('T')[0]
+      }]);
+    }
+
     setProcessingId(null);
     if (error) alert('Gagal: ' + error.message);
     else { setShowEditModal(false); fetchWarga(); }
@@ -189,34 +219,18 @@ export default function SekretarisDataWarga() {
     } catch (err) { alert('Gagal: ' + err.message); } finally { setProcessingId(null); }
   };
 
-  // ═══ FUNGSI MODAL KK ═══
   const openLihatKK = (warga, kk, anggota) => {
-    setSelectedKKWarga(warga);
-    setKkData([kk, ...anggota]);
-    setIsAddingNewKK(false);
-    setIsKelolaMode(false);
-    setNewFileKK(null);
-    setPreviewKK(null);
-    setShowKKModal(true);
+    setSelectedKKWarga(warga); setKkData([kk, ...anggota]); setIsAddingNewKK(false); setIsKelolaMode(false); setNewFileKK(null); setPreviewKK(null); setShowKKModal(true);
   };
 
   const openTambahKK = (warga) => {
-    setSelectedKKWarga(warga);
-    setKkData([]);
-    setIsAddingNewKK(true);
-    setIsKelolaMode(false);
-    
-    setNewNama(''); setNewNik(''); setNewNoKk(''); setNewNoHp(''); 
-    setNewTglLahir(''); setNewJenisKelamin('L'); setNewPekerjaan('');
-    setNewHubungan('Kepala Keluarga'); setNewFileKK(null); setPreviewKK(null);
-    setShowKKModal(true);
+    setSelectedKKWarga(warga); setKkData([]); setIsAddingNewKK(true); setIsKelolaMode(false);
+    setNewNama(''); setNewNik(''); setNewNoKk(''); setNewNoHp(''); setNewTglLahir(''); setNewJenisKelamin('L'); setNewPekerjaan(''); setNewHubungan('Kepala Keluarga'); setNewFileKK(null); setPreviewKK(null); setShowKKModal(true);
   };
 
   const handleFileKKChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setNewFileKK(file);
-    setPreviewKK(URL.createObjectURL(file));
+    const file = e.target.files?.[0]; if (!file) return;
+    setNewFileKK(file); setPreviewKK(URL.createObjectURL(file));
   };
 
   const handleTambahKKSubmit = async (e) => {
@@ -230,17 +244,13 @@ export default function SekretarisDataWarga() {
     setProcessingId(selectedKKWarga.id);
     try {
       const urlKK = await uploadKK(newFileKK, selectedKKWarga.id);
-
       const { error } = await supabase.from('penghuni').insert([{
         warga_id: selectedKKWarga.id, nama_lengkap: newNama.trim(), nik: newNik.trim() || null, no_kk: newNoKk.trim() || null,
         no_hp: newNoHp.trim() || null, tanggal_lahir: newTglLahir || null, jenis_kelamin: newJenisKelamin, pekerjaan: newPekerjaan.trim() || null,
         hubungan: newHubungan, tipe_penghuni: 'penyewa', is_aktif: true, status_verifikasi: 'approved', url_kk: urlKK
       }]);
       if (error) throw error;
-
-      alert('✅ Data Kartu Keluarga berhasil disimpan!');
-      setShowKKModal(false);
-      fetchPenghuni(); 
+      alert('✅ Data Kartu Keluarga berhasil disimpan!'); setShowKKModal(false); fetchPenghuni(); 
     } catch (err) { alert('Gagal: ' + err.message); } finally { setProcessingId(null); }
   };
 
@@ -256,22 +266,18 @@ export default function SekretarisDataWarga() {
         urlKK = await uploadKK(newFileKK, selectedKKWarga.id);
         await supabase.from('penghuni').update({ url_kk: urlKK }).eq('id', kkData[0].id);
       }
-
       const { error } = await supabase.from('penghuni').insert([{
         warga_id: selectedKKWarga.id, nama_lengkap: newNama.trim(), nik: newNik.trim() || null,
         tanggal_lahir: newTglLahir || null, jenis_kelamin: newJenisKelamin, pekerjaan: newPekerjaan.trim() || null,
         hubungan: newHubungan, tipe_penghuni: 'penyewa', is_aktif: true, status_verifikasi: 'approved'
       }]);
       if (error) throw error;
-
       alert('✅ Anggota keluarga berhasil ditambahkan!');
       setNewNama(''); setNewNik(''); setNewTglLahir(''); setNewJenisKelamin('L'); setNewPekerjaan(''); setNewHubungan('Istri'); setNewFileKK(null); setPreviewKK(null);
-      
       const { data } = await supabase.from('penghuni').select('*').eq('warga_id', selectedKKWarga.id).eq('is_aktif', true);
       const kk = data.find(p => p.hubungan === 'Kepala Keluarga');
       const anggota = data.filter(p => p.hubungan !== 'Kepala Keluarga');
-      setKkData([kk, ...anggota]);
-      fetchPenghuni();
+      setKkData([kk, ...anggota]); fetchPenghuni();
     } catch (err) { alert('Gagal: ' + err.message); } finally { setProcessingId(null); }
   };
 
@@ -279,13 +285,10 @@ export default function SekretarisDataWarga() {
     if (!confirm(`Keluarkan ${nama} dari daftar penghuni aktif? (Data akan masuk arsip)`)) return;
     setProcessingId(id);
     await supabase.from('penghuni').update({ is_aktif: false }).eq('id', id);
-    
     const { data } = await supabase.from('penghuni').select('*').eq('warga_id', selectedKKWarga.id).eq('is_aktif', true);
     const kk = data.find(p => p.hubungan === 'Kepala Keluarga');
     const anggota = data.filter(p => p.hubungan !== 'Kepala Keluarga');
-    setKkData([kk, ...anggota]);
-    fetchPenghuni();
-    setProcessingId(null);
+    setKkData([kk, ...anggota]); fetchPenghuni(); setProcessingId(null);
   };
 
   // ═══ FILTERING ═══
@@ -323,43 +326,27 @@ export default function SekretarisDataWarga() {
                 <input type="text" placeholder="Cari nama penghuni atau no. rumah..." className="w-full bg-transparent text-xs text-white focus:outline-none" value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
             </div>
-            <TabelPenghuni 
-              loading={loading} 
-              listRumahPenghuni={listRumahPenghuni} 
-              openLihatKK={openLihatKK} 
-              openTambahKK={openTambahKK} 
-            />
+            <TabelPenghuni loading={loading} listRumahPenghuni={listRumahPenghuni} openLihatKK={openLihatKK} openTambahKK={openTambahKK} />
           </div>
         )}
 
         {activeTab === 'pemilik' && (
           <TabelDataRumah 
-            isSubmitting={isSubmitting} 
-            handleTambahWarga={handleTambahWarga} 
-            namaLengkap={namaLengkap} setNamaLengkap={setNamaLengkap} 
-            noRumah={noRumah} setNoRumah={setNoRumah} 
-            statusHuni={statusHuni} setStatusHuni={setStatusHuni} 
-            kategori={kategori} setKategori={setKategori} 
-            nik={nik} setNik={setNik} noKk={noKk} setNoKk={setNoKk} 
-            noWa={noWa} setNoWa={setNoWa} handleAngkaChange={handleAngkaChange} 
-            search={search} setSearch={setSearch} filteredWarga={filteredWarga} 
-            openDetailRumah={openDetailRumah} 
+            isSubmitting={isSubmitting} handleTambahWarga={handleTambahWarga} 
+            namaLengkap={namaLengkap} setNamaLengkap={setNamaLengkap} noRumah={noRumah} setNoRumah={setNoRumah} 
+            statusHuni={statusHuni} setStatusHuni={setStatusHuni} kategori={kategori} setKategori={setKategori} 
+            nik={nik} setNik={setNik} noKk={noKk} setNoKk={setNoKk} noWa={noWa} setNoWa={setNoWa} 
+            handleAngkaChange={handleAngkaChange} search={search} setSearch={setSearch} filteredWarga={filteredWarga} openDetailRumah={openDetailRumah} 
           />
         )}
       </div>
 
-      {/* RENDER MODAL DETAIL RUMAH */}
       <ModalDetailRumah 
-        detailRumah={detailRumah} 
-        setDetailRumah={setDetailRumah} // GUNAKAN setDetailRumah, BUKAN setShowDetailRumah
-        openEditModal={openEditModal} 
-        handleResetPassword={handleResetPassword} 
-        handleSelesaikanSewa={handleSelesaikanSewa} 
-        handleHapusWarga={handleHapusWarga} 
-        processingId={processingId} 
+        detailRumah={detailRumah} setDetailRumah={setDetailRumah} 
+        openEditModal={openEditModal} handleResetPassword={handleResetPassword} 
+        handleSelesaikanSewa={handleSelesaikanSewa} handleHapusWarga={handleHapusWarga} processingId={processingId} 
       />
 
-      {/* RENDER MODAL EDIT RUMAH */}
       <ModalEditRumah 
         showEditModal={showEditModal} setShowEditModal={setShowEditModal} 
         handleUpdateWarga={handleUpdateWarga} editNama={editNama} setEditNama={setEditNama} 
@@ -367,9 +354,9 @@ export default function SekretarisDataWarga() {
         editKategori={editKategori} setEditKategori={setEditKategori} editNik={editNik} setEditNik={setEditNik} 
         editNoKk={editNoKk} setEditNoKk={setEditNoKk} editNoWa={editNoWa} setEditNoWa={setEditNoWa} 
         handleAngkaChange={handleAngkaChange} processingId={processingId} editId={editId} 
+        originalKategori={originalKategori} // PASSING PROP BARU
       />
 
-      {/* RENDER MODAL KK */}
       <ModalKK 
         showKKModal={showKKModal} setShowKKModal={setShowKKModal} selectedKKWarga={selectedKKWarga} 
         kkData={kkData} isAddingNewKK={isAddingNewKK} isKelolaMode={isKelolaMode} setIsKelolaMode={setIsKelolaMode} 
