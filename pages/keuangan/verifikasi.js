@@ -17,24 +17,49 @@ export default function PageVerifikasi() {
   };
 
   async function handleApprove(batch) {
-    if (!confirm('Approve pembayaran ini?')) return;
+    if (!confirm('Approve pembayaran ini? (Foto bukti tetap tersimpan, foto lama akan dibersihkan)')) return;
     try {
       const today = new Date().toISOString().split('T')[0];
+      const wargaId = batch.items[0]?.warga_id;
       
-      // 1. Update status iuran
+      // 1. Update status batch yang baru menjadi APPROVED (JANGAN hapus foto)
       await supabase.from('iuran').update({ status: 'approved', tanggal_transaksi: today, metode: 'qris' }).eq('batch_id', batch.batchId);
       
-      // 2. Hapus file fisik di storage
-      const urls = batch.items[0]?.bukti_urls || [];
-      const paths = urls.map(getPathFromUrl).filter(Boolean);
+      // 2. Cari batch-batch APPROVED sebelumnya dari warga ini (kecuali batch ini)
+      const { data: previousBatches } = await supabase
+        .from('iuran')
+        .select('id, batch_id, bukti_urls')
+        .eq('warga_id', wargaId)
+        .eq('status', 'approved')
+        .neq('batch_id', batch.batchId);
       
-      if (paths.length > 0) {
-        await supabase.storage.from('bukti-transfer').remove(paths);
-        // 3. Ubah URL di database menjadi ['DIHAPUS'] agar UI tidak error
-        await supabase.from('iuran').update({ bukti_urls: ['DIHAPUS'] }).eq('batch_id', batch.batchId);
+      // 3. Hapus foto dari batch-batch sebelumnya
+      if (previousBatches && previousBatches.length > 0) {
+        const allPaths = [];
+        const affectedBatchIds = new Set();
+        
+        previousBatches.forEach(prev => {
+          const urls = prev.bukti_urls || [];
+          if (urls.length === 0 || urls[0] === 'DIHAPUS') return; // Sudah dihapus sebelumnya
+          
+          urls.forEach(url => {
+            const path = getPathFromUrl(url);
+            if (path) allPaths.push(path);
+          });
+          affectedBatchIds.add(prev.batch_id);
+        });
+        
+        if (allPaths.length > 0) {
+          await supabase.storage.from('bukti-transfer').remove(allPaths);
+          
+          // Update DB batch lama menjadi ['DIHAPUS']
+          for (const oldBatchId of affectedBatchIds) {
+            await supabase.from('iuran').update({ bukti_urls: ['DIHAPUS'] }).eq('batch_id', oldBatchId);
+          }
+        }
       }
       
-      alert('✅ Berhasil di-approve & foto dibersihkan.'); 
+      alert('✅ Berhasil di-approve! Foto bukti terbaru tersimpan, foto lama telah dibersihkan.'); 
       invalidateKeuanganCache(); 
       refetch();
     } catch (err) { alert('Gagal approve: ' + err.message); }
