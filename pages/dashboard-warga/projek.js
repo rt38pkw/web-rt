@@ -68,7 +68,7 @@ export default function DashboardWargaProjek() {
         supabase.from('proyek').select('*').in('status', ['aktif', 'selesai']).order('created_at', { ascending: false }),
         supabase.from('iuran_proyek').select('*').eq('warga_id', wargaId).order('created_at', { ascending: false }),
         supabase.from('kas_proyek').select('*').order('tanggal', { ascending: false }),
-        supabase.from('warga').select('id, nama_lengkap, no_rumah'), // Fetch list warga untuk nama donatur
+        supabase.from('warga').select('id, nama_lengkap, no_rumah'),
       ]);
       
       const proyekValid = (resProyek.data || []).filter(p => p && p.id && p.nominal_per_warga);
@@ -84,6 +84,7 @@ export default function DashboardWargaProjek() {
     }
   };
 
+  // ═══ FUNGSI INI YANG TADI HILANG ═══
   const handleLogout = () => {
     if (!confirm('Keluar dari akun warga?')) return;
     localStorage.removeItem('warga_session');
@@ -269,7 +270,7 @@ export default function DashboardWargaProjek() {
             )}
 
             {riwayatGabungan.length > 0 && (
-              <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl overflow-hidden shadow-xl">
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl overflow-hidden shadow-xl mt-4">
                 <div className="p-4 border-b border-slate-800">
                   <h3 className="text-sm font-bold text-white">📜 Riwayat Cicilan & Donasi Anda</h3>
                 </div>
@@ -342,6 +343,7 @@ export default function DashboardWargaProjek() {
           proyek={rekapProyek}
           wargaList={allWargaList}
           iuranProyekList={allIuranList}
+          kasProyekList={kasProyekList}
         />
       )}
 
