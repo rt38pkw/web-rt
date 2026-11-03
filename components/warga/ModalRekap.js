@@ -1,7 +1,25 @@
-import { getPeriodeBulan, isWargaUsaha, TARIF_NORMAL, TARIF_USAHA } from '../../lib/iuran/constants';
+// components/warga/ModalRekap.js
+import { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
+import { getPeriodeBulan, isWargaUsaha } from '../../lib/iuran/constants';
 import { getTarifWarga } from '../../lib/iuran/tarif';
 
 export default function ModalRekap({ show, onClose, allWargaList, allIuranList, allPenghuniList = [], tarifList }) {
+  const [riwayatList, setRiwayatList] = useState([]);
+  const [loadingRiwayat, setLoadingRiwayat] = useState(false);
+
+  // Fetch data riwayat saat modal dibuka
+  useEffect(() => {
+    if (show) {
+      setLoadingRiwayat(true);
+      supabase.from('riwayat_kategori_warga').select('*')
+        .then(({ data, error }) => {
+          if (!error && data) setRiwayatList(data);
+          setLoadingRiwayat(false);
+        });
+    }
+  }, [show]);
+
   if (!show) return null;
 
   const wargaList = Array.isArray(allWargaList) ? allWargaList : [];
@@ -31,133 +49,136 @@ export default function ModalRekap({ show, onClose, allWargaList, allIuranList, 
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto">
-          <table className="w-full border-collapse" style={{ minWidth: '440px' }}>
-            <thead className="sticky top-0 z-30 bg-slate-950">
-              <tr className="border-b border-slate-800 text-slate-400">
-                <th className="p-1.5 sm:p-3 text-[10px] sm:text-xs text-left sticky left-0 bg-slate-950 z-30 w-[100px] sm:w-[220px] border-r border-slate-800/80">
-                  Warga / Penyewa
-                </th>
-                {periodeBulanAktif.map((b, i) => {
-                  const isJatuhTempo = b.kode <= bulanSekarang;
+        {loadingRiwayat ? (
+          <div className="flex-1 flex items-center justify-center text-xs text-slate-500 animate-pulse">
+            Memuat riwayat tarif warga...
+          </div>
+        ) : (
+          <div className="flex-1 overflow-auto">
+            <table className="w-full border-collapse" style={{ minWidth: '440px' }}>
+              <thead className="sticky top-0 z-30 bg-slate-950">
+                <tr className="border-b border-slate-800 text-slate-400">
+                  <th className="p-1.5 sm:p-3 text-[10px] sm:text-xs text-left sticky left-0 bg-slate-950 z-30 w-[100px] sm:w-[220px] border-r border-slate-800/80">
+                    Warga / Penyewa
+                  </th>
+                  {periodeBulanAktif.map((b, i) => {
+                    const isJatuhTempo = b.kode <= bulanSekarang;
+                    return (
+                      <th
+                        key={i}
+                        className={`p-1 sm:p-3 text-[10px] sm:text-xs text-center w-[42px] sm:w-auto ${
+                          isJatuhTempo ? 'text-rose-400/70' : 'text-slate-500'
+                        }`}
+                      >
+                        <span className="hidden md:inline">{b.nama}</span>
+                        <span className="md:hidden">{b.nama.substring(0, 3)}</span>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {wargaList.map((w, idx) => {
+                  if (!w) return null;
+
+                  const usaha = isWargaUsaha(w);
+                  const iuranWarga = iuranList.filter((i) => i && i.warga_id === w.id);
+                  
+                  const totalWargaSetor = iuranWarga
+                    .filter((i) => i.status === 'approved')
+                    .reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
+
+                  const penyewa = penghuniListSafe.find(p => p.warga_id === w.id && p.hubungan === 'Kepala Keluarga');
+
                   return (
-                    <th
-                      key={i}
-                      className={`p-1 sm:p-3 text-[10px] sm:text-xs text-center w-[42px] sm:w-auto ${
-                        isJatuhTempo ? 'text-rose-400/70' : 'text-slate-500'
-                      }`}
-                    >
-                      <span className="hidden md:inline">{b.nama}</span>
-                      <span className="md:hidden">{b.nama.substring(0, 3)}</span>
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {wargaList.map((w, idx) => {
-                if (!w) return null;
-
-                const usaha = isWargaUsaha(w);
-                const tarifWarga =
-                  tarifListSafe.length > 0
-                    ? getTarifWarga(w, tarifListSafe, 2026)
-                    : usaha ? TARIF_USAHA : TARIF_NORMAL;
-
-                const iuranWarga = iuranList.filter((i) => i && i.warga_id === w.id);
-                const totalWargaSetor = iuranWarga
-                  .filter((i) => i.status === 'approved')
-                  .reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
-
-                // CARI DATA PENYEWA UNTUK RUMAH INI
-                const penyewa = penghuniListSafe.find(p => p.warga_id === w.id && p.hubungan === 'Kepala Keluarga');
-
-                return (
-                  <tr key={idx} className="hover:bg-slate-800/30 transition">
-                    <td className="p-1.5 sm:p-3 sticky left-0 bg-slate-900 z-20 w-[100px] sm:w-[220px] border-r border-slate-800/80">
-                      <div className="flex flex-col gap-0.5 min-w-0">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <span className="text-[10px] sm:text-xs font-bold text-white whitespace-nowrap">
-                            {w.no_rumah?.replace(/\s/g, '') || '-'}
-                          </span>
-                          <span className={`text-[8px] sm:text-[9px] px-1 py-0.5 rounded border font-medium whitespace-nowrap ${usaha ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' : 'bg-slate-800/60 text-slate-400 border-slate-700/60'}`}>
-                            {usaha ? '🏪' : '🏠'}
-                          </span>
-                        </div>
-                        
-                        <div className="text-[9px] sm:text-[11px] text-slate-300 truncate max-w-[80px] sm:max-w-[180px]">
-                          {w.nama_lengkap || '-'}
-                        </div>
-                        
-                        {/* TAMPILKAN PENYEWA JIKA ADA */}
-                        {penyewa && (
-                          <div className="text-[8px] sm:text-[10px] font-semibold text-orange-400 truncate max-w-[80px] sm:max-w-[180px] flex items-center gap-1">
-                            <span>🔑</span> {penyewa.nama_lengkap}
+                    <tr key={idx} className="hover:bg-slate-800/30 transition">
+                      <td className="p-1.5 sm:p-3 sticky left-0 bg-slate-900 z-20 w-[100px] sm:w-[220px] border-r border-slate-800/80">
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <span className="text-[10px] sm:text-xs font-bold text-white whitespace-nowrap">
+                              {w.no_rumah?.replace(/\s/g, '') || '-'}
+                            </span>
+                            <span className={`text-[8px] sm:text-[9px] px-1 py-0.5 rounded border font-medium whitespace-nowrap ${usaha ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' : 'bg-slate-800/60 text-slate-400 border-slate-700/60'}`}>
+                              {usaha ? '🏪' : '🏠'}
+                            </span>
                           </div>
-                        )}
+                          
+                          <div className="text-[9px] sm:text-[11px] text-slate-300 truncate max-w-[80px] sm:max-w-[180px]">
+                            {w.nama_lengkap || '-'}
+                          </div>
+                          
+                          {penyewa && (
+                            <div className="text-[8px] sm:text-[10px] font-semibold text-orange-400 truncate max-w-[80px] sm:max-w-[180px] flex items-center gap-1">
+                              <span>🔑</span> {penyewa.nama_lengkap}
+                            </div>
+                          )}
 
-                        <div className="text-[9px] sm:text-[10px] font-bold text-blue-400 whitespace-nowrap mt-0.5">
-                          Rp {totalWargaSetor.toLocaleString('id-ID')}
+                          <div className="text-[9px] sm:text-[10px] font-bold text-blue-400 whitespace-nowrap mt-0.5">
+                            Rp {totalWargaSetor.toLocaleString('id-ID')}
+                          </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {periodeBulanAktif.map((bln, bIdx) => {
-                      const recsBulan = iuranWarga.filter((i) => i && i.bulan_tahun === bln.kode);
-                      const totalApproved = recsBulan
-                        .filter((r) => r.status === 'approved')
-                        .reduce((s, r) => s + Number(r.jumlah || 0), 0);
-                      const adaPendingBulan = recsBulan.some((r) => r.status === 'pending');
-                      const kosong = recsBulan.length === 0 && !adaPendingBulan;
-                      const lunas = !adaPendingBulan && totalApproved >= tarifWarga;
-                      const sebagian = !adaPendingBulan && totalApproved > 0 && totalApproved < tarifWarga;
-                      const kurang = tarifWarga - totalApproved;
-                      const isJatuhTempo = bln.kode <= bulanSekarang;
+                      {periodeBulanAktif.map((bln, bIdx) => {
+                        // ═══ HITUNG TARIF SPESIFIK UNTUK BULAN INI (DENGAN RIWAYAT) ═══
+                        const tarifBulanIni = getTarifWarga(w, tarifListSafe, bln.kode, riwayatList);
 
-                      if (kosong) {
-                        if (isJatuhTempo) {
+                        const recsBulan = iuranWarga.filter((i) => i && i.bulan_tahun === bln.kode);
+                        const totalApproved = recsBulan
+                          .filter((r) => r.status === 'approved')
+                          .reduce((s, r) => s + Number(r.jumlah || 0), 0);
+                        const adaPendingBulan = recsBulan.some((r) => r.status === 'pending');
+                        const kosong = recsBulan.length === 0 && !adaPendingBulan;
+                        const lunas = !adaPendingBulan && totalApproved >= tarifBulanIni;
+                        const sebagian = !adaPendingBulan && totalApproved > 0 && totalApproved < tarifBulanIni;
+                        const kurang = tarifBulanIni - totalApproved;
+                        const isJatuhTempo = bln.kode <= bulanSekarang;
+
+                        if (kosong) {
+                          if (isJatuhTempo) {
+                            return (
+                              <td key={bIdx} className="p-0.5 sm:p-2 text-center align-middle">
+                                <span className="text-[9px] sm:text-[10px] font-semibold px-1 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">⚠️</span>
+                              </td>
+                            );
+                          }
                           return (
                             <td key={bIdx} className="p-0.5 sm:p-2 text-center align-middle">
-                              <span className="text-[9px] sm:text-[10px] font-semibold px-1 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">⚠️</span>
+                              <span className="text-slate-600 text-[10px]">-</span>
                             </td>
                           );
                         }
+
+                        if (adaPendingBulan) {
+                          return (
+                            <td key={bIdx} className="p-0.5 sm:p-2 text-center align-middle">
+                              <span className="text-[9px] sm:text-[10px] font-semibold px-1 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">⏳</span>
+                            </td>
+                          );
+                        }
+
                         return (
                           <td key={bIdx} className="p-0.5 sm:p-2 text-center align-middle">
-                            <span className="text-slate-600 text-[10px]">-</span>
-                          </td>
-                        );
-                      }
-
-                      if (adaPendingBulan) {
-                        return (
-                          <td key={bIdx} className="p-0.5 sm:p-2 text-center align-middle">
-                            <span className="text-[9px] sm:text-[10px] font-semibold px-1 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">⏳</span>
-                          </td>
-                        );
-                      }
-
-                      return (
-                        <td key={bIdx} className="p-0.5 sm:p-2 text-center align-middle">
-                          <div className="inline-flex flex-col items-center justify-center">
-                            <span className={`text-[9px] sm:text-[10px] font-semibold px-1 py-0.5 rounded whitespace-nowrap ${lunas ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
-                              {totalApproved.toLocaleString('id-ID')}
-                            </span>
-                            {sebagian && (
-                              <span className="text-[7px] sm:text-[8px] text-amber-500/80 whitespace-nowrap mt-0.5">
-                                -{kurang.toLocaleString('id-ID')}
+                            <div className="inline-flex flex-col items-center justify-center">
+                              <span className={`text-[9px] sm:text-[10px] font-semibold px-1 py-0.5 rounded whitespace-nowrap ${lunas ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
+                                {totalApproved.toLocaleString('id-ID')}
                               </span>
-                            )}
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                              {sebagian && (
+                                <span className="text-[7px] sm:text-[8px] text-amber-500/80 whitespace-nowrap mt-0.5">
+                                  -{kurang.toLocaleString('id-ID')}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         <div className="px-3 sm:px-6 py-3 border-t border-slate-800 bg-slate-950/60 flex justify-between items-center text-[10px] sm:text-xs text-slate-400 gap-3">
           <span>💡 Geser ke kanan untuk lihat semua bulan</span>
