@@ -17,12 +17,12 @@ export default function PageVerifikasi() {
   };
 
   async function handleApprove(batch) {
-    if (!confirm('Approve pembayaran ini? (Foto bukti tetap tersimpan, foto lama akan dibersihkan)')) return;
+    if (!confirm('Approve pembayaran ini? (Foto baru disimpan, foto lama warga ini akan dibersihkan)')) return;
     try {
       const today = new Date().toISOString().split('T')[0];
       const wargaId = batch.items[0]?.warga_id;
       
-      // 1. Update status batch yang baru menjadi APPROVED (JANGAN hapus foto)
+      // 1. Approve batch yang baru (Foto TETAP disimpan)
       await supabase.from('iuran').update({ status: 'approved', tanggal_transaksi: today, metode: 'qris' }).eq('batch_id', batch.batchId);
       
       // 2. Cari batch-batch APPROVED sebelumnya dari warga ini (kecuali batch ini)
@@ -31,7 +31,7 @@ export default function PageVerifikasi() {
         .select('id, batch_id, bukti_urls')
         .eq('warga_id', wargaId)
         .eq('status', 'approved')
-        .neq('batch_id', batch.batchId);
+        .neq('batch_id', batch.batchId); // Jangan sentuh batch yang baru di-approve
       
       // 3. Hapus foto dari batch-batch sebelumnya
       if (previousBatches && previousBatches.length > 0) {
@@ -59,7 +59,7 @@ export default function PageVerifikasi() {
         }
       }
       
-      alert('✅ Berhasil di-approve! Foto bukti terbaru tersimpan, foto lama telah dibersihkan.'); 
+      alert('✅ Berhasil di-approve! Bukti terbaru tersimpan, bukti lama dibersihkan.'); 
       invalidateKeuanganCache(); 
       refetch();
     } catch (err) { alert('Gagal approve: ' + err.message); }
