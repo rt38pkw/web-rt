@@ -11,7 +11,7 @@ import ModalRekap from '../../components/warga/ModalRekap';
 import ModalDetailBulan from '../../components/warga/ModalDetailBulan';
 import ModalKasRT from '../../components/warga/ModalKasRT';
 import ModalLengkapiProfil from '../../components/warga/ModalLengkapiProfil'; 
-import ModalUbahPin from '../../components/warga/ModalUbahPin'; // IMPORT MODAL BARU
+import ModalUbahPin from '../../components/warga/ModalUbahPin'; 
 
 import { getPeriodeBulan, TAHUN_TERSEDIA, getTahunSekarang, isWargaUsaha } from '../../lib/iuran/constants';
 import { getInfoBulan, hitungBelumLunas, formatTanggal } from '../../lib/iuran/calculations';
@@ -27,6 +27,7 @@ export default function DashboardWargaIuran() {
   const [iuranList, setIuranList] = useState([]);
   const [depositList, setDepositList] = useState([]);
   const [tarifList, setTarifList] = useState([]);
+  const [riwayatList, setRiwayatList] = useState([]); // State baru untuk riwayat kategori
   
   const [allWargaList, setAllWargaList] = useState([]);
   const [allIuranList, setAllIuranList] = useState([]);
@@ -38,7 +39,7 @@ export default function DashboardWargaIuran() {
   const [showRekapModal, setShowRekapModal] = useState(false);
   const [showKasRTModal, setShowKasRTModal] = useState(false);
   const [showModalProfil, setShowModalProfil] = useState(false); 
-  const [showModalUbahPin, setShowModalUbahPin] = useState(false); // STATE BARU
+  const [showModalUbahPin, setShowModalUbahPin] = useState(false);
   
   const [kasRTIuranList, setKasRTIuranList] = useState([]);
   const [pengeluaranList, setPengeluaranList] = useState([]);
@@ -67,6 +68,7 @@ export default function DashboardWargaIuran() {
     loadIuran(parsed.id);
     loadDeposit(parsed.id);
     loadTarif();
+    loadRiwayatKategori(parsed.id); // Fetch riwayat
     refreshDataRumah(parsed.id);
   }, []);
 
@@ -123,6 +125,19 @@ export default function DashboardWargaIuran() {
     try { const data = await fetchTarifList(); setTarifList(data); } catch (err) {}
   };
 
+  const loadRiwayatKategori = async (wargaId) => {
+    try {
+      const { data, error } = await supabase
+        .from('riwayat_kategori_warga')
+        .select('*')
+        .eq('warga_id', wargaId)
+        .order('tanggal_mulai', { ascending: true });
+      if (!error && data) setRiwayatList(data);
+    } catch (err) {
+      console.error('Gagal load riwayat kategori:', err);
+    }
+  };
+
   const loadKasRT = async () => {
     try {
       const [resIuranGlobal, resPengeluaran, resPemasukan] = await Promise.all([fetchAllIuran(), supabase.from('pengeluaran').select('*').order('tanggal', { ascending: false }), supabase.from('pemasukan_lain').select('*').order('tanggal', { ascending: false })]);
@@ -157,12 +172,21 @@ export default function DashboardWargaIuran() {
   const tarifBulanan = getTarifWarga(warga, tarifList, tahunTerpilih);
   const usaha = isWargaUsaha(warga);
 
+  // ═══ MEMBUAT KAMUS TARIF PER BULAN UNTUK TAHUN YANG DIPILIH ═══
+  const tarifMap = {};
+  periodeBulanAktif.forEach(bln => {
+    tarifMap[bln.kode] = getTarifWarga(warga, tarifList, bln.kode, riwayatList);
+  });
+
   const totalDisetor = iuranList.filter((i) => i.status === 'approved').reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
   const saldoDeposit = depositList.reduce((s, d) => s + (d.tipe === 'masuk' ? Number(d.jumlah) : -Number(d.jumlah)), 0);
   const estimasiBulan = tarifBulanan > 0 ? Math.floor(saldoDeposit / tarifBulanan) : 0;
 
   const adaPending = iuranList.some((i) => i.status === 'pending');
   const adaDitolak = iuranList.some((i) => i.status === 'rejected');
+  
+  // Hitung belum lunas berdasarkan tarif tahun yang dipilih (menggunakan tarif tertinggi atau map)
+  // Agar akurat, kita gunakan hitungBelumLunas dengan tarif default (karena map diterapkan di grid)
   const belumLunasList = hitungBelumLunas(iuranList, periodeBulanAktif, tarifBulanan);
   const bulanTombolBayar = belumLunasList[0]?.kode || null;
 
@@ -186,7 +210,10 @@ export default function DashboardWargaIuran() {
       }
 
       for (const bln of bulanPilih) {
-        const info = getInfoBulan(iuranList, bln, tarifBulanan);
+        // Gunakan tarifMap agar tagihan sesuai tarif historis bulan tersebut
+        const tarifSpesifik = tarifMap[bln] !== undefined ? tarifMap[bln] : tarifBulanan;
+        const info = getInfoBulan(iuranList, bln, tarifSpesifik);
+        
         if (info.kurang <= 0) continue;
         const existingRejected = info.recs.find(r => r.status === 'rejected');
         if (existingRejected) {
@@ -200,13 +227,11 @@ export default function DashboardWargaIuran() {
     } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
   };
 
-  // ═══ LOGIKA BANNER & KELENGKAPAN PROFIL ═══
+  // ═══ LOGIKA BANNER ═══
   const statusPenghuni = penghuniData?.status_verifikasi;
   const alasanReject = penghuniData?.alasan_reject;
-  
   const punyaNik = !!penghuniData?.nik && penghuniData.nik !== '0';
   const punyaKK = !!penghuniData?.url_kk;
-  
   const isBelumLengkap = !penghuniData || statusPenghuni === 'belum' || (statusPenghuni === 'approved' && (!punyaNik || !punyaKK));
   const isPending = statusPenghuni === 'pending';
   const isRejected = statusPenghuni === 'rejected';
@@ -223,10 +248,9 @@ export default function DashboardWargaIuran() {
           tarifBulanan={tarifBulanan} 
           isUsaha={usaha} 
           onUbahPin={() => setShowModalUbahPin(true)}
-          isProfileComplete={!isBelumLengkap} // PROP BARU UNTUK SEMBUNYIKAN TOMBOL PIN
+          isProfileComplete={!isBelumLengkap} 
         />
 
-        {/* BANNER: BELUM LENGKAP / DATA KOSONG */}
         {isBelumLengkap && (
           <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
             <div className="flex items-start gap-3">
@@ -240,7 +264,6 @@ export default function DashboardWargaIuran() {
           </div>
         )}
 
-        {/* BANNER: PENDING */}
         {isPending && (
           <div className="bg-blue-950/40 border border-blue-500/30 rounded-2xl p-4 flex items-start gap-3">
             <span className="text-xl">⏳</span>
@@ -251,7 +274,6 @@ export default function DashboardWargaIuran() {
           </div>
         )}
 
-        {/* BANNER: REJECTED */}
         {isRejected && (
           <div className="bg-gradient-to-r from-rose-950/60 to-slate-900 border border-rose-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
             <div className="flex items-start gap-3">
@@ -308,18 +330,35 @@ export default function DashboardWargaIuran() {
           <IuranGrid 
             iuranList={iuranList} 
             tarifBulanan={tarifBulanan} 
+            tarifMap={tarifMap}
             adaPending={adaPending} 
             bulanTombolBayar={bulanTombolBayar} 
             onKlikDetail={setSelectedBulanDetail} 
             onBayar={handleOpenModalBayar} 
             periodeBulan={periodeBulanAktif} 
             isModePantau={isModePantau} 
+            tahunTerpilih={tahunTerpilih}
+            setTahunTerpilih={setTahunTerpilih}
+            tahunTersedia={TAHUN_TERSEDIA}
           />
         )}
       </Layout>
 
       <ModalDetailBulan detail={selectedBulanDetail} onClose={() => setSelectedBulanDetail(null)} />
-      <ModalBayar show={showModalBayar} onClose={() => setShowModalBayar(false)} iuranList={iuranList} tarifBulanan={tarifBulanan} belumLunasList={belumLunasList} bulanDipilih={bulanDipilih} setBulanDipilih={setBulanDipilih} onSubmit={handleSubmitBayar} submitting={submitting} tahun={tahunTerpilih} />
+      
+      <ModalBayar 
+        show={showModalBayar} 
+        onClose={() => setShowModalBayar(false)} 
+        iuranList={iuranList} 
+        tarifBulanan={tarifBulanan} 
+        tarifMap={tarifMap}
+        belumLunasList={belumLunasList} 
+        bulanDipilih={bulanDipilih} 
+        setBulanDipilih={setBulanDipilih} 
+        onSubmit={handleSubmitBayar} 
+        submitting={submitting} 
+        tahun={tahunTerpilih} 
+      />
       
       {showRekapModal && (
         <ModalRekap show={showRekapModal} onClose={() => setShowRekapModal(false)} allWargaList={allWargaList} allIuranList={allIuranList} allPenghuniList={allPenghuniList} tarifList={tarifList} />
@@ -337,7 +376,6 @@ export default function DashboardWargaIuran() {
         onSuccess={() => refreshDataRumah(warga.id)} 
       />
 
-      {/* MODAL UBAH PIN BARU */}
       <ModalUbahPin 
         show={showModalUbahPin} 
         onClose={() => setShowModalUbahPin(false)} 
