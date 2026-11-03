@@ -2,36 +2,38 @@
 import { formatRupiahProyek, formatTanggalProyek } from '../../lib/proyek/constants';
 
 export default function ProjekCard({
-  proyek,
-  terbayar,
-  sisa,
-  statusWarga,
-  adaPending,
-  donasiWarga,
-  onBayar,
-  onLihatRekap,
-  onLihatKas, // PROP BARU
+  proyek, terbayar, sisa, statusWarga, adaPending, donasiWarga, 
+  adaDitolak, catatanDitolak, // PROP BARU
+  onBayar, onLihatRekap, onLihatKas
 }) {
   if (!proyek) return null;
 
   const target = Number(proyek.nominal_per_warga) || 0;
   const progress = target > 0 ? Math.min((terbayar / target) * 100, 100) : 0;
+  const isSelesai = proyek.status === 'selesai';
   
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
+    <div className={`bg-slate-900 border rounded-3xl p-5 shadow-xl space-y-4 ${adaDitolak ? 'border-rose-500/50' : isSelesai ? 'border-slate-700/50 opacity-90' : 'border-slate-800'}`}>
       
       {/* HEADER PROYEK */}
       <div className="flex justify-between items-start gap-3">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${
-              proyek.status === 'aktif' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-800 text-slate-400 border-slate-700'
+              isSelesai ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 
+              proyek.status === 'aktif' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 
+              'bg-slate-800 text-slate-400 border-slate-700'
             }`}>
-              {proyek.status === 'aktif' ? '🟢 Aktif' : '⚪ Selesai'}
+              {isSelesai ? '✅ Selesai' : proyek.status === 'aktif' ? '🟢 Aktif' : '⚪ Dibatalkan'}
             </span>
             {donasiWarga > 0 && (
               <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase border bg-purple-500/10 text-purple-400 border-purple-500/20">
                 💚 Donatur
+              </span>
+            )}
+            {adaDitolak && (
+              <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase border bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse">
+                ❌ Ditolak
               </span>
             )}
           </div>
@@ -44,7 +46,14 @@ export default function ProjekCard({
         </div>
       </div>
 
-      {/* PROGRESS BAR & NOMINAL DONASI */}
+      {/* CATATAN DITOLAK */}
+      {adaDitolak && catatanDitolak && (
+        <div className="bg-rose-950/40 border border-rose-500/30 rounded-xl p-3 text-xs text-rose-300">
+          <strong>Alasan Penolakan Admin:</strong> {catatanDitolak}
+        </div>
+      )}
+
+      {/* PROGRESS BAR */}
       <div className="space-y-2">
         <div className="flex justify-between text-xs">
           <span className="text-slate-400">Terkumpul: <strong className="text-white">{formatRupiahProyek(terbayar)}</strong></span>
@@ -54,10 +63,7 @@ export default function ProjekCard({
         </div>
         
         <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
-          <div 
-            className={`h-full rounded-full transition-all duration-500 ${statusWarga === 'lunas' ? 'bg-emerald-500' : 'bg-amber-500'}`}
-            style={{ width: `${progress}%` }}
-          ></div>
+          <div className={`h-full rounded-full transition-all duration-500 ${statusWarga === 'lunas' ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${progress}%` }}></div>
         </div>
 
         {donasiWarga > 0 && (
@@ -68,36 +74,39 @@ export default function ProjekCard({
         )}
       </div>
 
-      {/* FOOTER & AKSI (3 TOMBOL) */}
+      {/* FOOTER & AKSI */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-2 border-t border-slate-800/60">
         <div className="text-[10px] text-slate-500">
           {proyek.deadline ? `Tenggat: ${formatTanggalProyek(proyek.deadline)}` : 'Tanpa tenggat waktu'}
         </div>
         
         <div className="flex gap-2 w-full sm:w-auto">
-          <button onClick={onLihatKas} className="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-[10px] font-semibold transition">
-            💰 Kas
-          </button>
-          <button onClick={onLihatRekap} className="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-[10px] font-semibold transition">
-            📊 Rekap
-          </button>
+          <button onClick={onLihatKas} className="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-[10px] font-semibold transition">💰 Kas</button>
+          <button onClick={onLihatRekap} className="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-[10px] font-semibold transition">📊 Rekap</button>
           
-          {statusWarga !== 'lunas' && proyek.status === 'aktif' && (
+          {/* LOGIKA TOMBOL BAYAR: Hanya muncul jika proyek AKTIF dan BELUM LUNAS */}
+          {!isSelesai && proyek.status === 'aktif' && statusWarga !== 'lunas' && (
             <button 
-              onClick={onBayar}
-              disabled={adaPending}
+              onClick={onBayar} 
+              disabled={adaPending} 
               className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-[10px] font-bold transition shadow-lg ${
-                adaPending 
-                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed' 
-                  : 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/20'
+                adaPending ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 
+                adaDitolak ? 'bg-rose-600 hover:bg-rose-500 text-white' : 
+                'bg-amber-600 hover:bg-amber-500 text-white'
               }`}
             >
-              {adaPending ? '⏳ Pending' : '💳 Bayar'}
+              {adaPending ? '⏳ Pending' : adaDitolak ? '🔄 Bayar Ulang' : '💳 Bayar'}
             </button>
+          )}
+
+          {/* Jika proyek selesai, tampilkan status terkunci */}
+          {isSelesai && statusWarga !== 'lunas' && (
+            <div className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-[10px] font-bold bg-slate-800 text-slate-500 border border-slate-700 text-center">
+              Proyek Ditutup
+            </div>
           )}
         </div>
       </div>
-
     </div>
   );
 }
