@@ -9,7 +9,7 @@ import { useProyekData, getPendingProyekCount, invalidateProyekCache } from '../
 import { formatRupiahProyek, formatTanggalProyek } from '../../lib/proyek/constants';
 import { getRingkasanKasProyek } from '../../lib/proyek/calculations';
 import { insertKasProyek, updateKasProyek, deleteKasProyek } from '../../lib/proyek/kas';
-import { exportKasProyekToPdf } from '../../lib/proyek/exportPdf'; // IMPORT FUNGSI PDF
+import { exportKasProyekToPdf } from '../../lib/proyek/exportPdf';
 
 export default function PageProyekKas() {
   const { user, warga, proyekList, iuranProyekList, kasProyekList, loading, refetch } = useProyekData();
@@ -51,7 +51,7 @@ export default function PageProyekKas() {
         await insertKasProyek({
           proyek_id: data.proyek_id,
           warga_id: data.warga_id,
-          tipe: data.tipe, // 'pengeluaran'
+          tipe: data.tipe,
           tanggal: data.tanggal,
           nominal: data.nominal,
           keterangan: data.keterangan,
@@ -148,7 +148,9 @@ export default function PageProyekKas() {
   const riwayatGabungan = [...riwayatIuran, ...riwayatKas]
     .sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
 
-  // Handler Tombol Export PDF
+  // Filter KHUSUS untuk Tabel Rincian Pengeluaran
+  const rincianPengeluaran = riwayatGabungan.filter(r => r.tipe === 'pengeluaran');
+
   const handleExportPdf = () => {
     if (!proyekAktif) return alert('Pilih proyek terlebih dahulu');
     exportKasProyekToPdf(proyekAktif, kas, riwayatGabungan, warga);
@@ -157,6 +159,8 @@ export default function PageProyekKas() {
   return (
     <Layout user={user} pendingCount={getPendingProyekCount(iuranProyekList)}>
       <div className="space-y-4">
+        
+        {/* HEADER & TOMBOL */}
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3 bg-slate-900 border border-slate-800 rounded-2xl p-4">
           <div className="flex-1 min-w-[200px] w-full">
             <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-1">Pilih Proyek Kas</label>
@@ -176,7 +180,6 @@ export default function PageProyekKas() {
           </div>
           
           <div className="flex flex-wrap gap-2 w-full xl:w-auto mt-2 xl:mt-0">
-            {/* TOMBOL EXPORT PDF BARU */}
             <button
               onClick={handleExportPdf}
               disabled={!proyekAktif}
@@ -198,6 +201,7 @@ export default function PageProyekKas() {
           </div>
         </div>
 
+        {/* KARTU RINGKASAN */}
         {proyekAktif && (
           <div className="bg-gradient-to-br from-slate-900 to-slate-900 border border-slate-700 rounded-2xl p-5 shadow-lg">
             <h3 className="text-sm font-bold text-white mb-4">💰 Saldo Kas Proyek: {proyekAktif.nama}</h3>
@@ -226,6 +230,39 @@ export default function PageProyekKas() {
           </div>
         )}
 
+        {/* ═══ BLOK RINCIAN PENGELUARAN (BARU) ═══ */}
+        {rincianPengeluaran.length > 0 && (
+          <div className="bg-slate-900 border border-rose-500/20 rounded-2xl overflow-hidden shadow-xl">
+            <div className="p-4 border-b border-slate-800 bg-rose-950/20 flex justify-between items-center">
+              <h3 className="text-sm font-bold text-rose-400 flex items-center gap-2">💸 Rincian Pengeluaran Proyek</h3>
+              <span className="text-[10px] text-rose-300 font-bold bg-rose-500/10 px-2 py-1 rounded border border-rose-500/20">
+                Total: {formatRupiahProyek(kas.totalPengeluaran)}
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-950 text-slate-400 uppercase text-[10px]">
+                  <tr>
+                    <th className="p-3">Tanggal</th>
+                    <th className="p-3">Keterangan</th>
+                    <th className="p-3 text-right">Nominal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {rincianPengeluaran.map((k) => (
+                    <tr key={k.id} className="hover:bg-slate-800/40">
+                      <td className="p-3 text-slate-400 whitespace-nowrap text-[10px]">{formatTanggalProyek(k.tanggal)}</td>
+                      <td className="p-3 text-slate-300 text-[11px]">{k.keterangan || '-'}</td>
+                      <td className="p-3 text-right font-mono font-bold text-rose-400">- {formatRupiahProyek(k.nominal)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TABEL RIWAYAT MUTASI GABUNGAN */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
           <div className="p-4 border-b border-slate-800 flex justify-between items-center">
             <h3 className="text-sm font-bold text-white">📜 Riwayat Mutasi Kas Proyek</h3>
@@ -256,7 +293,6 @@ export default function PageProyekKas() {
                     const isPengeluaran = k.tipe === 'pengeluaran';
                     const isDonasi = k.tipe === 'donasi';
                     const isRefund = k.tipe === 'refund';
-                    
                     const isMasuk = isIuran || isDonasi;
                     
                     let badgeClass = 'bg-slate-500/10 text-slate-400 border-slate-500/20';
