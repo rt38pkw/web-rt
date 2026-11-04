@@ -25,7 +25,10 @@ jobs:
         java-version: '21'
 
     - name: Install Dependencies
-      run: npm install
+      run: |
+        npm install
+        npm install @capacitor/push-notifications
+        npx cap sync
 
     - name: Build Web App (Next.js)
       run: npm run build
@@ -63,7 +66,7 @@ jobs:
         # 2. Ubah Nama Aplikasi di strings.xml
         sed -i 's/RT 38/RT 38 Admin/g' android/app/src/main/res/values/strings.xml
         
-        # 3. Ubah Package Name di strings.xml (INI YANG BIKIN CRASH)
+        # 3. Ubah Package Name di strings.xml
         sed -i 's/com.rt38.warga/com.rt38.admin/g' android/app/src/main/res/values/strings.xml
         
         # 4. Ubah Namespace di AndroidManifest.xml
