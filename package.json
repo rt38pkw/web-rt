@@ -2,7 +2,7 @@
   "name": "web-rt",
   "version": "0.1.0",
   "private": true,
-    "scripts": {
+  "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -14,6 +14,7 @@
     "@capacitor/android": "^8.6.0",
     "@capacitor/cli": "^8.6.0",
     "@capacitor/core": "^8.6.0",
+    "@capacitor/push-notifications": "^8.6.0",
     "@supabase/supabase-js": "^2.39.0",
     "browser-image-compression": "^2.0.2",
     "jspdf": "^2.5.1",
