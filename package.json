@@ -2,13 +2,13 @@
   "name": "web-rt",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
+    "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "cap:warga": "npx cap sync android --config capacitor.warga.json",
-    "cap:admin": "npx cap sync android --config capacitor.admin.json"
+    "cap:warga": "cp capacitor.warga.json capacitor.config.json && npx cap sync android",
+    "cap:admin": "cp capacitor.admin.json capacitor.config.json && npx cap sync android"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.0",
