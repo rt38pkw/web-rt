@@ -50,11 +50,10 @@ jobs:
         path: android/app/build/outputs/apk/debug/RT38-Warga.apk
 
     # ═══════════════════════════════════════════
-    # 2. BUILD APLIKASI ADMIN (Ubah ID Otomatis)
+    # 2. BUILD APLIKASI ADMIN
     # ═══════════════════════════════════════════
     - name: Ubah Application ID ke Admin
       run: |
-        # Mengganti com.rt38.warga menjadi com.rt38.admin di build.gradle
         sed -i 's/com.rt38.warga/com.rt38.admin/g' android/app/build.gradle
 
     - name: Capacitor Sync (Admin)
