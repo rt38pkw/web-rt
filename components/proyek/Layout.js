@@ -1,3 +1,4 @@
+// components/proyek/Layout.js
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import NotifToggle from '../NotifToggle';
@@ -18,7 +19,7 @@ export default function Layout({ user, pendingCount = 0, children }) {
 
   const handleLogout = () => {
     if (!confirm('Keluar dari akun pengurus?')) return;
-    localStorage.removeItem('pengurusSession'); // Ubah ke localStorage
+    localStorage.removeItem('pengurusSession'); 
     window.location.replace('/admin');
   };
 
@@ -72,7 +73,7 @@ export default function Layout({ user, pendingCount = 0, children }) {
               <span className="text-base sm:text-xs leading-none">{t.i}</span>
               <span className="leading-tight">{t.l}</span>
               {t.key === 'verifikasi' && pendingCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 inline-block bg-orange-500 text-white text-[8px] px-1 rounded-full leading-tight">
+                <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-lg animate-pulse">
                   {pendingCount}
                 </span>
               )}
