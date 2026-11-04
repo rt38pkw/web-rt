@@ -1,0 +1,8 @@
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "cap:warga": "npx cap sync android --config capacitor.warga.json",
+    "cap:admin": "npx cap sync android --config capacitor.admin.json"
+  },
