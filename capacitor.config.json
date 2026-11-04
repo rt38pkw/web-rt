@@ -1,0 +1,10 @@
+{
+  "appId": "com.rt38.warga",
+  "appName": "RT 38",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://web-rt-tan.vercel.app",
+    "cleartext": true
+  }
+}

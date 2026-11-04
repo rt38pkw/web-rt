@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">RT 38</string>
+    <string name="title_activity_main">RT 38</string>
+    <string name="package_name">com.rt38.warga</string>
+    <string name="custom_url_scheme">com.rt38.warga</string>
+</resources>

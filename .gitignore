@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Next.js
+.next/
+out/
+build/
+
+# Capacitor
+android/app/build/
+android/build/
+
+# Misc
+.DS_Store
+*.pem
+npm-debug.log*
+.env*.local

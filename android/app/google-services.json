@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "227056600853",
+    "project_id": "rt-38-pkw",
+    "storage_bucket": "rt-38-pkw.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:227056600853:android:1210f4b695315fbc830b1c",
+        "android_client_info": {
+          "package_name": "com.rt38.warga"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyADjsefJKdPqVo9k3xJYIlCDjO4aRt-pmQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
