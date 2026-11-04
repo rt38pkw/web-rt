@@ -1,3 +1,4 @@
+// pages/proyek/kas.js
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import Layout from '../../components/proyek/Layout';
@@ -8,6 +9,7 @@ import { useProyekData, getPendingProyekCount, invalidateProyekCache } from '../
 import { formatRupiahProyek, formatTanggalProyek } from '../../lib/proyek/constants';
 import { getRingkasanKasProyek } from '../../lib/proyek/calculations';
 import { insertKasProyek, updateKasProyek, deleteKasProyek } from '../../lib/proyek/kas';
+import { exportKasProyekToPdf } from '../../lib/proyek/exportPdf'; // IMPORT FUNGSI PDF
 
 export default function PageProyekKas() {
   const { user, warga, proyekList, iuranProyekList, kasProyekList, loading, refetch } = useProyekData();
@@ -66,13 +68,11 @@ export default function PageProyekKas() {
     }
   };
 
-  // ═══ HANDLER REFUND (LIST) ═══
   const handleProcessRefundList = async (wargaTerpilih, tanggal) => {
     if (proyekAktif?.status !== 'batal') {
       alert('❌ Gagal: Refund hanya bisa diproses untuk proyek yang dibatalkan!');
       return;
     }
-
     setSubmitting(true);
     try {
       const insertData = wargaTerpilih.map(w => ({
@@ -83,10 +83,8 @@ export default function PageProyekKas() {
         nominal: w.refundable,
         keterangan: `Refund pembatalan proyek`,
       }));
-
       const { error } = await supabase.from('kas_proyek').insert(insertData);
       if (error) throw error;
-
       alert(`✅ Berhasil memproses refund untuk ${wargaTerpilih.length} warga!`);
       setShowRefundList(false);
       invalidateProyekCache();
@@ -123,7 +121,6 @@ export default function PageProyekKas() {
     ? getRingkasanKasProyek(iuranProyekList, kasProyekList, proyekAktif.id)
     : { totalIuran: 0, totalDonasi: 0, totalPengeluaran: 0, totalRefund: 0, saldo: 0 };
 
-  // ═══ PENGGABUNGAN RIWAYAT (MUTASI REKENING) ═══
   const riwayatIuran = iuranProyekList
     .filter(i => i.proyek_id === proyekAktif?.id && i.status === 'approved')
     .map(i => ({
@@ -151,6 +148,12 @@ export default function PageProyekKas() {
   const riwayatGabungan = [...riwayatIuran, ...riwayatKas]
     .sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
 
+  // Handler Tombol Export PDF
+  const handleExportPdf = () => {
+    if (!proyekAktif) return alert('Pilih proyek terlebih dahulu');
+    exportKasProyekToPdf(proyekAktif, kas, riwayatGabungan, warga);
+  };
+
   return (
     <Layout user={user} pendingCount={getPendingProyekCount(iuranProyekList)}>
       <div className="space-y-4">
@@ -173,6 +176,13 @@ export default function PageProyekKas() {
           </div>
           
           <div className="flex flex-wrap gap-2 w-full xl:w-auto mt-2 xl:mt-0">
+            {/* TOMBOL EXPORT PDF BARU */}
+            <button
+              onClick={handleExportPdf}
+              disabled={!proyekAktif}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-[11px] font-semibold px-4 py-2 rounded-lg"
+            >📄 Export PDF</button>
+
             <button
               onClick={() => { setModalMode('pengeluaran'); setShowModal(true); }}
               disabled={!proyekAktif}
@@ -286,7 +296,6 @@ export default function PageProyekKas() {
                         </td>
                         <td className="p-3 text-right">
                           <div className="flex gap-1 justify-end">
-                            {/* Iuran dikelola di halaman Tunai, jadi tombol aksi hanya muncul untuk data Kas */}
                             {!isIuran ? (
                               <>
                                 <button
