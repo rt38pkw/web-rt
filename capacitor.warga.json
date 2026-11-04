@@ -1,7 +1,7 @@
 {
   "appId": "com.rt38.warga",
   "appName": "RT 38 Warga",
-  "webDir": "public",
+  "webDir": ".next",
   "bundledWebRuntime": false,
   "server": {
     "url": "https://web-rt-tan.vercel.app",
