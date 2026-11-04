@@ -1,8 +1,10 @@
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "cap:warga": "npx cap sync android --config capacitor.warga.json",
-    "cap:admin": "npx cap sync android --config capacitor.admin.json"
-  },
+{
+  "appId": "com.rt38.admin",
+  "appName": "RT 38 Admin",
+  "webDir": ".next",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://web-rt-tan.vercel.app/admin",
+    "cleartext": true
+  }
+}
