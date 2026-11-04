@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import Link from 'next/link';
 import InstallButton from '../components/InstallButton';
+import { setupPushNotifications } from '../lib/push-notifications'; // <-- TAMBAHAN BARU
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
@@ -50,6 +51,7 @@ export default function AdminDashboard() {
 
       setUser(parsedUser);
       fetchStats();
+      setupPushNotifications('pengurus', parsedUser.id); // <-- TAMBAHAN BARU
     }
   }, []);
 
@@ -74,6 +76,8 @@ export default function AdminDashboard() {
     const { password: _, ...profilAman } = data;
     setUser(profilAman);
     localStorage.setItem('pengurusSession', JSON.stringify(profilAman));
+    
+    setupPushNotifications('pengurus', data.id); // <-- TAMBAHAN BARU
 
     if (data.role === 'bendahara') {
       window.location.replace('/keuangan/dashboard');
