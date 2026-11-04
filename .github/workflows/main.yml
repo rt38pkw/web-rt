@@ -25,10 +25,7 @@ jobs:
         java-version: '21'
 
     - name: Install Dependencies
-      run: |
-        npm install
-        npm install @capacitor/push-notifications
-        npx cap sync
+      run:  npm install
 
     - name: Build Web App (Next.js)
       run: npm run build
