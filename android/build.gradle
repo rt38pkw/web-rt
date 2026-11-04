@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.2.1'
+        classpath 'com.android.tools.build:gradle:8.13.0'
         classpath 'com.google.gms:google-services:4.4.0'
     }
 }
@@ -22,7 +22,6 @@ task clean(type: Delete) {
     delete rootProject.buildDir
 }
 
-// MEMAKSA SEMUA SUB-PROJECT & PLUGIN PAKAI JAVA 17
 subprojects {
     afterEvaluate { project ->
         if (project.hasProperty('android')) {
