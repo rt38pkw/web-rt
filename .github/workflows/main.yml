@@ -55,9 +55,12 @@ jobs:
     # ═══════════════════════════════════════════
     # 2. BUILD APLIKASI ADMIN
     # ═══════════════════════════════════════════
-    - name: Ubah Application ID ke Admin
+    - name: Ubah Application ID & Nama App ke Admin
       run: |
+        # Ubah ID paket di build.gradle
         sed -i 's/com.rt38.warga/com.rt38.admin/g' android/app/build.gradle
+        # Ubah nama aplikasi di strings.xml agar muncul "RT 38 Admin" di HP
+        sed -i 's/<string name="app_name">RT 38<\/string>/<string name="app_name">RT 38 Admin<\/string>/g' android/app/src/main/res/values/strings.xml
 
     - name: Tulis google-services.json (Admin)
       run: echo '${{ secrets.GOOGLE_SERVICES_ADMIN }}' | base64 -d > android/app/google-services.json
