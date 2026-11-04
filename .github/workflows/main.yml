@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build 2 Android APK (Admin & Warga)
 
 on:
   push:
@@ -30,17 +30,44 @@ jobs:
     - name: Build Web App (Next.js)
       run: npm run build
 
-    - name: Capacitor Sync Android
-      run: npx cap sync android
+    # ═══════════════════════════════════════════
+    # 1. BUILD APLIKASI WARGA
+    # ═══════════════════════════════════════════
+    - name: Capacitor Sync (Warga)
+      run: npm run cap:warga
 
-    - name: Build Android APK
+    - name: Build APK (Warga)
       run: |
         cd android
         chmod +x gradlew
         ./gradlew assembleDebug
+        mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/RT38-Warga.apk
 
-    - name: Upload APK
+    - name: Upload APK (Warga)
       uses: actions/upload-artifact@v4
       with:
-        name: app-debug-apk
-        path: android/app/build/outputs/apk/debug/app-debug.apk
+        name: RT38-Warga-APK
+        path: android/app/build/outputs/apk/debug/RT38-Warga.apk
+
+    # ═══════════════════════════════════════════
+    # 2. BUILD APLIKASI ADMIN (Ubah ID Otomatis)
+    # ═══════════════════════════════════════════
+    - name: Ubah Application ID ke Admin
+      run: |
+        # Mengganti com.rt38.warga menjadi com.rt38.admin di build.gradle
+        sed -i 's/com.rt38.warga/com.rt38.admin/g' android/app/build.gradle
+
+    - name: Capacitor Sync (Admin)
+      run: npm run cap:admin
+
+    - name: Build APK (Admin)
+      run: |
+        cd android
+        ./gradlew assembleDebug
+        mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/RT38-Admin.apk
+
+    - name: Upload APK (Admin)
+      uses: actions/upload-artifact@v4
+      with:
+        name: RT38-Admin-APK
+        path: android/app/build/outputs/apk/debug/RT38-Admin.apk
