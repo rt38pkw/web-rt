@@ -28,7 +28,24 @@ export default function PageProyekVerifikasi() {
           console.warn('Gagal hapus bukti:', errHapus); 
         }
       }
-      
+
+      // ═══ TAMBAHAN NOTIFIKASI KE WARGA ═══
+      try {
+        const namaProyek = proyekList.find(p => p.id === item.proyek_id)?.nama || 'Proyek';
+        await supabase.functions.invoke('smart-handler', {
+          body: {
+            role_target: 'warga',
+            target_id: item.warga_id,
+            title: '✅ Pembayaran Proyek Disetujui',
+            body: `Pembayaran proyek ${namaProyek} Anda telah disetujui.`,
+            url: '/dashboard-warga/projek'
+          }
+        });
+      } catch (notifErr) {
+        console.log('Gagal kirim notif approve:', notifErr);
+      }
+      // ═════════════════════════════════════
+
       alert('✅ Cicilan berhasil di-approve & foto dibersihkan!'); 
       invalidateProyekCache(); 
       refetch();
@@ -42,6 +59,24 @@ export default function PageProyekVerifikasi() {
     try {
       const { error } = await supabase.from('iuran_proyek').update({ status: 'rejected', catatan: `Ditolak: ${alasan.trim()}` }).eq('id', item.id);
       if (error) throw error;
+
+      // ═══ TAMBAHAN NOTIFIKASI KE WARGA ═══
+      try {
+        const namaProyek = proyekList.find(p => p.id === item.proyek_id)?.nama || 'Proyek';
+        await supabase.functions.invoke('smart-handler', {
+          body: {
+            role_target: 'warga',
+            target_id: item.warga_id,
+            title: '❌ Pembayaran Proyek Ditolak',
+            body: `Pembayaran proyek ${namaProyek} ditolak. Alasan: ${alasan.trim()}`,
+            url: '/dashboard-warga/projek'
+          }
+        });
+      } catch (notifErr) {
+        console.log('Gagal kirim notif reject:', notifErr);
+      }
+      // ═════════════════════════════════════
+
       alert('✅ Cicilan berhasil ditolak.'); invalidateProyekCache(); refetch();
     } catch (err) { alert('Gagal menolak: ' + err.message); }
   }
