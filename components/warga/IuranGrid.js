@@ -77,6 +77,12 @@ export default function IuranGrid({
             ? new Date(lastTx.tanggal_transaksi).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
             : null;
 
+          // ═══ TAMBAHAN BARU: Ambil catatan penolakan ═══
+          const rejectRecord = info.recs.find(r => r.status === 'rejected');
+          // Menghapus teks "Ditolak: " dari database agar rapi saat ditampilkan
+          const alasanTolak = rejectRecord?.catatan ? rejectRecord.catatan.replace(/^Ditolak:\s*/i, '') : null;
+          // ══════════════════════════════════════════════
+
           return (
             <div key={idx} className={`p-3.5 rounded-2xl border transition-all duration-200 ${cardClass}`}>
               <div className="flex items-center justify-between mb-2">
@@ -104,6 +110,14 @@ export default function IuranGrid({
                     </span>
                   </div>
                 )}
+
+                {/* ═══ TAMBAHAN BARU: Tampilkan Alasan Penolakan ═══ */}
+                {isRejected && alasanTolak && (
+                  <div className="mt-2 text-[10px] bg-rose-500/10 text-rose-300 p-2 rounded-lg border border-rose-500/20">
+                    <span className="font-bold">Catatan Admin:</span> {alasanTolak}
+                  </div>
+                )}
+                {/* ══════════════════════════════════════════════════ */}
               </div>
 
               {/* TOMBOL QRIS (HANYA MUNCUL 1 KALI DI BULAN YANG DITENTUKAN) */}
