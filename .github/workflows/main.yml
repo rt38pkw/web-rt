@@ -25,7 +25,7 @@ jobs:
         java-version: '21'
 
     - name: Install Dependencies
-      run:  npm install
+      run: npm install
 
     - name: Build Web App (Next.js)
       run: npm run build
@@ -35,6 +35,9 @@ jobs:
     # ═══════════════════════════════════════════
     - name: Tulis google-services.json (Warga)
       run: echo '${{ secrets.GOOGLE_SERVICES_WARGA }}' | base64 -d > android/app/google-services.json
+
+    - name: Generate Ikon Warga
+      run: npx @capacitor/assets generate --android --iconBackgroundColor '#0f172a'
 
     - name: Capacitor Sync (Warga)
       run: npm run cap:warga
@@ -53,31 +56,26 @@ jobs:
         path: android/app/build/outputs/apk/debug/RT38-Warga.apk
 
     # ═══════════════════════════════════════════
-    # 2. BUILD APLIKASI ADMIN (DIPISAH TOTAL)
+    # 2. BUILD APLIKASI ADMIN
     # ═══════════════════════════════════════════
     - name: Ubah ID, Nama, dan Namespace ke Admin
       run: |
-        # 1. Ubah ID Paket di build.gradle
         sed -i 's/com.rt38.warga/com.rt38.admin/g' android/app/build.gradle
-        
-        # 2. Ubah Nama Aplikasi di strings.xml
         sed -i 's/RT 38/RT 38 Admin/g' android/app/src/main/res/values/strings.xml
-        
-        # 3. Ubah Package Name di strings.xml
         sed -i 's/com.rt38.warga/com.rt38.admin/g' android/app/src/main/res/values/strings.xml
-        
-        # 4. Ubah Namespace di AndroidManifest.xml
         sed -i 's/com.rt38.warga/com.rt38.admin/g' android/app/src/main/AndroidManifest.xml
-        
-        # 5. Pindahkan folder Java asli Capacitor ke folder Admin
         mkdir -p android/app/src/main/java/com/rt38/admin
         mv android/app/src/main/java/com/rt38/warga/MainActivity.java android/app/src/main/java/com/rt38/admin/ 2>/dev/null || true
-        
-        # 6. Ubah isi file MainActivity.java
         sed -i 's/package com.rt38.warga;/package com.rt38.admin;/g' android/app/src/main/java/com/rt38/admin/MainActivity.java
 
     - name: Tulis google-services.json (Admin)
       run: echo '${{ secrets.GOOGLE_SERVICES_ADMIN }}' | base64 -d > android/app/google-services.json
+
+    # Ganti nama file icon.png menjadi icon-admin.png sementara agar dibaca oleh robot
+    - name: Ganti Ikon Admin
+      run: |
+        cp icon-admin.png icon.png
+        npx @capacitor/assets generate --android --iconBackgroundColor '#0f172a'
 
     - name: Capacitor Sync (Admin)
       run: npm run cap:admin
