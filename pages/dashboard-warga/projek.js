@@ -144,6 +144,35 @@ export default function DashboardWargaProjek() {
         if (errKas) throw errKas;
       }
 
+      // ═══ TAMBAHAN NOTIFIKASI (Jalur Pintas) ═══
+      try {
+        const namaWarga = warga.nama_lengkap || 'Warga';
+        const namaProyek = proyekDipilih.nama || 'Proyek';
+
+        // Nembak ke Bendahara 2 (Operator Proyek)
+        await supabase.functions.invoke('smart-handler', {
+          body: {
+            role_target: 'bendahara_2',
+            title: '🏗️ Pembayaran Proyek Baru',
+            body: `${namaWarga} baru bayar proyek ${namaProyek}.`,
+            url: '/proyek/dashboard' // <--- URL DIPERBAIKI
+          }
+        });
+
+        // Nembak ke Ketua
+        await supabase.functions.invoke('smart-handler', {
+          body: {
+            role_target: 'ketua',
+            title: '🏗️ Pembayaran Proyek Baru',
+            body: `${namaWarga} baru bayar proyek ${namaProyek}.`,
+            url: '/proyek/dashboard' // <--- URL DIPERBAIKI
+          }
+        });
+      } catch (notifErr) {
+        console.log('Gagal kirim notif proyek:', notifErr);
+      }
+      // ═══════════════════════════════════════════
+
       let pesan = '✅ Pengajuan berhasil dikirim!';
       if (nominalDonasi > 0) {
         pesan += `\n\n📊 Rincian:\n• Cicilan iuran: ${formatRupiahProyek(nominalIuran)}\n• Donasi otomatis: ${formatRupiahProyek(nominalDonasi)}\n\nDonasi langsung tercatat, cicilan menunggu approve bendahara.`;
@@ -245,12 +274,10 @@ export default function DashboardWargaProjek() {
                   const sisa = getSisaWarga(iuranProyekList, warga.id, proyek);
                   const adaPending = pending > 0;
 
-                  // ═══ LOGIKA CEK STATUS DITOLAK ═══
                   const iuranWargaIni = iuranProyekList.filter(i => i.proyek_id === proyek.id && i.warga_id === warga.id);
                   const rejectedData = iuranWargaIni.find(i => i.status === 'rejected');
                   const adaDitolak = !!rejectedData;
                   const catatanDitolak = rejectedData?.catatan || null;
-                  // ═════════════════════════════════
 
                   const donasiWarga = kasProyekList
                     .filter((k) => k.proyek_id === proyek.id && k.warga_id === warga.id && k.tipe === 'donasi')
@@ -269,8 +296,8 @@ export default function DashboardWargaProjek() {
                       statusWarga={statusWarga}
                       adaPending={adaPending}
                       donasiWarga={donasiWarga}
-                      adaDitolak={adaDitolak}         // PROP BARU
-                      catatanDitolak={catatanDitolak} // PROP BARU
+                      adaDitolak={adaDitolak}
+                      catatanDitolak={catatanDitolak}
                       onBayar={() => handleBayar(proyek)}
                       onLihatRekap={() => handleLihatRekap(proyek)}
                       onLihatKas={() => handleLihatKas(proyek)}
