@@ -19,7 +19,7 @@ import { getInfoBulan, hitungBelumLunas, formatTanggal } from '../../lib/iuran/c
 import { fetchWargaById, fetchIuranByWarga, fetchAllWarga, fetchAllIuran, insertPengajuanIuran, updatePengajuanIuran } from '../../lib/iuran/queries';
 import { uploadBukti } from '../../lib/iuran/storage';
 import { fetchTarifList, getTarifWarga } from '../../lib/iuran/tarif';
-import { setupPushNotifications } from '../../lib/push-notifications'; // <-- TAMBAHAN BARU
+import { setupPushNotifications } from '../../lib/push-notifications'; // IMPORT NOTIFIKASI
 
 export default function DashboardWargaIuran() {
   const [sessionData, setSessionData] = useState(null); 
@@ -52,7 +52,6 @@ export default function DashboardWargaIuran() {
   const [bulanDipilih, setBulanDipilih] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   
-  // STATE TAHUN YANG DINAMIS
   const [tahunTerpilih, setTahunTerpilih] = useState(getTahunSekarang());
 
   const router = useRouter();
@@ -75,7 +74,7 @@ export default function DashboardWargaIuran() {
     loadRiwayatKategori(parsed.id); 
     refreshDataRumah(parsed.id);
     
-    // <-- TAMBAHAN BARU (Panggil fungsi notifikasi)
+    // Panggil notifikasi warga
     setupPushNotifications('warga', parsed.id);
   }, []);
 
@@ -179,7 +178,6 @@ export default function DashboardWargaIuran() {
   const tarifBulanan = getTarifWarga(warga, tarifList, tahunTerpilih);
   const usaha = isWargaUsaha(warga);
 
-  // KAMUS TARIF PER BULAN UNTUK TAHUN YANG DIPILIH
   const tarifMap = {};
   periodeBulanAktif.forEach(bln => {
     tarifMap[bln.kode] = getTarifWarga(warga, tarifList, bln.kode, riwayatList);
@@ -227,6 +225,34 @@ export default function DashboardWargaIuran() {
           await insertPengajuanIuran([{ warga_id: warga.id, bulan_tahun: bln, jumlah: info.kurang, status: 'pending', batch_id: batchId, bukti_urls: uploadedUrls, catatan: catatan || null, tanggal_transaksi: null }]);
         }
       }
+
+      // ═══ TAMBAHAN BARU: KIRIM NOTIF KE BENDAHARA & KETUA ═══
+      try {
+        const namaWarga = warga.nama_lengkap || 'Warga';
+        const listBulan = bulanPilih.join(', ');
+        await supabase.functions.invoke('smart-handler', {
+          body: {
+            role_target: 'bendahara', // Nembak ke role bendahara
+            title: '💰 Bukti Transfer Baru',
+            body: `${namaWarga} baru saja upload bukti transfer untuk bulan ${listBulan}.`,
+            url: '/keuangan/verifikasi'
+          }
+        });
+        
+        // Nembak juga ke Ketua
+        await supabase.functions.invoke('smart-handler', {
+          body: {
+            role_target: 'ketua',
+            title: '💰 Bukti Transfer Baru',
+            body: `${namaWarga} baru saja upload bukti transfer untuk bulan ${listBulan}.`,
+            url: '/keuangan/verifikasi'
+          }
+        });
+      } catch (notifErr) {
+        console.log('Gagal kirim notif ke pengurus:', notifErr);
+      }
+      // ═══════════════════════════════════════════════════════
+
       alert('✅ Pengajuan berhasil dikirim!'); setShowModalBayar(false); loadIuran(warga.id);
     } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
   };
