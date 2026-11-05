@@ -13,13 +13,12 @@ import ModalKasRT from '../../components/warga/ModalKasRT';
 import ModalLengkapiProfil from '../../components/warga/ModalLengkapiProfil'; 
 import ModalUbahPin from '../../components/warga/ModalUbahPin'; 
 
-// IMPORT YANG SUDAH DINAMIS
 import { getPeriodeBulan, getTahunTersedia, getTahunSekarang, isWargaUsaha } from '../../lib/iuran/constants';
 import { getInfoBulan, hitungBelumLunas, formatTanggal } from '../../lib/iuran/calculations';
 import { fetchWargaById, fetchIuranByWarga, fetchAllWarga, fetchAllIuran, insertPengajuanIuran, updatePengajuanIuran } from '../../lib/iuran/queries';
 import { uploadBukti } from '../../lib/iuran/storage';
 import { fetchTarifList, getTarifWarga } from '../../lib/iuran/tarif';
-import { setupPushNotifications } from '../../lib/push-notifications'; // IMPORT NOTIFIKASI
+import { setupPushNotifications } from '../../lib/push-notifications';
 
 export default function DashboardWargaIuran() {
   const [sessionData, setSessionData] = useState(null); 
@@ -74,7 +73,7 @@ export default function DashboardWargaIuran() {
     loadRiwayatKategori(parsed.id); 
     refreshDataRumah(parsed.id);
     
-    // Panggil notifikasi warga
+    // Tetap panggil fungsi minta izin notifikasi
     setupPushNotifications('warga', parsed.id);
   }, []);
 
@@ -226,38 +225,10 @@ export default function DashboardWargaIuran() {
         }
       }
 
-      // ═══ TAMBAHAN BARU: KIRIM NOTIF KE BENDAHARA & KETUA ═══
-      try {
-        const namaWarga = warga.nama_lengkap || 'Warga';
-        const listBulan = bulanPilih.join(', ');
-        await supabase.functions.invoke('smart-handler', {
-          body: {
-            role_target: 'bendahara', // Nembak ke role bendahara
-            title: '💰 Bukti Transfer Baru',
-            body: `${namaWarga} baru saja upload bukti transfer untuk bulan ${listBulan}.`,
-            url: '/keuangan/verifikasi'
-          }
-        });
-        
-        // Nembak juga ke Ketua
-        await supabase.functions.invoke('smart-handler', {
-          body: {
-            role_target: 'ketua',
-            title: '💰 Bukti Transfer Baru',
-            body: `${namaWarga} baru saja upload bukti transfer untuk bulan ${listBulan}.`,
-            url: '/keuangan/verifikasi'
-          }
-        });
-      } catch (notifErr) {
-        console.log('Gagal kirim notif ke pengurus:', notifErr);
-      }
-      // ═══════════════════════════════════════════════════════
-
       alert('✅ Pengajuan berhasil dikirim!'); setShowModalBayar(false); loadIuran(warga.id);
     } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
   };
 
-  // ═══ LOGIKA BANNER ═══
   const statusPenghuni = penghuniData?.status_verifikasi;
   const alasanReject = penghuniData?.alasan_reject;
   const punyaNik = !!penghuniData?.nik && penghuniData.nik !== '0';
