@@ -5,6 +5,7 @@ import { formatRupiahProyek, formatTanggalProyek } from '../../lib/proyek/consta
 export default function TabVerifikasi({ proyekList = [], iuranProyekList = [], wargaList = [], onApprove, onReject }) {
   const [filterProyek, setFilterProyek] = useState('semua');
   const [processing, setProcessing] = useState(null);
+  const [zoomImage, setZoomImage] = useState(null); // State untuk pop-up gambar
 
   const pendingList = iuranProyekList.filter((i) => i.status === 'pending').filter((i) => filterProyek === 'semua' || i.proyek_id === filterProyek).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
@@ -54,14 +55,16 @@ export default function TabVerifikasi({ proyekList = [], iuranProyekList = [], w
                       <td className="p-3 text-slate-300 text-[11px]">{p?.nama || '-'}</td>
                       <td className="p-3 text-right font-mono font-bold text-amber-400">{formatRupiahProyek(item.jumlah)}</td>
                       <td className="p-3">
-                        {/* ═══ PERBAIKAN: CEK URL 'DIHAPUS' ═══ */}
+                        {/* ═══ TOMBOL LIHAT GAMBAR BARU ═══ */}
                         {bukti.length > 0 ? (
                           <div className="flex gap-1">
                             {bukti.map((u, i) => (
                               u === 'DIHAPUS' ? (
                                 <span key={i} className="text-slate-500 italic text-[10px] px-1.5 py-0.5 bg-slate-800/50 rounded border border-slate-700">Terhapus</span>
                               ) : (
-                                <a key={i} href={u} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline text-[10px] bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">📎{i + 1}</a>
+                                <button key={i} onClick={() => setZoomImage(u)} className="bg-blue-600/20 text-blue-400 border border-blue-500/30 px-2 py-1 rounded text-[10px] font-semibold hover:bg-blue-600/40 transition">
+                                  👁️ Lihat
+                                </button>
                               )
                             ))}
                           </div>
@@ -84,6 +87,16 @@ export default function TabVerifikasi({ proyekList = [], iuranProyekList = [], w
           </table>
         </div>
       </div>
+
+      {/* ═══ MODAL LIHAT GAMBAR ═══ */}
+      {zoomImage && (
+        <div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setZoomImage(null)}>
+          <button className="absolute top-4 right-4 text-white text-3xl font-bold z-10" onClick={() => setZoomImage(null)}>✕</button>
+          <div className="w-full h-full overflow-auto flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+             <img src={zoomImage} alt="Bukti Transfer" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
