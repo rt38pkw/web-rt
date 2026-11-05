@@ -144,32 +144,48 @@ export default function DashboardWargaProjek() {
         if (errKas) throw errKas;
       }
 
-      // ═══ TAMBAHAN NOTIFIKASI (Jalur Pintas) ═══
+      // ═══ TAMBAHAN NOTIFIKASI (PAKAI FETCH) ═══
       try {
         const namaWarga = warga.nama_lengkap || 'Warga';
         const namaProyek = proyekDipilih.nama || 'Proyek';
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-        // Nembak ke Bendahara 2 (Operator Proyek)
-        await supabase.functions.invoke('smart-handler', {
-          body: {
-            role_target: 'bendahara_2',
-            title: '🏗️ Pembayaran Proyek Baru',
-            body: `${namaWarga} baru bayar proyek ${namaProyek}.`,
-            url: '/proyek/dashboard' // <--- URL DIPERBAIKI
-          }
+        const payloadBendahara = {
+          role_target: 'bendahara_2',
+          title: '🏗️ Pembayaran Proyek Baru',
+          body: `${namaWarga} baru bayar proyek ${namaProyek}.`,
+          url: '/proyek/dashboard'
+        };
+
+        const payloadKetua = {
+          role_target: 'ketua',
+          title: '🏗️ Pembayaran Proyek Baru',
+          body: `${namaWarga} baru bayar proyek ${namaProyek}.`,
+          url: '/proyek/dashboard'
+        };
+
+        await fetch(`${supabaseUrl}/functions/v1/smart-handler`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`
+          },
+          body: JSON.stringify(payloadBendahara)
         });
 
-        // Nembak ke Ketua
-        await supabase.functions.invoke('smart-handler', {
-          body: {
-            role_target: 'ketua',
-            title: '🏗️ Pembayaran Proyek Baru',
-            body: `${namaWarga} baru bayar proyek ${namaProyek}.`,
-            url: '/proyek/dashboard' // <--- URL DIPERBAIKI
-          }
+        await fetch(`${supabaseUrl}/functions/v1/smart-handler`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`
+          },
+          body: JSON.stringify(payloadKetua)
         });
+
       } catch (notifErr) {
-        console.log('Gagal kirim notif proyek:', notifErr);
+        console.error('Gagal kirim notif proyek:', notifErr);
+        alert('DEBUG: Gagal kirim notif: ' + (notifErr.message || JSON.stringify(notifErr)));
       }
       // ═══════════════════════════════════════════
 
