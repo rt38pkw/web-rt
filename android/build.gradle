@@ -4,9 +4,9 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.2.1'
+        classpath 'com.android.tools.build:gradle:8.13.0'
         classpath 'com.google.gms:google-services:4.4.0'
-        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24'
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.21'
     }
 }
 
@@ -23,7 +23,6 @@ task clean(type: Delete) {
     delete rootProject.buildDir
 }
 
-// Maksa semua modul pakai Java 17 (biar plugin Capacitor aman)
 subprojects {
     afterEvaluate { project ->
         if (project.hasProperty('android')) {
