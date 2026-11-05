@@ -1,9 +1,23 @@
+import { useEffect } from 'react';
 import Layout from '../../components/proyek/Layout';
 import TabRingkasan from '../../components/proyek/TabRingkasan';
 import { useProyekData, getPendingProyekCount } from '../../lib/proyek/hooks';
+import { setupPushNotifications } from '../../lib/push-notifications';
 
 export default function PageProyekDashboard() {
   const { user, warga, proyekList, iuranProyekList, kasProyekList, loading } = useProyekData();
+
+  // ═══ TAMBAHAN BARU: Minta Izin Notifikasi ═══
+  useEffect(() => {
+    const savedUser = localStorage.getItem('pengurusSession');
+    if (savedUser) {
+      const parsedUser = JSON.parse(savedUser);
+      if (parsedUser.id) {
+        setupPushNotifications('pengurus', parsedUser.id);
+      }
+    }
+  }, []);
+  // ════════════════════════════════════════════
 
   if (typeof window === 'undefined') return null;
 
