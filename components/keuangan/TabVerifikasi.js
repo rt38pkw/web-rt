@@ -1,7 +1,11 @@
 // components/keuangan/TabVerifikasi.js
+import { useState } from 'react'; // Tambah useState
 import { formatRupiah, formatTanggal } from '../../lib/keuangan/helpers';
 
 export default function TabVerifikasi({ pendingBatches, iuran, filterVerif, setFilterVerif, handleApprove, handleReject }) {
+  // State untuk nyimpen URL gambar yang lagi di-klik
+  const [zoomImage, setZoomImage] = useState(null);
+
   const grouped = {};
   iuran.filter((i) => (filterVerif === 'all' ? true : i.status === filterVerif)).forEach((i) => {
     const key = i.batch_id || i.id;
@@ -49,14 +53,16 @@ export default function TabVerifikasi({ pendingBatches, iuran, filterVerif, setF
                       <td className="p-3 font-mono">{formatRupiah(total)}</td>
                       <td className="p-3"><span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 uppercase">{metode}</span></td>
                       <td className="p-3">
-                        {/* ═══ PERBAIKAN: CEK URL 'DIHAPUS' ═══ */}
                         {bukti.length > 0 ? (
                           <div className="flex gap-1">
                             {bukti.map((u, i) => (
                               u === 'DIHAPUS' ? (
                                 <span key={i} className="text-slate-500 italic text-[10px] px-1.5 py-0.5 bg-slate-800/50 rounded border border-slate-700">Terhapus</span>
                               ) : (
-                                <a key={i} href={u} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline text-[10px]">📎{i + 1}</a>
+                                // ═══ TOMBOL LIHAT GAMBAR BARU ═══
+                                <button key={i} onClick={() => setZoomImage(u)} className="bg-blue-600/20 text-blue-400 border border-blue-500/30 px-2 py-1 rounded text-[10px] font-semibold hover:bg-blue-600/40 transition">
+                                  👁️ Lihat
+                                </button>
                               )
                             ))}
                           </div>
@@ -86,6 +92,16 @@ export default function TabVerifikasi({ pendingBatches, iuran, filterVerif, setF
           </table>
         </div>
       </div>
+
+      {/* ═══ MODAL LIHAT GAMBAR ═══ */}
+      {zoomImage && (
+        <div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setZoomImage(null)}>
+          <button className="absolute top-4 right-4 text-white text-3xl font-bold z-10" onClick={() => setZoomImage(null)}>✕</button>
+          <div className="w-full h-full overflow-auto flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+             <img src={zoomImage} alt="Bukti Transfer" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
