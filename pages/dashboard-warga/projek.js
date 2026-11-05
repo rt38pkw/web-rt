@@ -144,12 +144,10 @@ export default function DashboardWargaProjek() {
         if (errKas) throw errKas;
       }
 
-      // ═══ TAMBAHAN NOTIFIKASI (PAKAI FETCH) ═══
+      // ═══ TAMBAHAN NOTIFIKASI (DEBUG ALERT) ═══
       try {
         const namaWarga = warga.nama_lengkap || 'Warga';
         const namaProyek = proyekDipilih.nama || 'Proyek';
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
         const payloadBendahara = {
           role_target: 'bendahara_2',
@@ -165,27 +163,15 @@ export default function DashboardWargaProjek() {
           url: '/proyek/dashboard'
         };
 
-        await fetch(`${supabaseUrl}/functions/v1/smart-handler`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseKey}`
-          },
-          body: JSON.stringify(payloadBendahara)
-        });
+        // Panggil smart-handler via invoke (kayak iuran)
+        const resBendahara = await supabase.functions.invoke('smart-handler', { body: payloadBendahara });
+        alert('DEBUG Bendahara: ' + JSON.stringify(resBendahara));
 
-        await fetch(`${supabaseUrl}/functions/v1/smart-handler`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseKey}`
-          },
-          body: JSON.stringify(payloadKetua)
-        });
+        const resKetua = await supabase.functions.invoke('smart-handler', { body: payloadKetua });
+        alert('DEBUG Ketua: ' + JSON.stringify(resKetua));
 
       } catch (notifErr) {
-        console.error('Gagal kirim notif proyek:', notifErr);
-        alert('DEBUG: Gagal kirim notif: ' + (notifErr.message || JSON.stringify(notifErr)));
+        alert('DEBUG Gagal: ' + (notifErr.message || JSON.stringify(notifErr)));
       }
       // ═══════════════════════════════════════════
 
