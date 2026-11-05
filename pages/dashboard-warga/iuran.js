@@ -83,7 +83,17 @@ export default function DashboardWargaIuran() {
     const channel = supabase.channel(channelName)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'warga', filter: `id=eq.${warga.id}` }, () => refreshDataRumah(warga.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'penghuni', filter: `warga_id=eq.${warga.id}` }, () => refreshDataRumah(warga.id))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran' }, () => loadIuran(warga.id))
+      // ═══ OPTIMASI REALTIME: Cuma update data yang berubah ═══
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'iuran', filter: `warga_id=eq.${warga.id}` }, (payload) => {
+        setIuranList(prev => [...prev, payload.new]);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'iuran', filter: `warga_id=eq.${warga.id}` }, (payload) => {
+        setIuranList(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'iuran', filter: `warga_id=eq.${warga.id}` }, (payload) => {
+        setIuranList(prev => prev.filter(item => item.id !== payload.old.id));
+      })
+      // ════════════════════════════════════════════════════════
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deposit_warga' }, () => loadDeposit(warga.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pengeluaran' }, () => { if (showKasRTModalRef.current) loadKasRT(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pemasukan_lain' }, () => { if (showKasRTModalRef.current) loadKasRT(); })
@@ -223,7 +233,6 @@ export default function DashboardWargaIuran() {
         }
       }
 
-      // ═══ TAMBAHAN NOTIFIKASI (Nembak ke Bendahara & Ketua) ═══
       try {
         const namaWarga = warga.nama_lengkap || 'Warga';
         const listBulan = bulanPilih.join(', ');
@@ -249,7 +258,8 @@ export default function DashboardWargaIuran() {
         console.log('Gagal kirim notif ke pengurus:', notifErr);
       }
 
-      alert('✅ Pengajuan berhasil dikirim!'); setShowModalBayar(false); loadIuran(warga.id);
+      alert('✅ Pengajuan berhasil dikirim!'); setShowModalBayar(false); 
+      // Nggak perlu loadIuran lagi di sini, karena realtime udah nangkep
     } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
   };
 
