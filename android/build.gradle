@@ -23,15 +23,24 @@ task clean(type: Delete) {
     delete rootProject.buildDir
 }
 
+// ═══ PAKSA SEMUA MODUL PAKAI JAVA 21 ═══
 subprojects {
     afterEvaluate { project ->
         if (project.hasProperty('android')) {
             project.android {
                 compileOptions {
-                    sourceCompatibility JavaVersion.VERSION_17
-                    targetCompatibility JavaVersion.VERSION_17
+                    sourceCompatibility JavaVersion.VERSION_21
+                    targetCompatibility JavaVersion.VERSION_21
                 }
             }
         }
     }
+    
+    // Trik JVM Toolchain: Paksa Java & Kotlin nyamain versi (21)
+    project.plugins.withId('org.jetbrains.kotlin.android') {
+        project.kotlin {
+            jvmToolchain(21)
+        }
+    }
 }
+// ═════════════════════════════════════════
