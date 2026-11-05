@@ -6,7 +6,6 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:8.2.1'
         classpath 'com.google.gms:google-services:4.4.0'
-        // TAMBAHAN: Library Kotlin biar nggak error "unknown property 'org'"
         classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24'
     }
 }
@@ -24,32 +23,16 @@ task clean(type: Delete) {
     delete rootProject.buildDir
 }
 
+// Maksa semua modul pakai Java 17 (biar plugin Capacitor aman)
 subprojects {
     afterEvaluate { project ->
         if (project.hasProperty('android')) {
             project.android {
                 compileOptions {
-                    sourceCompatibility JavaVersion.VERSION_21
-                    targetCompatibility JavaVersion.VERSION_21
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
                 }
             }
         }
     }
 }
-
-// ═══ TAMBAHAN SAKTI: Paksa Java & Kotlin ke versi 21 ═══
-subprojects {
-    tasks.withType(JavaCompile).configureEach {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-    // Hanya jalankan ini kalau plugin Kotlin-nya ada
-    pluginManager.withPlugin('org.jetbrains.kotlin.android') {
-        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-            kotlinOptions {
-                jvmTarget = "21"
-            }
-        }
-    }
-}
-// ═══════════════════════════════════════════════════════
