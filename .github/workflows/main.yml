@@ -25,7 +25,10 @@ jobs:
         java-version: '21'
 
     - name: Install Dependencies
-      run: npm install
+      run: |
+        npm install --ignore-scripts
+        npm install sharp
+        npm install @capacitor/filesystem
 
     - name: Build Web App (Next.js)
       run: npm run build
