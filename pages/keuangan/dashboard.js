@@ -1,8 +1,10 @@
 // pages/keuangan/dashboard.js
+import { useEffect } from 'react'; // Tambah import useEffect
 import KeuanganLayout from '../../components/keuangan/Layout';
 import TabDashboard from '../../components/keuangan/TabDashboard';
 import { useKeuanganData, getPendingBatches } from '../../lib/keuangan/hooks';
-import { exportLaporanKeuangan } from '../../lib/keuangan/exportExcel'; // Import fungsi export
+import { exportLaporanKeuangan } from '../../lib/keuangan/exportExcel'; 
+import { setupPushNotifications } from '../../lib/push-notifications'; // TAMBAHAN BARU
 
 export default function PageDashboard() {
   const {
@@ -13,6 +15,19 @@ export default function PageDashboard() {
     depositList = [],
     loading,
   } = useKeuanganData();
+
+  // ═══ TAMBAHAN BARU: Minta Izin Notifikasi ═══
+  useEffect(() => {
+    // Ambil data pengurus dari localStorage (karena user dari hooks belum tentu punya ID)
+    const savedUser = localStorage.getItem('pengurusSession');
+    if (savedUser) {
+      const parsedUser = JSON.parse(savedUser);
+      if (parsedUser.id) {
+        setupPushNotifications('pengurus', parsedUser.id);
+      }
+    }
+  }, []);
+  // ════════════════════════════════════════════
 
   if (typeof window === 'undefined') return null;
 
