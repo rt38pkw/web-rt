@@ -45,17 +45,23 @@ export default function DashboardWargaProjek() {
     loadData(userData.id);
   }, []);
 
-  // Realtime
+  // ═══ REALTIME OPTIMASI ═══
   useEffect(() => {
     if (!warga?.id) return;
 
     const channel = supabase
-      .channel('warga-proyek-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran_proyek' }, () => {
-        loadData(warga.id);
+      .channel(`warga-proyek-${warga.id}-${Math.random()}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'iuran_proyek', filter: `warga_id=eq.${warga.id}` }, (payload) => {
+        setIuranProyekList(prev => [...prev, payload.new]);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'iuran_proyek', filter: `warga_id=eq.${warga.id}` }, (payload) => {
+        setIuranProyekList(prev => prev.map(item => item.id === payload.new.id ? payload.new : item));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'iuran_proyek', filter: `warga_id=eq.${warga.id}` }, (payload) => {
+        setIuranProyekList(prev => prev.filter(item => item.id !== payload.old.id));
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'kas_proyek' }, () => {
-        loadData(warga.id);
+        loadData(warga.id); 
       })
       .subscribe();
 
@@ -63,6 +69,7 @@ export default function DashboardWargaProjek() {
       supabase.removeChannel(channel);
     };
   }, [warga?.id]);
+  // ════════════════════════
 
   const loadData = async (wargaId) => {
     setLoading(true);
@@ -144,7 +151,7 @@ export default function DashboardWargaProjek() {
         if (errKas) throw errKas;
       }
 
-      // ═══ TAMBAHAN NOTIFIKASI (DEBUG ALERT) ═══
+      // ═══ NOTIFIKASI KE PENGURUS (TANPA ALERT DEBUG) ═══
       try {
         const namaWarga = warga.nama_lengkap || 'Warga';
         const namaProyek = proyekDipilih.nama || 'Proyek';
@@ -153,25 +160,21 @@ export default function DashboardWargaProjek() {
           role_target: 'bendahara_2',
           title: '🏗️ Pembayaran Proyek Baru',
           body: `${namaWarga} baru bayar proyek ${namaProyek}.`,
-          url: '/proyek/dashboard'
+          url: '/proyek/verifikasi'
         };
 
         const payloadKetua = {
           role_target: 'ketua',
           title: '🏗️ Pembayaran Proyek Baru',
           body: `${namaWarga} baru bayar proyek ${namaProyek}.`,
-          url: '/proyek/dashboard'
+          url: '/proyek/verifikasi'
         };
 
-        // Panggil smart-handler via invoke (kayak iuran)
-        const resBendahara = await supabase.functions.invoke('smart-handler', { body: payloadBendahara });
-        alert('DEBUG Bendahara: ' + JSON.stringify(resBendahara));
-
-        const resKetua = await supabase.functions.invoke('smart-handler', { body: payloadKetua });
-        alert('DEBUG Ketua: ' + JSON.stringify(resKetua));
+        await supabase.functions.invoke('smart-handler', { body: payloadBendahara });
+        await supabase.functions.invoke('smart-handler', { body: payloadKetua });
 
       } catch (notifErr) {
-        alert('DEBUG Gagal: ' + (notifErr.message || JSON.stringify(notifErr)));
+        console.log('Gagal kirim notif proyek:', notifErr);
       }
       // ═══════════════════════════════════════════
 
@@ -185,7 +188,7 @@ export default function DashboardWargaProjek() {
 
       setShowModalBayar(false);
       setProyekDipilih(null);
-      loadData(warga.id);
+      // loadData(warga.id); // Realtime udah nangkep
     } catch (err) {
       console.error(err);
       alert('Gagal: ' + (err.message || 'Unknown error'));
