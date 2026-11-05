@@ -16,12 +16,32 @@ export default function PageVerifikasi() {
     return idx === -1 ? null : url.substring(idx + marker.length);
   };
 
+  // ═══ FUNGSI BANTUAN UNTUK KIRIM NOTIF ═══
+  const kirimNotifWarga = async (wargaId, judul, pesan, url) => {
+    try {
+      await supabase.functions.invoke('smart-handler', {
+        body: {
+          role_target: 'warga',
+          title: judul,
+          body: pesan,
+          url: url || '/dashboard-warga/iuran'
+        }
+      });
+    } catch (e) {
+      console.log('Gagal kirim notif:', e);
+    }
+  };
+
   async function handleApprove(batch) {
     if (!confirm('Approve pembayaran ini? (Foto baru disimpan, foto lama warga ini akan dibersihkan)')) return;
     try {
       const today = new Date().toISOString().split('T')[0];
       const wargaId = batch.items[0]?.warga_id;
       
+      // Ambil data warga & bulan untuk pesan notif
+      const namaWarga = batch.items[0]?.warga?.nama_lengkap || 'Warga';
+      const listBulan = batch.items.map(i => i.bulan_tahun).join(', ');
+
       // 1. Approve batch yang baru (Foto TETAP disimpan)
       await supabase.from('iuran').update({ status: 'approved', tanggal_transaksi: today, metode: 'qris' }).eq('batch_id', batch.batchId);
       
@@ -31,7 +51,7 @@ export default function PageVerifikasi() {
         .select('id, batch_id, bukti_urls')
         .eq('warga_id', wargaId)
         .eq('status', 'approved')
-        .neq('batch_id', batch.batchId); // Jangan sentuh batch yang baru di-approve
+        .neq('batch_id', batch.batchId);
       
       // 3. Hapus foto dari batch-batch sebelumnya
       if (previousBatches && previousBatches.length > 0) {
@@ -40,8 +60,7 @@ export default function PageVerifikasi() {
         
         previousBatches.forEach(prev => {
           const urls = prev.bukti_urls || [];
-          if (urls.length === 0 || urls[0] === 'DIHAPUS') return; // Sudah dihapus sebelumnya
-          
+          if (urls.length === 0 || urls[0] === 'DIHAPUS') return;
           urls.forEach(url => {
             const path = getPathFromUrl(url);
             if (path) allPaths.push(path);
@@ -51,13 +70,18 @@ export default function PageVerifikasi() {
         
         if (allPaths.length > 0) {
           await supabase.storage.from('bukti-transfer').remove(allPaths);
-          
-          // Update DB batch lama menjadi ['DIHAPUS']
           for (const oldBatchId of affectedBatchIds) {
             await supabase.from('iuran').update({ bukti_urls: ['DIHAPUS'] }).eq('batch_id', oldBatchId);
           }
         }
       }
+
+      // ═══ TAMBAHAN: Kirim Notif ke Warga ═══
+      await kirimNotifWarga(
+        wargaId, 
+        '✅ Pembayaran Iuran Disetujui', 
+        `Halo ${namaWarga}, pembayaran iuran bulan ${listBulan} Anda telah disetujui. Terima kasih!`
+      );
       
       alert('✅ Berhasil di-approve! Bukti terbaru tersimpan, bukti lama dibersihkan.'); 
       invalidateKeuanganCache(); 
@@ -70,7 +94,19 @@ export default function PageVerifikasi() {
     if (alasan === null) return;
     if (!alasan.trim()) { alert('Alasan penolakan tidak boleh kosong!'); return; }
     try {
+      const wargaId = batch.items[0]?.warga_id;
+      const namaWarga = batch.items[0]?.warga?.nama_lengkap || 'Warga';
+      const listBulan = batch.items.map(i => i.bulan_tahun).join(', ');
+
       await supabase.from('iuran').update({ status: 'rejected', catatan: `Ditolak: ${alasan.trim()}` }).eq('batch_id', batch.batchId);
+      
+      // ═══ TAMBAHAN: Kirim Notif ke Warga ═══
+      await kirimNotifWarga(
+        wargaId, 
+        '❌ Pembayaran Iuran Ditolak', 
+        `Halo ${namaWarga}, pembayaran iuran bulan ${listBulan} ditolak. Alasan: ${alasan.trim()}`
+      );
+
       alert('✅ Pembayaran ditolak.'); invalidateKeuanganCache(); refetch();
     } catch (err) { alert('Gagal menolak: ' + err.message); }
   }
