@@ -151,10 +151,12 @@ export default function PageProyekKas() {
   // Filter KHUSUS untuk Tabel Rincian Pengeluaran
   const rincianPengeluaran = riwayatGabungan.filter(r => r.tipe === 'pengeluaran');
 
-  const handleExportPdf = () => {
+  // ═══ FUNGSI EXPORT PDF (ASYNC) ═══
+  const handleExportPdf = async () => {
     if (!proyekAktif) return alert('Pilih proyek terlebih dahulu');
-    exportKasProyekToPdf(proyekAktif, kas, riwayatGabungan, warga);
+    await exportKasProyekToPdf(proyekAktif, kas, riwayatGabungan, warga);
   };
+  // ═════════════════════════════════
 
   return (
     <Layout user={user} pendingCount={getPendingProyekCount(iuranProyekList)}>
@@ -230,7 +232,7 @@ export default function PageProyekKas() {
           </div>
         )}
 
-        {/* ═══ BLOK RINCIAN PENGELUARAN (BARU) ═══ */}
+        {/* ═══ BLOK RINCIAN PENGELUARAN ═══ */}
         {rincianPengeluaran.length > 0 && (
           <div className="bg-slate-900 border border-rose-500/20 rounded-2xl overflow-hidden shadow-xl">
             <div className="p-4 border-b border-slate-800 bg-rose-950/20 flex justify-between items-center">
