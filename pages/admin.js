@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import Link from 'next/link';
 import InstallButton from '../components/InstallButton';
-import { setupPushNotifications } from '../lib/push-notifications'; // <-- TAMBAHAN BARU
+import { setupPushNotifications } from '../lib/push-notifications';
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
@@ -36,6 +36,9 @@ export default function AdminDashboard() {
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser);
 
+      // Panggil notifikasi di paling atas sebelum ngecek role
+      setupPushNotifications('pengurus', parsedUser.id);
+
       if (parsedUser.role === 'bendahara') {
         window.location.replace('/keuangan/dashboard');
         return;
@@ -51,7 +54,6 @@ export default function AdminDashboard() {
 
       setUser(parsedUser);
       fetchStats();
-      setupPushNotifications('pengurus', parsedUser.id); // <-- TAMBAHAN BARU
     }
   }, []);
 
@@ -77,7 +79,8 @@ export default function AdminDashboard() {
     setUser(profilAman);
     localStorage.setItem('pengurusSession', JSON.stringify(profilAman));
     
-    setupPushNotifications('pengurus', data.id); // <-- TAMBAHAN BARU
+    // Panggil notifikasi di sini sebelum redirect
+    setupPushNotifications('pengurus', data.id); 
 
     if (data.role === 'bendahara') {
       window.location.replace('/keuangan/dashboard');
