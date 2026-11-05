@@ -36,8 +36,9 @@ jobs:
     - name: Tulis google-services.json (Warga)
       run: echo '${{ secrets.GOOGLE_SERVICES_WARGA }}' | base64 -d > android/app/google-services.json
 
+    # Generate ikon dari folder assets (menggunakan icon.png)
     - name: Generate Ikon Warga
-      run: npx @capacitor/assets generate --android --iconBackgroundColor '#0f172a'
+      run: npx @capacitor/assets generate --android --assets assets --iconBackgroundColor '#0f172a'
 
     - name: Capacitor Sync (Warga)
       run: npm run cap:warga
@@ -71,11 +72,11 @@ jobs:
     - name: Tulis google-services.json (Admin)
       run: echo '${{ secrets.GOOGLE_SERVICES_ADMIN }}' | base64 -d > android/app/google-services.json
 
-    # Ganti nama file icon.png menjadi icon-admin.png sementara agar dibaca oleh robot
+    # Timpa icon.png dengan icon-admin.png agar Admin punya ikon beda
     - name: Ganti Ikon Admin
       run: |
-        cp icon-admin.png icon.png
-        npx @capacitor/assets generate --android --iconBackgroundColor '#0f172a'
+        cp assets/icon-admin.png assets/icon.png
+        npx @capacitor/assets generate --android --assets assets --iconBackgroundColor '#0f172a'
 
     - name: Capacitor Sync (Admin)
       run: npm run cap:admin
