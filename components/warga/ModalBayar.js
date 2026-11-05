@@ -2,19 +2,10 @@
 import { useState, useEffect } from 'react';
 import { getInfoBulan } from '../../lib/iuran/calculations';
 import { ALLOWED_TYPES, MAX_FILE_SIZE } from '../../lib/iuran/constants';
+import { simpanFileKeHP } from '../../lib/download-helper'; // Import fungsi bantuan
 
 export default function ModalBayar({
-  show,
-  onClose,
-  iuranList,
-  tarifBulanan,
-  tarifMap = {}, // TAMBAHAN
-  belumLunasList,
-  bulanDipilih,
-  setBulanDipilih,
-  onSubmit,
-  submitting,
-  tahun,
+  show, onClose, iuranList, tarifBulanan, tarifMap = {}, belumLunasList, bulanDipilih, setBulanDipilih, onSubmit, submitting, tahun,
 }) {
   const [fileBukti, setFileBukti] = useState([null, null, null]);
   const [previewBukti, setPreviewBukti] = useState([null, null, null]);
@@ -32,7 +23,6 @@ export default function ModalBayar({
 
   const tahunAktif = tahun || new Date().getFullYear();
   
-  // HITUNG TOTAL BAYAR MENGGUNAKAN TARIF MAP (HISTORIS)
   const totalBayar = bulanDipilih.reduce((total, kode) => {
     const tarifSpesifik = tarifMap[kode] !== undefined ? tarifMap[kode] : tarifBulanan;
     const info = getInfoBulan(iuranList, kode, tarifSpesifik);
@@ -42,45 +32,41 @@ export default function ModalBayar({
   const handleFileChange = (slotIndex, e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      alert('Format file harus JPG, PNG, atau WebP');
-      return;
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      alert('Ukuran file maksimal 3 MB');
-      return;
-    }
-    const newFiles = [...fileBukti];
-    newFiles[slotIndex] = file;
-    setFileBukti(newFiles);
-
-    const newPreviews = [...previewBukti];
-    if (newPreviews[slotIndex]) URL.revokeObjectURL(newPreviews[slotIndex]);
-    newPreviews[slotIndex] = URL.createObjectURL(file);
-    setPreviewBukti(newPreviews);
+    if (!ALLOWED_TYPES.includes(file.type)) { alert('Format file harus JPG, PNG, atau WebP'); return; }
+    if (file.size > MAX_FILE_SIZE) { alert('Ukuran file maksimal 3 MB'); return; }
+    const newFiles = [...fileBukti]; newFiles[slotIndex] = file; setFileBukti(newFiles);
+    const newPreviews = [...previewBukti]; if (newPreviews[slotIndex]) URL.revokeObjectURL(newPreviews[slotIndex]);
+    newPreviews[slotIndex] = URL.createObjectURL(file); setPreviewBukti(newPreviews);
   };
 
   const handleRemoveFile = (slotIndex) => {
-    const newFiles = [...fileBukti];
-    newFiles[slotIndex] = null;
-    setFileBukti(newFiles);
-
-    const newPreviews = [...previewBukti];
-    if (newPreviews[slotIndex]) URL.revokeObjectURL(newPreviews[slotIndex]);
-    newPreviews[slotIndex] = null;
-    setPreviewBukti(newPreviews);
+    const newFiles = [...fileBukti]; newFiles[slotIndex] = null; setFileBukti(newFiles);
+    const newPreviews = [...previewBukti]; if (newPreviews[slotIndex]) URL.revokeObjectURL(newPreviews[slotIndex]);
+    newPreviews[slotIndex] = null; setPreviewBukti(newPreviews);
   };
 
   const handleSubmit = async () => {
-    if (bulanDipilih.length === 0) {
-      alert('Pilih minimal 1 bulan');
-      return;
-    }
-    if (!fileBukti[0]) {
-      alert('Upload minimal 1 bukti pembayaran (slot 1)');
-      return;
-    }
+    if (bulanDipilih.length === 0) { alert('Pilih minimal 1 bulan'); return; }
+    if (!fileBukti[0]) { alert('Upload minimal 1 bukti pembayaran (slot 1)'); return; }
     await onSubmit({ fileBukti, catatan, bulanDipilih });
+  };
+
+  // ═══ FUNGSI DOWNLOAD QRIS VIA CAPACITOR ═══
+  const handleDownloadQRIS = async () => {
+    try {
+      // Ambil gambar qris.png dari folder public, ubah ke base64
+      const response = await fetch('/qris.png');
+      const blob = await response.blob();
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Data = reader.result.split(',')[1]; // Ambil bagian base64-nya aja
+        const msg = await simpanFileKeHP(base64Data, 'QRIS-RT38.png', 'image/png');
+        alert(msg);
+      };
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      alert('Gagal download QRIS: ' + err.message);
+    }
   };
 
   return (
@@ -88,25 +74,22 @@ export default function ModalBayar({
       <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xl my-8">
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <div>
-            <h3 className="font-bold text-white text-base">
-              📱 Bayar Iuran {tahunAktif}
-            </h3>
-            <p className="text-[11px] text-slate-400">
-              Scan QR, transfer, lalu upload bukti
-            </p>
+            <h3 className="font-bold text-white text-base">📱 Bayar Iuran {tahunAktif}</h3>
+            <p className="text-[11px] text-slate-400">Scan QR, transfer, lalu upload bukti</p>
           </div>
           <button onClick={() => !submitting && onClose()} disabled={submitting} className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center text-sm transition disabled:opacity-40">✕</button>
         </div>
 
-        {/* QRIS */}
         <div className="bg-white rounded-2xl p-3 flex flex-col items-center">
           <img src="/qris.png" alt="QRIS RT 38" className="w-48 h-48 object-contain" />
           <p className="text-[10px] text-slate-600 mt-2 font-medium">Scan dengan aplikasi bank / e-wallet</p>
-          <a href="/qris.png" download="QRIS-RT38.png" className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition">⬇️ Download QRIS</a>
+          
+          {/* ═══ TOMBOL DOWNLOAD BARU ═══ */}
+          <button onClick={handleDownloadQRIS} className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition">⬇️ Download QRIS</button>
+          
           <button onClick={() => { navigator.clipboard.writeText(String(totalBayar)); alert('Total Rp ' + totalBayar.toLocaleString('id-ID') + ' disalin'); }} className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition">📋 Salin Total: Rp {totalBayar.toLocaleString('id-ID')}</button>
         </div>
 
-        {/* Checklist bulan */}
         <div>
           <label className="text-xs font-semibold text-slate-300 block mb-2">Pilih Bulan <span className="text-slate-500">(bisa pilih beberapa)</span></label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -118,7 +101,6 @@ export default function ModalBayar({
                 const info = getInfoBulan(iuranList, bln.kode, tarifSpesifik);
                 const checked = bulanDipilih.includes(bln.kode);
                 const labelNominal = info.totalApproved > 0 ? `kurang Rp ${info.kurang.toLocaleString('id-ID')}` : `Rp ${tarifSpesifik.toLocaleString('id-ID')}`;
-
                 return (
                   <label key={bln.kode} className={`p-2 rounded-xl border text-xs flex flex-col gap-0.5 cursor-pointer transition ${checked ? 'bg-blue-600/20 border-blue-500/50 text-white' : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'}`}>
                     <div className="flex items-center gap-2">
@@ -133,7 +115,6 @@ export default function ModalBayar({
           </div>
         </div>
 
-        {/* Upload 3 slot */}
         <div>
           <label className="text-xs font-semibold text-slate-300 block mb-2">Upload Bukti Transfer <span className="text-slate-500">(slot 1 wajib)</span></label>
           <div className="grid grid-cols-3 gap-2">
@@ -159,13 +140,11 @@ export default function ModalBayar({
           <p className="text-[10px] text-slate-500 mt-1.5">JPG / PNG / WebP • maks 3 MB per file</p>
         </div>
 
-        {/* Catatan */}
         <div>
           <label className="text-xs font-semibold text-slate-300 block mb-2">Catatan (opsional)</label>
           <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="Contoh: transfer dari rekening istri" rows={2} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 resize-none" />
         </div>
 
-        {/* Total & Submit */}
         <div className="flex items-center justify-between border-t border-slate-800 pt-3">
           <div>
             <div className="text-[10px] text-slate-400 uppercase">Total Bayar</div>
