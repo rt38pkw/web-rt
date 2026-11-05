@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '../../lib/supabase';
 import Layout from '../../components/sekretaris/Layout';
+import { setupPushNotifications } from '../../lib/push-notifications'; // TAMBAHAN BARU
 
 export default function DashboardSekretaris() {
   const [loading, setLoading] = useState(true);
@@ -13,6 +14,16 @@ export default function DashboardSekretaris() {
   const [pendingVerif, setPendingVerif] = useState(0);
 
   useEffect(() => {
+    // ═══ TAMBAHAN BARU: Minta Izin Notifikasi ═══
+    const savedUser = localStorage.getItem('pengurusSession');
+    if (savedUser) {
+      const parsedUser = JSON.parse(savedUser);
+      if (parsedUser.id) {
+        setupPushNotifications('pengurus', parsedUser.id);
+      }
+    }
+    // ════════════════════════════════════════════
+
     fetchDashboardData();
   }, []);
 
