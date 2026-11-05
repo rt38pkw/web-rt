@@ -1,4 +1,5 @@
 // pages/proyek/verifikasi.js
+import { useEffect } from 'react'; // Tambah import useEffect
 import { supabase } from '../../lib/supabase';
 import Layout from '../../components/proyek/Layout';
 import TabVerifikasi from '../../components/proyek/TabVerifikasi';
@@ -7,22 +8,37 @@ import { hapusBuktiProyek } from '../../lib/proyek/storage';
 
 export default function PageProyekVerifikasi() {
   const { user, warga, proyekList, iuranProyekList, loading, refetch } = useProyekData();
+  
+  // ═══ TAMBAHAN REALTIME ═══
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('admin-proyek-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'iuran_proyek' }, () => {
+        refetch(); // Refresh data otomatis kalau ada perubahan
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+  // ═════════════════════════
+
   if (typeof window === 'undefined') return null;
 
   async function handleApprove(item) {
     try {
       const today = new Date().toISOString().split('T')[0];
       
-      // 1. Update status
       const { error: errUpdate } = await supabase.from('iuran_proyek').update({ status: 'approved', tanggal_transaksi: today }).eq('id', item.id);
       if (errUpdate) throw errUpdate;
       
-      // 2. Hapus file fisik
       const bukti = item.bukti_urls || [];
       if (bukti.length > 0) {
         try { 
           await hapusBuktiProyek(bukti); 
-          // 3. Ubah URL di database menjadi ['DIHAPUS']
           await supabase.from('iuran_proyek').update({ bukti_urls: ['DIHAPUS'] }).eq('id', item.id); 
         } catch (errHapus) { 
           console.warn('Gagal hapus bukti:', errHapus); 
