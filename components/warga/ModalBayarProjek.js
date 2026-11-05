@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { ALLOWED_TYPES, MAX_FILE_SIZE } from '../../lib/iuran/constants';
 import { formatRupiahProyek } from '../../lib/proyek/constants';
+import { simpanFileKeHP } from '../../lib/download-helper'; // Import fungsi
 
 export default function ModalBayarProjek({
   show,
@@ -34,7 +35,6 @@ export default function ModalBayarProjek({
   const kelebihan = nominalNum - sisaWarga;
   const terlaluKecil = nominalNum <= 0;
 
-  // Split: berapa masuk iuran, berapa jadi donasi
   const masukIuran = Math.min(nominalNum, sisaWarga);
   const masukDonasi = Math.max(0, kelebihan);
 
@@ -91,6 +91,23 @@ export default function ModalBayarProjek({
     });
   };
 
+  // ═══ FUNGSI DOWNLOAD QRIS ═══
+  const handleDownloadQRIS = async () => {
+    try {
+      const response = await fetch('/qris-proyek.png');
+      const blob = await response.blob();
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Data = reader.result.split(',')[1];
+        const msg = await simpanFileKeHP(base64Data, 'QRIS-Proyek-RT38.png', 'image/png');
+        alert(msg);
+      };
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      alert('Gagal download QRIS: ' + err.message);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xl my-8">
@@ -108,7 +125,6 @@ export default function ModalBayarProjek({
           </button>
         </div>
 
-        {/* Info Proyek */}
         <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-3 space-y-1">
           <div className="flex justify-between text-xs">
             <span className="text-slate-400">Target per warga:</span>
@@ -124,20 +140,18 @@ export default function ModalBayarProjek({
           </div>
         </div>
 
-        {/* QRIS PROYEK (Sudah Diubah) */}
         <div className="bg-white rounded-2xl p-3 flex flex-col items-center">
           <img src="/qris-proyek.png" alt="QRIS Proyek RT 38" className="w-40 h-40 object-contain" />
           <p className="text-[10px] text-slate-600 mt-1 font-medium">Scan untuk bayar cicilan proyek</p>
-          <a
-            href="/qris-proyek.png"
-            download="QRIS-Proyek-RT38.png"
+          {/* ═══ TOMBOL DOWNLOAD BARU ═══ */}
+          <button
+            onClick={handleDownloadQRIS}
             className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition"
           >
             ⬇️ Download QRIS
-          </a>
+          </button>
         </div>
 
-        {/* Nominal */}
         <div>
           <label className="text-xs font-semibold text-slate-300 block mb-2">
             Nominal Bayar <span className="text-slate-500">(bebas)</span>
@@ -167,7 +181,6 @@ export default function ModalBayarProjek({
           </div>
         </div>
 
-        {/* ═══ PREVIEW SPLIT (Kalau ada kelebihan) ═══ */}
         {nominalNum > 0 && masukDonasi > 0 && (
           <div className="bg-purple-950/30 border border-purple-500/30 rounded-xl p-3 space-y-2">
             <div className="text-[11px] font-semibold text-purple-300">📊 Rincian:</div>
@@ -185,7 +198,6 @@ export default function ModalBayarProjek({
           </div>
         )}
 
-        {/* Upload 3 slot */}
         <div>
           <label className="text-xs font-semibold text-slate-300 block mb-2">
             Bukti Transfer <span className="text-slate-500">(slot 1 wajib)</span>
@@ -243,7 +255,6 @@ export default function ModalBayarProjek({
           <p className="text-[10px] text-slate-500 mt-1.5">JPG / PNG / WebP • maks 3 MB per file</p>
         </div>
 
-        {/* Catatan */}
         <div>
           <label className="text-xs font-semibold text-slate-300 block mb-2">
             Catatan (opsional)
@@ -257,14 +268,12 @@ export default function ModalBayarProjek({
           />
         </div>
 
-        {/* Error */}
         {error && (
           <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-xs text-rose-400">
             ⚠️ {error}
           </div>
         )}
 
-        {/* Submit */}
         <div className="flex gap-3 pt-2 border-t border-slate-800">
           <button
             onClick={onClose}
