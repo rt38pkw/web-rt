@@ -73,7 +73,6 @@ export default function DashboardWargaIuran() {
     loadRiwayatKategori(parsed.id); 
     refreshDataRumah(parsed.id);
     
-    // Tetap panggil fungsi minta izin notifikasi
     setupPushNotifications('warga', parsed.id);
   }, []);
 
@@ -170,7 +169,6 @@ export default function DashboardWargaIuran() {
 
   if (!warga || !sessionData) return null;
 
-  const isPenyewa = sessionData.role_login === 'penyewa';
   const isModePantau = sessionData.mode_akses === 'pantau';
 
   const periodeBulanAktif = getPeriodeBulan(tahunTerpilih);
@@ -223,6 +221,32 @@ export default function DashboardWargaIuran() {
         } else {
           await insertPengajuanIuran([{ warga_id: warga.id, bulan_tahun: bln, jumlah: info.kurang, status: 'pending', batch_id: batchId, bukti_urls: uploadedUrls, catatan: catatan || null, tanggal_transaksi: null }]);
         }
+      }
+
+      // ═══ TAMBAHAN NOTIFIKASI (Nembak ke Bendahara & Ketua) ═══
+      try {
+        const namaWarga = warga.nama_lengkap || 'Warga';
+        const listBulan = bulanPilih.join(', ');
+        
+        await supabase.functions.invoke('smart-handler', {
+          body: {
+            role_target: 'bendahara',
+            title: '💰 Bukti Transfer Baru',
+            body: `${namaWarga} baru upload bukti transfer untuk bulan ${listBulan}.`,
+            url: '/keuangan/verifikasi'
+          }
+        });
+        
+        await supabase.functions.invoke('smart-handler', {
+          body: {
+            role_target: 'ketua',
+            title: '💰 Bukti Transfer Baru',
+            body: `${namaWarga} baru upload bukti transfer untuk bulan ${listBulan}.`,
+            url: '/keuangan/verifikasi'
+          }
+        });
+      } catch (notifErr) {
+        console.log('Gagal kirim notif ke pengurus:', notifErr);
       }
 
       alert('✅ Pengajuan berhasil dikirim!'); setShowModalBayar(false); loadIuran(warga.id);
