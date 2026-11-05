@@ -26,21 +26,44 @@ const sanitizeNoRumah = (input) => {
   return clean;
 };
 
-// ═══ FUNGSI PINTAR BACA TANGGAL EXCEL ═══
+// ═══ FUNGSI PINTAR BACA TANGGAL EXCEL (ANTI GESER) ═══
 const parseExcelDate = (val) => {
   if (!val) return null;
+
+  // 1. Kalau angka (format Date asli Excel)
   if (typeof val === 'number') {
-    const date = new Date(Math.round((val - 25569) * 86400 * 1000));
-    return date.toISOString().split('T')[0];
+    // Pakai fungsi bawaan XLSX buat baca tanggal tanpa lewat zona waktu
+    const dateCode = XLSX.SSF.parse_date_code(val);
+    if (dateCode) {
+      const y = dateCode.y;
+      const m = String(dateCode.m).padStart(2, '0');
+      const d = String(dateCode.d).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    return null;
   }
+
+  // 2. Kalau teks (string)
   const str = val.toString().trim();
+  
+  // Format YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+
+  // Format DD-MM-YYYY atau DD/MM/YYYY
   const parts = str.split(/[-/.]/);
   if (parts.length === 3 && parts[2].length === 4) {
     return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
   }
+
+  // Format lain (coba parse manual tanpa toISOString)
   const parsed = new Date(val);
-  if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  
   return null;
 };
 
@@ -52,7 +75,6 @@ export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, i
 
   // ═══ FUNGSI DOWNLOAD TEMPLATE ═══
   const handleDownloadTemplate = () => {
-    // Buat data contoh
     const data = [
       ["Tanggal", "Petugas 1", "Petugas 2", "Petugas 3"],
       ["2026-12-01", "A1 - 01", "A2 - 05", "A3 - 10"],
@@ -64,10 +86,8 @@ export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, i
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Jadwal Ronda");
 
-    // Lebarkan kolom agar rapi
     ws['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
 
-    // Download file
     XLSX.writeFile(wb, "Template_Jadwal_Ronda_RT38.xlsx");
   };
 
@@ -75,7 +95,6 @@ export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, i
     const file = e.target.files[0];
     if (!file) return;
 
-    // Cek nama file agar tidak salah upload
     if (file.name.toLowerCase().includes('pengeluaran') || file.name.toLowerCase().includes('iuran')) {
       alert('⚠️ Sepertinya Anda salah memilih file. Ini adalah file Rekapan, bukan Jadwal Ronda.');
     }
@@ -97,7 +116,6 @@ export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, i
     const newErrors = [];
     const parsed = [];
     
-    // Buat Kamus Warga berdasarkan nomor rumah
     const wargaMap = {};
     wargaList.forEach(w => {
       if (w.kk_data && w.no_rumah) {
@@ -166,7 +184,6 @@ export default function ModalImportExcel({ isOpen, onClose, onSave, wargaList, i
         
         <div className="flex-1 overflow-y-auto space-y-4">
           
-          {/* ═══ TOMBOL DOWNLOAD TEMPLATE ═══ */}
           <div className="bg-indigo-950/30 border border-indigo-500/30 rounded-xl p-3 flex flex-col sm:flex-row justify-between items-center gap-3">
             <div className="text-xs text-indigo-300">
               Belum punya format Excel-nya? Download template di samping, lalu isi sesuai contoh.
