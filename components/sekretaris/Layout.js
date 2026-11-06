@@ -1,6 +1,8 @@
 // components/sekretaris/Layout.js
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import NotifToggle from '../NotifToggle';
 import { supabase } from '../../lib/supabase';
 import { useState, useEffect } from 'react';
@@ -43,13 +45,10 @@ export default function Layout({ children }) {
     
     const fetchAllCounts = async () => {
       try {
-        // ═══ 1. HITUNG PENDING VERIFIKASI (CUMA DARI TABEL PENGHUNI) ═══
         const { data: pPending } = await supabase.from('penghuni').select('warga_id').eq('status_verifikasi', 'pending').eq('is_aktif', true);
         const uniqueRumahIds = new Set((pPending || []).map(p => p.warga_id));
         setPendingVerifCount(uniqueRumahIds.size);
-        // ═════════════════════════════════════════════════════════════
 
-        // 2. Hitung Pending Ronda
         const { data: rondaData } = await supabase
           .from('petugas_ronda')
           .select('id, foto_bukti, jadwal:jadwal_id!inner(tanggal, periode:periode_id!inner(jam_selesai, status))')
@@ -62,20 +61,17 @@ export default function Layout({ children }) {
             const tgl = item.jadwal?.tanggal;
             const jamSelesai = item.jadwal?.periode?.jam_selesai;
             if (!tgl || !jamSelesai) return;
-            
             const dateStr = tgl.split('T')[0];
             const [selesaiH, selesaiM] = jamSelesai.split(':');
             let endDateTime = new Date(`${dateStr}T${selesaiH}:${selesaiM}:00`);
             const startDateTime = new Date(`${dateStr}T00:00:00`);
             if (endDateTime < startDateTime || parseInt(selesaiH) < 12) endDateTime.setDate(endDateTime.getDate() + 1);
-            
             const isPassed = new Date() > endDateTime;
             if (item.foto_bukti || isPassed) totalRonda++;
           });
         }
         setPendingRondaCount(totalRonda);
 
-        // 3. Update PWA Badge (Gabungan)
         const grandTotal = uniqueRumahIds.size + totalRonda;
         if ('setAppBadge' in navigator) {
           if (grandTotal > 0) await navigator.setAppBadge(grandTotal);
@@ -100,11 +96,12 @@ export default function Layout({ children }) {
     };
   }, [user]);
 
-  const handleLogout = () => {
-    if (!confirm('Keluar dari akun pengurus?')) return;
-    if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(() => {});
-    localStorage.removeItem('pengurusSession');
-    window.location.replace('/admin');
+  const handleTutupAplikasi = () => {
+    if (Capacitor.isNativePlatform()) {
+      App.exitApp();
+    } else {
+      alert('Silakan tutup tab ini secara manual.');
+    }
   };
 
   if (loading || !user) {
@@ -129,8 +126,12 @@ export default function Layout({ children }) {
               </Link>
             )}
 
-            <button onClick={handleLogout} className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-2 rounded-lg border border-rose-500/20 font-medium transition active:scale-95">
-              🚪 <span className="hidden sm:inline">Keluar</span>
+            <Link href="/sekretaris/pengaturan" className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2 rounded-lg font-medium transition active:scale-95">
+              ⚙️
+            </Link>
+
+            <button onClick={handleTutupAplikasi} className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-2 rounded-lg border border-rose-500/20 font-medium transition active:scale-95">
+              ✕
             </button>
           </div>
         </div>
