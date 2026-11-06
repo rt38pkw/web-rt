@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import Link from 'next/link';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import Layout from '../../components/warga/Layout';
@@ -40,11 +41,21 @@ export default function PengaturanWarga() {
       <Head><title>Pengaturan Akun - Portal Warga RT 38</title></Head>
       <Layout warga={warga}>
         <div className="max-w-md mx-auto space-y-4">
-          
-          {/* HEADER HALAMAN */}
+
+          {/* HEADER HALAMAN — dengan tombol Kembali */}
           <div className="bg-gradient-to-r from-slate-900 to-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg">
-            <h2 className="text-lg font-bold text-white">⚙️ Pengaturan Akun</h2>
-            <p className="text-xs text-slate-400 mt-1">Kelola sesi dan akses aplikasi Anda.</p>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-white">⚙️ Pengaturan Akun</h2>
+                <p className="text-xs text-slate-400 mt-1">Kelola sesi dan akses aplikasi Anda.</p>
+              </div>
+              <Link
+                href="/dashboard-warga"
+                className="shrink-0 text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg text-slate-300 border border-slate-700 transition active:scale-95"
+              >
+                ← Kembali
+              </Link>
+            </div>
           </div>
 
           {/* INFO AKUN */}
