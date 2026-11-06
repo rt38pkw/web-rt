@@ -47,13 +47,15 @@ export default function SekretarisRonda() {
       fetchVerifikasiRonda();
     }
 
+    // ═══ REALTIME OPTIMASI ═══
     const channel = supabase
-      .channel('realtime-badge-ronda')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'petugas_ronda' }, () => {
+      .channel('realtime-ronda-sekretaris')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'petugas_ronda' }, () => {
         checkPendingCount();
-        if (activeTab === 'verifikasi') fetchVerifikasiRonda(true);
+        fetchVerifikasiRonda(true);
       })
       .subscribe();
+    // ════════════════════════
 
     return () => supabase.removeChannel(channel);
   }, [activeTab]);
