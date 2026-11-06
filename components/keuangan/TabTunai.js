@@ -1,3 +1,5 @@
+// components/keuangan/TabTunai.js
+import { useState, useRef, useEffect } from 'react';
 import { formatRupiah, formatTanggal } from '../../lib/keuangan/helpers';
 import { getInfoTagihan, distribusikanTunai } from '../../lib/keuangan/tunai';
 
@@ -46,6 +48,37 @@ export default function TabTunai({
     })
     .reduce((sum, b) => sum + (b.kekurangan || 0), 0);
 
+  // ═══════════════════════════════════════════════════════
+  // STATE UNTUK SEARCHABLE DROPDOWN
+  // ═══════════════════════════════════════════════════════
+  const [searchWarga, setSearchWarga] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Menutup dropdown jika klik di luar area
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Sinkronisasi teks input saat warga dipilih dari luar (misal saat edit)
+  useEffect(() => {
+    if (w) {
+      setSearchWarga(`${w.no_rumah} - ${w.nama_lengkap}`);
+    } else {
+      setSearchWarga('');
+    }
+  }, [tunaiWargaId, w]);
+
+  const filteredWarga = wargaList.filter((x) => 
+    `${x.no_rumah} ${x.nama_lengkap}`.toLowerCase().includes(searchWarga.toLowerCase())
+  );
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -54,14 +87,49 @@ export default function TabTunai({
           <h3 className="text-sm font-bold text-white">💵 Input Iuran Tunai</h3>
           <p className="text-[10px] text-slate-500">Input nominal yang diterima. Sistem otomatis distribusi ke bulan-bulan.</p>
           
-          <div>
-            <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Warga</label>
-            <select value={tunaiWargaId} onChange={(e) => setTunaiWargaId(e.target.value)} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
-              <option value="">-- Pilih Warga --</option>
-              {wargaList.map((x) => (
-                <option key={x.id} value={x.id}>{x.no_rumah} - {x.nama_lengkap} ({x.kategori || 'Rumah'})</option>
-              ))}
-            </select>
+          <div className="relative" ref={dropdownRef}>
+            <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Cari Warga (No. Rumah / Nama)</label>
+            
+            {/* Input Pencarian */}
+            <input
+              type="text"
+              placeholder="Ketik no rumah atau nama..."
+              value={searchWarga}
+              onChange={(e) => {
+                setSearchWarga(e.target.value);
+                setIsDropdownOpen(true);
+                if (e.target.value === '') setTunaiWargaId(''); // Reset jika dihapus
+              }}
+              onFocus={() => setIsDropdownOpen(true)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 transition"
+            />
+
+            {/* Dropdown List */}
+            {isDropdownOpen && (
+              <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl max-h-60 overflow-y-auto">
+                {filteredWarga.length === 0 ? (
+                  <div className="p-3 text-xs text-slate-400 text-center">Warga tidak ditemukan</div>
+                ) : (
+                  filteredWarga.map((x) => (
+                    <button
+                      key={x.id}
+                      type="button"
+                      onClick={() => {
+                        setTunaiWargaId(x.id);
+                        setSearchWarga(`${x.no_rumah} - ${x.nama_lengkap}`);
+                        setIsDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2.5 text-xs border-b border-slate-700/50 last:border-0 hover:bg-slate-700 transition ${
+                        tunaiWargaId === x.id ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-slate-200'
+                      }`}
+                    >
+                      <div className="font-semibold">{x.no_rumah} - {x.nama_lengkap}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">Kategori: {x.kategori || 'Rumah'}</div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
 
           {w && (
@@ -212,7 +280,6 @@ export default function TabTunai({
                       </td>
                       <td className="p-3 text-[10px] text-slate-400 max-w-[200px]">{bulanStr}</td>
                       <td className="p-3 text-right">
-                        {/* INI YANG KAMU MAU: TOTAL IURAN DULU, BARU DEPOSIT */}
                         <div className="font-mono text-emerald-400 font-semibold">
                           {formatRupiah(totalIuran)}
                         </div>
