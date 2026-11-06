@@ -1,6 +1,8 @@
 // components/warga/Layout.js
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import InstallButton from '../InstallButton';
 import NotifToggle from '../NotifToggle';
 
@@ -10,9 +12,17 @@ const MENU = [
   { key: 'ronda', label: 'Ronda', icon: '🛡️', path: '/dashboard-warga/ronda' }, 
 ];
 
-export default function Layout({ children, warga, onLogout }) {
+export default function Layout({ children, warga }) {
   const router = useRouter();
   const activeKey = MENU.find((m) => router.pathname.startsWith(m.path))?.key || 'iuran';
+
+  const handleTutupAplikasi = () => {
+    if (Capacitor.isNativePlatform()) {
+      App.exitApp();
+    } else {
+      alert('Silakan tutup tab ini secara manual untuk keluar dari aplikasi.');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-blue-500 selection:text-white antialiased">
@@ -30,11 +40,22 @@ export default function Layout({ children, warga, onLogout }) {
         <div className="flex items-center gap-2">
           {warga && <NotifToggle userId={warga.id} userType="warga" />}
           <InstallButton />
-          <button
-            onClick={onLogout}
-            className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-xl border border-rose-500/20 transition font-medium"
+          
+          {/* TOMBOL PENGATURAN */}
+          <Link
+            href="/dashboard-warga/pengaturan"
+            className="text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-xl border border-slate-700/60 transition font-medium flex items-center gap-1"
           >
-            Keluar 🚪
+            ⚙️ <span className="hidden sm:inline">Pengaturan</span>
+          </Link>
+
+          {/* TOMBOL TUTUP APLIKASI */}
+          <button
+            onClick={handleTutupAplikasi}
+            className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-xl border border-rose-500/20 transition font-medium"
+            title="Tutup Aplikasi"
+          >
+            ✕
           </button>
         </div>
       </header>
