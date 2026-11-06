@@ -14,7 +14,6 @@ webpush.setVapidDetails(
 );
 
 export default async function handler(req, res) {
-  // Keamanan sederhana: memastikan request datang dari webhook
   const secret = req.headers['x-webhook-secret'] || req.query.secret;
   if (process.env.WEBHOOK_SECRET && secret !== process.env.WEBHOOK_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -23,11 +22,10 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { tanggal } = req.body; // Supabase akan mengirim tanggal hari ini (YYYY-MM-DD)
-
+    const { tanggal } = req.body; 
     if (!tanggal) return res.status(400).json({ error: 'Tanggal wajib dikirim' });
 
-    // 1. Cari jadwal yang aktif pada tanggal tersebut, dan pastikan periodenya PUBLISHED
+    // 1. Cari jadwal yang aktif pada tanggal tersebut
     const { data: jadwalHariIni, error: errJ } = await supabase
       .from('jadwal_ronda')
       .select(`
@@ -53,58 +51,59 @@ export default async function handler(req, res) {
         }
       });
     });
-
-    wargaIds = [...new Set(wargaIds)]; // Hapus duplikat jika 1 orang ada di 2 jadwal
+    wargaIds = [...new Set(wargaIds)]; 
 
     if (wargaIds.length === 0) {
       return res.status(200).json({ success: true, message: 'Tidak ada petugas' });
     }
 
-    // 3. Ambil subscription HP milik warga tersebut
-    const { data: subscriptions, error: errS } = await supabase
+    // ═══ 3. KIRIM KE FCM (SMART-HANDLER) ═══
+    try {
+      for (const wargaId of wargaIds) {
+        await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/smart-handler`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
+            role_target: 'warga',
+            target_id: wargaId,
+            title: '⏰ Pengingat Jadwal Ronda',
+            body: `Malam ini Anda memiliki tugas ronda. Jangan lupa persiapkan diri dan absen sesuai jadwal!`,
+            url: '/dashboard-warga/ronda'
+          })
+        });
+      }
+    } catch (fcmErr) {
+      console.error('Gagal kirim FCM reminder:', fcmErr);
+    }
+    // ═══════════════════════════════════════
+
+    // 4. KIRIM KE WEB PUSH (PWA LAMA)
+    const { data: subscriptions } = await supabase
       .from('push_subscriptions')
       .select('*')
       .in('warga_id', wargaIds);
 
-    if (errS) throw errS;
-    if (!subscriptions || subscriptions.length === 0) {
-      return res.status(200).json({ success: true, message: 'Warga belum subscribe notif' });
-    }
+    let sentWeb = 0;
+    if (subscriptions && subscriptions.length > 0) {
+      const payload = JSON.stringify({
+        title: '⏰ Pengingat Jadwal Ronda',
+        body: `Malam ini Anda memiliki tugas ronda. Jangan lupa persiapkan diri dan absen sesuai jadwal!`,
+        icon: '/logo-rt38.png',
+        url: '/dashboard-warga/ronda',
+      });
 
-    // 4. Susun Payload Notifikasi
-    const payload = JSON.stringify({
-      title: '⏰ Pengingat Jadwal Ronda',
-      body: `Malam ini Anda memiliki tugas ronda. Jangan lupa persiapkan diri dan absen sesuai jadwal!`,
-      icon: '/logo-rt38.png',
-      badge: '/logo-rt38.png',
-      url: '/dashboard-warga/ronda',
-      tag: 'reminder-ronda',
-    });
-
-    // 5. Kirim Push
-    let sent = 0;
-    const invalidEndpoints = [];
-
-    for (const sub of subscriptions) {
-      try {
-        await webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          payload
-        );
-        sent++;
-      } catch (err) {
-        if (err.statusCode === 404 || err.statusCode === 410) {
-          invalidEndpoints.push(sub.endpoint);
-        }
+      for (const sub of subscriptions) {
+        try {
+          await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload);
+          sentWeb++;
+        } catch (err) { /* Abaikan error */ }
       }
     }
 
-    // 6. Bersihkan endpoint yang mati
-    if (invalidEndpoints.length > 0) {
-      await supabase.from('push_subscriptions').delete().in('endpoint', invalidEndpoints);
-    }
-
-    return res.status(200).json({ success: true, sent });
+    return res.status(200).json({ success: true, sentFCM: wargaIds.length, sentWeb });
   } catch (err) {
     console.error('Notify Reminder Error:', err);
     return res.status(500).json({ error: err.message });
