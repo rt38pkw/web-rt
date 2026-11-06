@@ -118,12 +118,10 @@ export default function RondaWarga() {
       const { error } = await supabase.from('petugas_ronda').update({ status_hadir: 'pending', foto_bukti: publicUrl, waktu_absen: new Date().toISOString(), catatan: catatanTeks }).eq('jadwal_id', jadwalId); 
       if (error) throw error;
       
-      // ═══ DEBUG NOTIFIKASI (PANCING) ═══
+      // ═══ NOTIFIKASI (FINAL, TANPA ALERT DEBUG) ═══
       try {
         const namaWarga = user?.penghuni_data?.nama_lengkap || user?.nama_lengkap || 'Warga';
         
-        alert("1. Masuk blok notif. Mau nembak smart-handler...");
-
         await supabase.functions.invoke('smart-handler', {
           body: {
             role_target: 'sekretaris',
@@ -141,12 +139,10 @@ export default function RondaWarga() {
             url: '/sekretaris/ronda'
           }
         });
-
-        alert("2. Selesai nembak smart-handler!");
       } catch (notifErr) {
-        alert('DEBUG Gagal Notif: ' + (notifErr.message || JSON.stringify(notifErr)));
+        console.log('Gagal kirim notif ronda:', notifErr);
       }
-      // ═════════════════════════
+      // ═══════════════════════════════════════════
 
       alert('✅ Absen berhasil dikirim!');
       fetchData(user.id, true); 
