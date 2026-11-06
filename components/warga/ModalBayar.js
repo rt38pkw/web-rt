@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { getInfoBulan } from '../../lib/iuran/calculations';
 import { ALLOWED_TYPES, MAX_FILE_SIZE } from '../../lib/iuran/constants';
-import { simpanFileKeHP } from '../../lib/download-helper';
 
 export default function ModalBayar({
   show, onClose, iuranList, tarifBulanan, tarifMap = {}, belumLunasList, bulanDipilih, setBulanDipilih, onSubmit, submitting, tahun,
@@ -10,12 +9,14 @@ export default function ModalBayar({
   const [fileBukti, setFileBukti] = useState([null, null, null]);
   const [previewBukti, setPreviewBukti] = useState([null, null, null]);
   const [catatan, setCatatan] = useState('');
+  const [zoomImage, setZoomImage] = useState(null); // State untuk Zoom QRIS
 
   useEffect(() => {
     if (show) {
       setFileBukti([null, null, null]);
       setPreviewBukti([null, null, null]);
       setCatatan('');
+      setZoomImage(null);
     }
   }, [show]);
 
@@ -51,27 +52,9 @@ export default function ModalBayar({
     await onSubmit({ fileBukti, catatan, bulanDipilih });
   };
 
-  // ═══ FUNGSI DOWNLOAD QRIS (GANTI NAMA FILE) ═══
-  const handleDownloadQRIS = async () => {
-    try {
-      const response = await fetch('/qris.png');
-      const blob = await response.blob();
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Data = reader.result.split(',')[1];
-        // GANTI NAMA FILE JADI UNDERSCORE
-        const msg = await simpanFileKeHP(base64Data, 'QRIS_RT38.png', 'image/png');
-        alert(msg);
-      };
-      reader.readAsDataURL(blob);
-    } catch (err) {
-      alert('Gagal download QRIS: ' + err.message);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xl my-8">
+    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-start justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xl my-10">
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <div>
             <h3 className="font-bold text-white text-base">📱 Bayar Iuran {tahunAktif}</h3>
@@ -81,10 +64,15 @@ export default function ModalBayar({
         </div>
 
         <div className="bg-white rounded-2xl p-3 flex flex-col items-center">
-          <img src="/qris.png" alt="QRIS RT 38" className="w-48 h-48 object-contain" />
+          <img 
+            src="/qris.png" 
+            alt="QRIS RT 38" 
+            className="w-48 h-48 object-contain cursor-zoom-in" 
+            onClick={() => setZoomImage('/qris.png')}
+          />
           <p className="text-[10px] text-slate-600 mt-2 font-medium">Scan dengan aplikasi bank / e-wallet</p>
           
-          <button onClick={handleDownloadQRIS} className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition">⬇️ Download QRIS</button>
+          <button onClick={() => setZoomImage('/qris.png')} className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition">🔍 Perbesar QRIS</button>
           
           <button onClick={() => { navigator.clipboard.writeText(String(totalBayar)); alert('Total Rp ' + totalBayar.toLocaleString('id-ID') + ' disalin'); }} className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition">📋 Salin Total: Rp {totalBayar.toLocaleString('id-ID')}</button>
         </div>
@@ -155,6 +143,16 @@ export default function ModalBayar({
           </button>
         </div>
       </div>
+
+      {/* MODAL ZOOM QRIS */}
+      {zoomImage && (
+        <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setZoomImage(null)}>
+          <button className="absolute top-4 right-4 text-white text-3xl font-bold z-10" onClick={() => setZoomImage(null)}>✕</button>
+          <div className="w-full h-full overflow-auto flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+             <img src={zoomImage} alt="Zoom QRIS" className="min-w-full min-h-full object-contain" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
