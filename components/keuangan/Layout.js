@@ -1,5 +1,8 @@
+// components/keuangan/Layout.js
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import NotifToggle from '../NotifToggle';
 
 const MENU_MAIN = [
@@ -27,10 +30,12 @@ export default function Layout({ user, pendingCount = 0, children }) {
   const MENU = isOperatorProyek ? MENU_PROYEK : MENU_MAIN;
   const activeKey = MENU.find((m) => router.pathname.startsWith(m.path))?.key;
 
-  const handleLogout = () => {
-    if (!confirm('Keluar dari akun pengurus?')) return;
-    localStorage.removeItem('pengurusSession'); // Ubah ke localStorage
-    window.location.replace('/admin');
+  const handleTutupAplikasi = () => {
+    if (Capacitor.isNativePlatform()) {
+      App.exitApp();
+    } else {
+      alert('Silakan tutup tab ini secara manual.');
+    }
   };
 
   return (
@@ -58,11 +63,18 @@ export default function Layout({ user, pendingCount = 0, children }) {
               </Link>
             )}
 
+            <Link
+              href="/keuangan/pengaturan"
+              className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg text-slate-300 border border-slate-700"
+            >
+              ⚙️
+            </Link>
+
             <button
-              onClick={handleLogout}
+              onClick={handleTutupAplikasi}
               className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-2 rounded-lg border border-rose-500/20 font-medium"
             >
-              🚪 Keluar
+              ✕
             </button>
           </div>
         </div>
