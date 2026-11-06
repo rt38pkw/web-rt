@@ -43,12 +43,11 @@ export default function Layout({ children }) {
     
     const fetchAllCounts = async () => {
       try {
-        // 1. Hitung Pending Verifikasi (Profil Warga)
-        const { data: wPending } = await supabase.from('warga').select('id').eq('status_verifikasi_profil', 'pending');
+        // ═══ 1. HITUNG PENDING VERIFIKASI (CUMA DARI TABEL PENGHUNI) ═══
         const { data: pPending } = await supabase.from('penghuni').select('warga_id').eq('status_verifikasi', 'pending').eq('is_aktif', true);
-        const uniqueRumahIds = new Set([ ...(wPending || []).map(w => w.id), ...(pPending || []).map(p => p.warga_id) ]);
-        const totalVerif = uniqueRumahIds.size;
-        setPendingVerifCount(totalVerif);
+        const uniqueRumahIds = new Set((pPending || []).map(p => p.warga_id));
+        setPendingVerifCount(uniqueRumahIds.size);
+        // ═════════════════════════════════════════════════════════════
 
         // 2. Hitung Pending Ronda
         const { data: rondaData } = await supabase
@@ -77,7 +76,7 @@ export default function Layout({ children }) {
         setPendingRondaCount(totalRonda);
 
         // 3. Update PWA Badge (Gabungan)
-        const grandTotal = totalVerif + totalRonda;
+        const grandTotal = uniqueRumahIds.size + totalRonda;
         if ('setAppBadge' in navigator) {
           if (grandTotal > 0) await navigator.setAppBadge(grandTotal);
           else if ('clearAppBadge' in navigator) await navigator.clearAppBadge();
@@ -91,7 +90,6 @@ export default function Layout({ children }) {
     
     const channel = supabase
       .channel('realtime-badge-sekretaris')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'warga' }, () => fetchAllCounts())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'penghuni' }, () => fetchAllCounts())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'petugas_ronda' }, () => fetchAllCounts())
       .subscribe();
@@ -125,7 +123,6 @@ export default function Layout({ children }) {
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {user && <NotifToggle userId={user.id} userType="pengurus" />}
             
-            {/* TOMBOL KEMBALI KE ADMIN (Hanya muncul untuk Ketua agar tidak dobel dengan menu Sekretaris) */}
             {user.role === 'ketua' && (
               <Link href="/admin" className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2 rounded-lg font-medium transition active:scale-95 flex items-center gap-1">
                 ← Admin
