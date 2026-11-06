@@ -29,6 +29,7 @@ jobs:
         npm install --ignore-scripts
         npm install sharp
         npm install @capacitor/filesystem
+        npm install @capacitor/share
 
     - name: Build Web App (Next.js)
       run: npm run build
