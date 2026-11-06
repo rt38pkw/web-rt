@@ -29,7 +29,6 @@ jobs:
         npm install --ignore-scripts
         npm install sharp
         npm install @capacitor/filesystem
-        npm install @capacitor-community/media
 
     - name: Build Web App (Next.js)
       run: npm run build
