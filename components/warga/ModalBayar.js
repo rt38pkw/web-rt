@@ -51,37 +51,19 @@ export default function ModalBayar({
     await onSubmit({ fileBukti, catatan, bulanDipilih });
   };
 
-  // ═══ FUNGSI DOWNLOAD QRIS (DENGAN DEBUG ALERT) ═══
   const handleDownloadQRIS = async () => {
     try {
-      alert('DEBUG: Mulai download QRIS...');
       const response = await fetch('/qris.png');
-      
-      if (!response.ok) {
-        alert('DEBUG: Gagal fetch gambar! Status: ' + response.status);
-        return;
-      }
-      
-      alert('DEBUG: Fetch gambar berhasil. Status: ' + response.status);
-      
       const blob = await response.blob();
-      alert('DEBUG: Blob didapat. Ukuran: ' + blob.size + ' bytes');
-      
       const reader = new FileReader();
       reader.onloadend = async () => {
-        try {
-          const base64Data = reader.result.split(',')[1];
-          alert('DEBUG: Base64 siap. Mau simpan pakai Capacitor...');
-          
-          const msg = await simpanFileKeHP(base64Data, 'QRIS-RT38.png', 'image/png');
-          alert('DEBUG: ' + msg);
-        } catch (saveErr) {
-          alert('DEBUG GAGAL SIMPAN: ' + saveErr.message);
-        }
+        const base64Data = reader.result.split(',')[1];
+        const msg = await simpanFileKeHP(base64Data, 'QRIS-RT38.png', 'image/png');
+        alert(msg);
       };
       reader.readAsDataURL(blob);
     } catch (err) {
-      alert('DEBUG GAGAL FETCH: ' + err.message);
+      alert('Gagal download QRIS: ' + err.message);
     }
   };
 
