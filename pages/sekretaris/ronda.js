@@ -98,44 +98,77 @@ export default function SekretarisRonda() {
     return new Date() > endDateTime; 
   };
 
+  // ═══ QUERY SEDERHANA (TANPA RELASI RUMIT) ═══
   async function fetchVerifikasiRonda(isSilent = false) {
     if (!isSilent) setLoadingVerifikasi(true);
     try {
-      const { data, error } = await supabase
+      // 1. Ambil data petugas_ronda mentah
+      const { data: petugasData, error: errP } = await supabase
         .from('petugas_ronda')
-        .select(`
-          id, jadwal_id, status_hadir, foto_bukti, catatan,
-          jadwal:jadwal_id!inner ( tanggal, periode:periode_id!inner(nama_periode, jam_selesai, status) ),
-          penghuni:penghuni_id ( nama_lengkap, warga:warga_id(no_rumah) )
-        `)
-        .eq('jadwal.periode.status', 'published')
-        .order('jadwal(tanggal)', { ascending: true });
+        .select('*')
+        .eq('status_hadir', 'pending');
+      if (errP) throw errP;
 
-      if (error) throw error;
+      // 2. Ambil data jadwal_ronda
+      const { data: jadwalData } = await supabase.from('jadwal_ronda').select('*');
+      // 3. Ambil data periode_ronda
+      const { data: periodeData } = await supabase.from('periode_ronda').select('*').eq('status', 'published');
+      // 4. Ambil data penghuni
+      const { data: penghuniData } = await supabase.from('penghuni').select('*, warga:warga_id(no_rumah)');
 
-      const grouped = (data || []).reduce((acc, curr) => {
+      // 5. Bikin map untuk pencarian cepat
+      const jadwalMap = {};
+      (jadwalData || []).forEach(j => { jadwalMap[j.id] = j; });
+
+      const periodeMap = {};
+      (periodeData || []).forEach(p => { periodeMap[p.id] = p; });
+
+      const penghuniMap = {};
+      (penghuniData || []).forEach(p => { penghuniMap[p.id] = p; });
+
+      // 6. Gabungin data
+      const dataGabungan = (petugasData || []).map(pr => {
+        const jadwal = jadwalMap[pr.jadwal_id];
+        const periode = jadwal ? periodeMap[jadwal.periode_id] : null;
+        const penghuni = penghuniMap[pr.penghuni_id];
+
+        // Cuma ambil kalau periodenya published
+        if (!periode) return null;
+
+        return {
+          ...pr,
+          tanggal: jadwal.tanggal,
+          periode_nama: periode.nama_periode,
+          jam_selesai: periode.jam_selesai,
+          nama_lengkap: penghuni?.nama_lengkap || 'Warga',
+          no_rumah: penghuni?.warga?.no_rumah || '-'
+        };
+      }).filter(Boolean); // Hapus yang null
+
+      // 7. Grouping berdasarkan jadwal_id
+      const grouped = dataGabungan.reduce((acc, curr) => {
         if (!acc[curr.jadwal_id]) {
           acc[curr.jadwal_id] = {
             jadwal_id: curr.jadwal_id,
-            tanggal: curr.jadwal.tanggal,
-            periode: curr.jadwal.periode.nama_periode,
-            jam_selesai: curr.jadwal.periode.jam_selesai,
-            foto_bukti: null,
-            catatan: null,
+            tanggal: curr.tanggal,
+            periode: curr.periode_nama,
+            jam_selesai: curr.jam_selesai,
+            foto_bukti: curr.foto_bukti,
+            catatan: curr.catatan,
             petugas: []
           };
         }
-        
-        if (curr.foto_bukti && curr.foto_bukti !== 'DIHAPUS') {
-          acc[curr.jadwal_id].foto_bukti = curr.foto_bukti;
-        }
-        if (curr.catatan) acc[curr.jadwal_id].catatan = curr.catatan;
-
-        acc[curr.jadwal_id].petugas.push(curr);
+        acc[curr.jadwal_id].petugas.push({
+          id: curr.id,
+          status_hadir: curr.status_hadir,
+          foto_bukti: curr.foto_bukti,
+          catatan: curr.catatan,
+          penghuni: { nama_lengkap: curr.nama_lengkap, warga: { no_rumah: curr.no_rumah } }
+        });
         return acc;
       }, {});
 
-      // ═══ LOGIKA BARU: Cek SEMUA baris, bukan cuma baris pertama ═══
+      // 8. Filter grup
       const filteredGroups = Object.values(grouped).filter(group => {
         const adaFoto = group.petugas.some(p => p.foto_bukti && p.foto_bukti !== 'DIHAPUS');
         const waktuLewat = isTimePassed(group.tanggal, group.jam_selesai);
@@ -145,7 +178,7 @@ export default function SekretarisRonda() {
       setVerifikasiData(filteredGroups);
 
       const initialEdits = {};
-      (data || []).forEach(p => { initialEdits[p.id] = p.status_hadir === 'pending' ? 'hadir' : p.status_hadir; });
+      (dataGabungan || []).forEach(p => { initialEdits[p.id] = p.status_hadir === 'pending' ? 'hadir' : p.status_hadir; });
       setVerifikasiEdits(initialEdits);
 
     } catch (err) {
