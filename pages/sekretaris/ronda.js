@@ -36,20 +36,17 @@ export default function SekretarisRonda() {
   const [verifikasiEdits, setVerifikasiEdits] = useState({}); 
   const [zoomImage, setZoomImage] = useState(null);
   
-  // ═══ STATE BARU UNTUK BADGE ═══
   const [pendingRondaCount, setPendingRondaCount] = useState(0);
 
   useEffect(() => {
     fetchPeriode();
     fetchWargaRonda(); 
-    checkPendingCount(); // Panggil saat pertama kali dimuat
+    checkPendingCount(); 
 
-    // Realtime untuk update badge secara langsung
     const channel = supabase
       .channel('realtime-badge-ronda')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'petugas_ronda' }, () => {
         checkPendingCount();
-        // Jika sedang di tab verifikasi, refresh datanya juga
         if (activeTab === 'verifikasi') fetchVerifikasiRonda(true);
       })
       .subscribe();
@@ -64,22 +61,8 @@ export default function SekretarisRonda() {
     setLoading(false);
   }
 
-  // ═══ FUNGSI HITUNG BADGE ═══
   async function checkPendingCount() {
     try {
-      // Cari yang statusnya pending dan periodenya published
-      const { data, error } = await supabase
-        .from('petugas_ronda')
-        .select(`
-          id, jadwal:jadwal_id!inner(tanggal, periode:periode_id!inner(jam_selesai, status))
-        `)
-        .eq('status_hadir', 'pending')
-        .eq('jadwal.periode.status', 'published');
-        
-      if (error) throw error;
-      
-      // Filter berdasarkan waktu (apakah sudah lewat atau ada foto)
-      // (Karena query bersarang cukup rumit, kita filter di JS)
       const { data: rawData } = await supabase
         .from('petugas_ronda')
         .select('id, foto_bukti, jadwal:jadwal_id!inner(tanggal, periode:periode_id!inner(jam_selesai, status))')
@@ -89,17 +72,14 @@ export default function SekretarisRonda() {
       const filtered = (rawData || []).filter(item => {
         const tgl = item.jadwal.tanggal;
         const jamSelesai = item.jadwal.periode.jam_selesai;
-        
         if (!tgl || !jamSelesai) return false;
-
         const dateStr = tgl.split('T')[0];
         const [selesaiH, selesaiM] = jamSelesai.split(':');
         let endDateTime = new Date(`${dateStr}T${selesaiH}:${selesaiM}:00`);
         const startDateTime = new Date(`${dateStr}T00:00:00`);
         if (endDateTime < startDateTime || parseInt(selesaiH) < 12) endDateTime.setDate(endDateTime.getDate() + 1);
-        
         const isPassed = new Date() > endDateTime;
-        return item.foto_bukti || isPassed; // Hitung jika ada foto (pending) ATAU waktu sudah habis (alpa)
+        return item.foto_bukti || isPassed;
       });
 
       setPendingRondaCount(filtered.length);
@@ -128,7 +108,6 @@ export default function SekretarisRonda() {
           jadwal:jadwal_id!inner ( tanggal, periode:periode_id!inner(nama_periode, jam_selesai, status) ),
           penghuni:penghuni_id ( nama_lengkap, warga:warga_id(no_rumah) )
         `)
-        .eq('status_hadir', 'pending')
         .eq('jadwal.periode.status', 'published')
         .order('jadwal(tanggal)', { ascending: true });
 
@@ -141,24 +120,45 @@ export default function SekretarisRonda() {
             tanggal: curr.jadwal.tanggal,
             periode: curr.jadwal.periode.nama_periode,
             jam_selesai: curr.jadwal.periode.jam_selesai,
-            foto_bukti: curr.foto_bukti, 
-            catatan: curr.catatan,
+            foto_bukti: null,
+            catatan: null,
             petugas: []
           };
         }
+        
+        // Simpan info foto & catatan di level grup (kalau ada)
+        if (curr.foto_bukti && curr.foto_bukti !== 'DIHAPUS') {
+          acc[curr.jadwal_id].foto_bukti = curr.foto_bukti;
+        }
+        if (curr.catatan) acc[curr.jadwal_id].catatan = curr.catatan;
+
         acc[curr.jadwal_id].petugas.push(curr);
         return acc;
       }, {});
 
-      const filteredGroups = Object.values(grouped).filter(group => {
-        if (group.foto_bukti) return true;
-        return isTimePassed(group.tanggal, group.jam_selesai);
-      });
+      // ═══ FILTER FINAL ═══
+      // 1. Cuma tampilin grup yang punya minimal 1 foto ATAU waktunya udah lewat (Alpa)
+      // 2. Di dalam grup, cuma tampilin petugas yang punya foto
+      const finalGroups = Object.values(grouped)
+        .filter(group => {
+          const adaFoto = group.foto_bukti !== null;
+          const waktuLewat = isTimePassed(group.tanggal, group.jam_selesai);
+          return adaFoto || waktuLewat;
+        })
+        .map(group => {
+          // Kalau ada foto, filter petugasnya biar cuma yang punya foto aja
+          if (group.foto_bukti) {
+            const petugasAbsen = group.petugas.filter(p => p.foto_bukti && p.foto_bukti !== 'DIHAPUS');
+            return { ...group, petugas: petugasAbsen };
+          }
+          // Kalau nggak ada foto (Alpa), tampilin semua
+          return group;
+        });
 
-      setVerifikasiData(filteredGroups);
+      setVerifikasiData(finalGroups);
 
       const initialEdits = {};
-      (data || []).forEach(p => { initialEdits[p.id] = 'hadir'; });
+      (data || []).forEach(p => { initialEdits[p.id] = p.status_hadir === 'pending' ? 'hadir' : p.status_hadir; });
       setVerifikasiEdits(initialEdits);
 
     } catch (err) {
@@ -182,7 +182,7 @@ export default function SekretarisRonda() {
           .update({ 
             status_hadir: newStatus, 
             verified_by: verifierId,
-            foto_bukti: fotoUrl ? 'DIHAPUS' : null 
+            foto_bukti: (fotoUrl && fotoUrl !== 'DIHAPUS') ? 'DIHAPUS' : p.foto_bukti 
           })
           .eq('id', p.id);
         if (error) throw error;
@@ -194,7 +194,7 @@ export default function SekretarisRonda() {
 
       alert('✅ Verifikasi berhasil!');
       fetchVerifikasiRonda(true); 
-      checkPendingCount(); // Update badge setelah verifikasi
+      checkPendingCount(); 
     } catch (err) {
       alert('Gagal memverifikasi: ' + err.message);
     } finally {
@@ -202,8 +202,6 @@ export default function SekretarisRonda() {
     }
   };
 
-  // ... (Fungsi handleBuatPeriode, handleHapusPeriode, handleLihatDetail, handleGenerateDraft, dll TETAP SAMA seperti sebelumnya)
-  
   const handleBuatPeriode = async (formData) => {
     setProcessing(true);
     try {
@@ -271,6 +269,22 @@ export default function SekretarisRonda() {
     try {
       await simpanJadwalRonda(selectedPeriode.id, targetStatus, draftData);
       setIsPublished(targetStatus === 'published'); setSelectedPeriode({ ...selectedPeriode, status: targetStatus }); fetchPeriode();
+
+      if (targetStatus === 'published') {
+        try {
+          await supabase.functions.invoke('smart-handler', {
+            body: {
+              role_target: 'warga',
+              title: '📅 Jadwal Ronda Baru',
+              body: `Jadwal ronda periode "${selectedPeriode.nama_periode}" telah terbit. Cek aplikasi!`,
+              url: '/dashboard-warga/ronda'
+            }
+          });
+        } catch (notifErr) {
+          console.log('Gagal kirim notif publish:', notifErr);
+        }
+      }
+
     } catch (err) { alert('Gagal: ' + err.message); } finally { setIsSaving(false); }
   };
 
@@ -307,8 +321,6 @@ export default function SekretarisRonda() {
   };
 
   const formatTanggal = (dateStr) => dateStr ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(dateStr)) : '-';
-
-  // ... (SISA RENDER / RETURN SAMA SEPERTI SEBELUMNYA, TAPI TAMBAHKAN BADGE DI TOMBOL VERIFIKASI)
 
   if (viewMode === 'detail' && selectedPeriode) {
     return (
@@ -368,7 +380,6 @@ export default function SekretarisRonda() {
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-2 flex gap-2 overflow-x-auto">
           <button onClick={() => setActiveTab('jadwal')} className={`flex-1 py-2.5 px-4 text-xs font-semibold rounded-xl whitespace-nowrap ${activeTab === 'jadwal' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>📅 Jadwal Ronda</button>
           
-          {/* ═══ TOMBOL DENGAN BADGE ═══ */}
           <button onClick={() => setActiveTab('verifikasi')} className={`relative flex-1 py-2.5 px-4 text-xs font-semibold rounded-xl whitespace-nowrap ${activeTab === 'verifikasi' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>
             ✅ Verifikasi & Alpa
             {pendingRondaCount > 0 && (
@@ -458,7 +469,7 @@ export default function SekretarisRonda() {
                         
                         <div className="space-y-2 flex-1">
                           {group.petugas.map(p => {
-                            const statusSekarang = verifikasiEdits[p.id] || 'hadir';
+                            const statusSekarang = verifikasiEdits[p.id] || (p.status_hadir === 'pending' ? 'hadir' : p.status_hadir);
                             return (
                               <div key={p.id} className="flex justify-between items-center bg-slate-950 p-2 rounded-lg border border-slate-800">
                                 <div>
