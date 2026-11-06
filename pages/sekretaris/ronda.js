@@ -43,11 +43,10 @@ export default function SekretarisRonda() {
     fetchWargaRonda(); 
     checkPendingCount(); 
 
-    // ═══ TAMBAHAN BARU: Panggil fetch saat tab verifikasi dibuka ═══
+    // Panggil fetch saat tab verifikasi dibuka
     if (activeTab === 'verifikasi') {
       fetchVerifikasiRonda();
     }
-    // ═══════════════════════════════════════════════════════════════
 
     const channel = supabase
       .channel('realtime-badge-ronda')
@@ -104,7 +103,6 @@ export default function SekretarisRonda() {
     return new Date() > endDateTime; 
   };
 
-  // ═══ QUERY SEDERHANA (TANPA RELASI RUMIT) ═══
   async function fetchVerifikasiRonda(isSilent = false) {
     if (!isSilent) setLoadingVerifikasi(true);
     try {
@@ -506,40 +504,4 @@ export default function SekretarisRonda() {
                                   onClick={() => setVerifikasiEdits({ ...verifikasiEdits, [p.id]: statusSekarang === 'hadir' ? 'tidak_hadir' : 'hadir' })}
                                   className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition border ${statusSekarang === 'hadir' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border-rose-500/30'}`}
                                 >
-                                  {statusSekarang === 'hadir' ? '✅ Hadir' : '❌ Alpa'}
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        <button 
-                          onClick={() => handleSimpanVerifikasi(group.jadwal_id, group.petugas, group.foto_bukti)}
-                          disabled={processing}
-                          className={`w-full mt-2 text-white font-bold py-2.5 rounded-xl text-xs transition ${!hasPhoto ? 'bg-rose-600 hover:bg-rose-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}
-                        >
-                          {processing ? 'Menyimpan...' : !hasPhoto ? 'Simpan Verifikasi Manual' : 'Simpan & Hapus Foto'}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <ModalBuatPeriode isOpen={showModalPeriode} onClose={() => setShowModalPeriode(false)} onSave={handleBuatPeriode} processing={processing} />
-      
-      {zoomImage && (
-        <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setZoomImage(null)}>
-          <button className="absolute top-4 right-4 text-white text-3xl font-bold" onClick={() => setZoomImage(null)}>✕</button>
-          <div className="w-full h-full overflow-auto flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-             <img src={zoomImage} alt="Zoom" className="min-w-full min-h-full object-contain" />
-          </div>
-        </div>
-      )}
-    </Layout>
-  );
-}
+                                 
