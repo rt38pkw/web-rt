@@ -1,5 +1,5 @@
 // pages/keuangan/pengaturan.jsx
-// Halaman Pengaturan MINIMAL: hanya logout + info akun (readonly).
+// Halaman Pengaturan MINIMAL: hanya logout + info akun (readonly, teks biasa).
 // TIDAK ada API, TIDAK ada ganti password, TIDAK ada ubah profil.
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
@@ -48,6 +48,11 @@ export default function PengaturanPage() {
     : user?.role === 'bendahara' ? '💰'
     : '📝';
 
+  // Label role tanpa "Bu"/"Pak" — cukup capitalize
+  const roleLabel = user?.role
+    ? user.role.charAt(0).toUpperCase() + user.role.slice(1).replace('_', ' ')
+    : '-';
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
       {/* HEADER */}
@@ -56,7 +61,7 @@ export default function PengaturanPage() {
           <div className="min-w-0">
             <h1 className="text-base sm:text-lg font-bold text-white truncate">⚙️ Pengaturan</h1>
             <p className="text-[11px] text-slate-400 truncate">
-              {user?.nama ? `${user.nama} — ${user.role}` : 'Akun Pengurus'}
+              {user?.username ? `@${user.username}` : 'Akun Pengurus'}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -77,50 +82,37 @@ export default function PengaturanPage() {
       </div>
 
       <div className="max-w-3xl mx-auto p-4 space-y-4">
-        {/* Kartu Akun (readonly) */}
+        {/* Kartu Akun (readonly, teks biasa) */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-2xl">
               {roleEmoji}
             </div>
             <div className="min-w-0">
-              <p className="font-bold text-white truncate">{user?.nama || '-'}</p>
+              <p className="font-bold text-white truncate">@{user?.username || '-'}</p>
               <p className="text-xs text-slate-400 truncate">
-                @{user?.username || '-'} · <span className="uppercase tracking-wide">{user?.role}</span>
+                Role: <span className="font-semibold text-slate-200">{roleLabel}</span>
               </p>
             </div>
           </div>
         </div>
 
-        {/* Info akun readonly — tidak bisa diubah di sini */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+        {/* Info Akun — teks biasa, bukan textbox beku */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
           <h2 className="text-sm font-bold text-white mb-1">Informasi Akun</h2>
 
-          <div>
-            <label className="text-xs text-slate-400">Nama Lengkap</label>
-            <input
-              value={user?.nama || ''}
-              disabled
-              className="w-full mt-1 bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-500 cursor-not-allowed"
-            />
+          <div className="flex items-center justify-between gap-4 border-b border-slate-800 pb-3">
+            <span className="text-xs text-slate-400">Username</span>
+            <span className="text-sm font-semibold text-slate-100 truncate">
+              @{user?.username || '-'}
+            </span>
           </div>
 
-          <div>
-            <label className="text-xs text-slate-400">Username</label>
-            <input
-              value={user?.username || ''}
-              disabled
-              className="w-full mt-1 bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-500 cursor-not-allowed"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs text-slate-400">Role</label>
-            <input
-              value={user?.role || ''}
-              disabled
-              className="w-full mt-1 bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-500 cursor-not-allowed capitalize"
-            />
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-xs text-slate-400">Role</span>
+            <span className="text-sm font-semibold text-slate-100">
+              {roleLabel}
+            </span>
           </div>
 
           <p className="text-[10px] text-slate-600 pt-1">
