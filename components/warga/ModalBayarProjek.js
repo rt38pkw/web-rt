@@ -2,16 +2,9 @@
 import { useState, useEffect } from 'react';
 import { ALLOWED_TYPES, MAX_FILE_SIZE } from '../../lib/iuran/constants';
 import { formatRupiahProyek } from '../../lib/proyek/constants';
-import { simpanFileKeHP } from '../../lib/download-helper'; // Import fungsi
 
 export default function ModalBayarProjek({
-  show,
-  onClose,
-  proyek,
-  sisaWarga,
-  sudahBayar,
-  onSubmit,
-  submitting,
+  show, onClose, proyek, sisaWarga, sudahBayar, onSubmit, submitting,
 }) {
   const [nominal, setNominal] = useState('');
   const [fileBukti, setFileBukti] = useState([null, null, null]);
@@ -91,21 +84,14 @@ export default function ModalBayarProjek({
     });
   };
 
-  // ═══ FUNGSI DOWNLOAD QRIS ═══
-  const handleDownloadQRIS = async () => {
-    try {
-      const response = await fetch('/qris-proyek.png');
-      const blob = await response.blob();
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Data = reader.result.split(',')[1];
-        const msg = await simpanFileKeHP(base64Data, 'QRIS-Proyek-RT38.png', 'image/png');
-        alert(msg);
-      };
-      reader.readAsDataURL(blob);
-    } catch (err) {
-      alert('Gagal download QRIS: ' + err.message);
-    }
+  // ═══ FUNGSI DOWNLOAD QRIS PAKAI LINK DINAMIS ═══
+  const handleDownloadQRIS = () => {
+    const link = document.createElement('a');
+    link.href = '/qris-proyek.png';
+    link.download = 'QRIS-Proyek-RT38.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -143,7 +129,7 @@ export default function ModalBayarProjek({
         <div className="bg-white rounded-2xl p-3 flex flex-col items-center">
           <img src="/qris-proyek.png" alt="QRIS Proyek RT 38" className="w-40 h-40 object-contain" />
           <p className="text-[10px] text-slate-600 mt-1 font-medium">Scan untuk bayar cicilan proyek</p>
-          {/* ═══ TOMBOL DOWNLOAD BARU ═══ */}
+          
           <button
             onClick={handleDownloadQRIS}
             className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition"
