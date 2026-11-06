@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { getInfoBulan } from '../../lib/iuran/calculations';
 import { ALLOWED_TYPES, MAX_FILE_SIZE } from '../../lib/iuran/constants';
-import { simpanFileKeHP } from '../../lib/download-helper'; // Import fungsi bantuan
+import { simpanFileKeHP } from '../../lib/download-helper';
 
 export default function ModalBayar({
   show, onClose, iuranList, tarifBulanan, tarifMap = {}, belumLunasList, bulanDipilih, setBulanDipilih, onSubmit, submitting, tahun,
@@ -51,21 +51,37 @@ export default function ModalBayar({
     await onSubmit({ fileBukti, catatan, bulanDipilih });
   };
 
-  // ═══ FUNGSI DOWNLOAD QRIS VIA CAPACITOR ═══
+  // ═══ FUNGSI DOWNLOAD QRIS (DENGAN DEBUG ALERT) ═══
   const handleDownloadQRIS = async () => {
     try {
-      // Ambil gambar qris.png dari folder public, ubah ke base64
+      alert('DEBUG: Mulai download QRIS...');
       const response = await fetch('/qris.png');
+      
+      if (!response.ok) {
+        alert('DEBUG: Gagal fetch gambar! Status: ' + response.status);
+        return;
+      }
+      
+      alert('DEBUG: Fetch gambar berhasil. Status: ' + response.status);
+      
       const blob = await response.blob();
+      alert('DEBUG: Blob didapat. Ukuran: ' + blob.size + ' bytes');
+      
       const reader = new FileReader();
       reader.onloadend = async () => {
-        const base64Data = reader.result.split(',')[1]; // Ambil bagian base64-nya aja
-        const msg = await simpanFileKeHP(base64Data, 'QRIS-RT38.png', 'image/png');
-        alert(msg);
+        try {
+          const base64Data = reader.result.split(',')[1];
+          alert('DEBUG: Base64 siap. Mau simpan pakai Capacitor...');
+          
+          const msg = await simpanFileKeHP(base64Data, 'QRIS-RT38.png', 'image/png');
+          alert('DEBUG: ' + msg);
+        } catch (saveErr) {
+          alert('DEBUG GAGAL SIMPAN: ' + saveErr.message);
+        }
       };
       reader.readAsDataURL(blob);
     } catch (err) {
-      alert('Gagal download QRIS: ' + err.message);
+      alert('DEBUG GAGAL FETCH: ' + err.message);
     }
   };
 
@@ -84,7 +100,6 @@ export default function ModalBayar({
           <img src="/qris.png" alt="QRIS RT 38" className="w-48 h-48 object-contain" />
           <p className="text-[10px] text-slate-600 mt-2 font-medium">Scan dengan aplikasi bank / e-wallet</p>
           
-          {/* ═══ TOMBOL DOWNLOAD BARU ═══ */}
           <button onClick={handleDownloadQRIS} className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition">⬇️ Download QRIS</button>
           
           <button onClick={() => { navigator.clipboard.writeText(String(totalBayar)); alert('Total Rp ' + totalBayar.toLocaleString('id-ID') + ' disalin'); }} className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition">📋 Salin Total: Rp {totalBayar.toLocaleString('id-ID')}</button>
