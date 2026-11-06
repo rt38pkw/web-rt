@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { ALLOWED_TYPES, MAX_FILE_SIZE } from '../../lib/iuran/constants';
 import { formatRupiahProyek } from '../../lib/proyek/constants';
-import { simpanFileKeHP } from '../../lib/download-helper';
 
 export default function ModalBayarProjek({
   show, onClose, proyek, sisaWarga, sudahBayar, onSubmit, submitting,
@@ -12,6 +11,7 @@ export default function ModalBayarProjek({
   const [previewBukti, setPreviewBukti] = useState([null, null, null]);
   const [catatan, setCatatan] = useState('');
   const [error, setError] = useState('');
+  const [zoomImage, setZoomImage] = useState(null); // State untuk Zoom QRIS
 
   useEffect(() => {
     if (show && proyek) {
@@ -20,6 +20,7 @@ export default function ModalBayarProjek({
       setPreviewBukti([null, null, null]);
       setCatatan('');
       setError('');
+      setZoomImage(null);
     }
   }, [show, proyek, sisaWarga]);
 
@@ -55,27 +56,9 @@ export default function ModalBayarProjek({
     await onSubmit({ nominal: nominalNum, nominalIuran: masukIuran, nominalDonasi: masukDonasi, fileBukti, catatan });
   };
 
-  // ═══ FUNGSI DOWNLOAD QRIS (GANTI NAMA FILE) ═══
-  const handleDownloadQRIS = async () => {
-    try {
-      const response = await fetch('/qris-proyek.png');
-      const blob = await response.blob();
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Data = reader.result.split(',')[1];
-        // GANTI NAMA FILE JADI UNDERSCORE
-        const msg = await simpanFileKeHP(base64Data, 'QRIS_Proyek_RT38.png', 'image/png');
-        alert(msg);
-      };
-      reader.readAsDataURL(blob);
-    } catch (err) {
-      alert('Gagal download QRIS: ' + err.message);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xl my-8">
+    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-start justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xl my-10">
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <div>
             <h3 className="font-bold text-white text-base">🏗️ Bayar Cicilan Proyek</h3>
@@ -91,9 +74,14 @@ export default function ModalBayarProjek({
         </div>
 
         <div className="bg-white rounded-2xl p-3 flex flex-col items-center">
-          <img src="/qris-proyek.png" alt="QRIS Proyek RT 38" className="w-40 h-40 object-contain" />
+          <img 
+            src="/qris-proyek.png" 
+            alt="QRIS Proyek RT 38" 
+            className="w-40 h-40 object-contain cursor-zoom-in" 
+            onClick={() => setZoomImage('/qris-proyek.png')}
+          />
           <p className="text-[10px] text-slate-600 mt-1 font-medium">Scan untuk bayar cicilan proyek</p>
-          <button onClick={handleDownloadQRIS} className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition">⬇️ Download QRIS</button>
+          <button onClick={() => setZoomImage('/qris-proyek.png')} className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition">🔍 Perbesar QRIS</button>
         </div>
 
         <div>
@@ -141,6 +129,16 @@ export default function ModalBayarProjek({
           <button onClick={handleSubmit} disabled={submitting || terlaluKecil || !fileBukti[0]} className="w-2/3 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-xs">{submitting ? 'Mengirim...' : `Kirim Pengajuan ${formatRupiahProyek(nominalNum)}`}</button>
         </div>
       </div>
+
+      {/* MODAL ZOOM QRIS */}
+      {zoomImage && (
+        <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setZoomImage(null)}>
+          <button className="absolute top-4 right-4 text-white text-3xl font-bold z-10" onClick={() => setZoomImage(null)}>✕</button>
+          <div className="w-full h-full overflow-auto flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+             <img src={zoomImage} alt="Zoom QRIS" className="min-w-full min-h-full object-contain" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
