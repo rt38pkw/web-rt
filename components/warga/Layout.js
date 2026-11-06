@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
-import InstallButton from '../InstallButton';
 import NotifToggle from '../NotifToggle';
 
 const MENU = [
@@ -39,9 +38,7 @@ export default function Layout({ children, warga }) {
 
         <div className="flex items-center gap-2">
           {warga && <NotifToggle userId={warga.id} userType="warga" />}
-          <InstallButton />
           
-          {/* TOMBOL PENGATURAN */}
           <Link
             href="/dashboard-warga/pengaturan"
             className="text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-xl border border-slate-700/60 transition font-medium flex items-center gap-1"
@@ -49,7 +46,6 @@ export default function Layout({ children, warga }) {
             ⚙️ <span className="hidden sm:inline">Pengaturan</span>
           </Link>
 
-          {/* TOMBOL TUTUP APLIKASI */}
           <button
             onClick={handleTutupAplikasi}
             className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-xl border border-rose-500/20 transition font-medium"
