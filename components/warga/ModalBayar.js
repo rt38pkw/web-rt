@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { getInfoBulan } from '../../lib/iuran/calculations';
 import { ALLOWED_TYPES, MAX_FILE_SIZE } from '../../lib/iuran/constants';
-import { simpanFileKeHP } from '../../lib/download-helper';
 
 export default function ModalBayar({
   show, onClose, iuranList, tarifBulanan, tarifMap = {}, belumLunasList, bulanDipilih, setBulanDipilih, onSubmit, submitting, tahun,
@@ -51,20 +50,14 @@ export default function ModalBayar({
     await onSubmit({ fileBukti, catatan, bulanDipilih });
   };
 
-  const handleDownloadQRIS = async () => {
-    try {
-      const response = await fetch('/qris.png');
-      const blob = await response.blob();
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Data = reader.result.split(',')[1];
-        const msg = await simpanFileKeHP(base64Data, 'QRIS-RT38.png', 'image/png');
-        alert(msg);
-      };
-      reader.readAsDataURL(blob);
-    } catch (err) {
-      alert('Gagal download QRIS: ' + err.message);
-    }
+  // ═══ FUNGSI DOWNLOAD QRIS PAKAI LINK DINAMIS ═══
+  const handleDownloadQRIS = () => {
+    const link = document.createElement('a');
+    link.href = '/qris.png';
+    link.download = 'QRIS-RT38.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
