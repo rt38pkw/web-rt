@@ -1,4 +1,5 @@
-import { useState } from 'react';
+// pages/proyek/tunai.js
+import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import Layout from '../../components/proyek/Layout';
 import ModalEditTunai from '../../components/proyek/ModalEditTunai';
@@ -22,10 +23,39 @@ export default function PageProyekTunai() {
   const [modalHapus, setModalHapus] = useState(null);
   const [hapusSubmitting, setHapusSubmitting] = useState(false);
 
+  // ═══ STATE UNTUK SEARCHABLE DROPDOWN ═══
+  const [searchProyek, setSearchProyek] = useState('');
+  const [isProyekOpen, setIsProyekOpen] = useState(false);
+  const proyekRef = useRef(null);
+
+  const [searchWarga, setSearchWarga] = useState('');
+  const [isWargaOpen, setIsWargaOpen] = useState(false);
+  const wargaRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (proyekRef.current && !proyekRef.current.contains(event.target)) setIsProyekOpen(false);
+      if (wargaRef.current && !wargaRef.current.contains(event.target)) setIsWargaOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   if (typeof window === 'undefined') return null;
 
   const proyekTerpilih = proyekList.find((p) => p.id === proyekId);
   const wargaTerpilih = warga.find((w) => w.id === wargaId);
+
+  // Sinkronisasi teks input dropdown
+  useEffect(() => {
+    if (proyekTerpilih) setSearchProyek(proyekTerpilih.nama);
+    else setSearchProyek('');
+  }, [proyekId, proyekTerpilih]);
+
+  useEffect(() => {
+    if (wargaTerpilih) setSearchWarga(`${wargaTerpilih.no_rumah} - ${wargaTerpilih.nama_lengkap}`);
+    else setSearchWarga('');
+  }, [wargaId, wargaTerpilih]);
 
   const sudahBayar = proyekTerpilih && wargaTerpilih
     ? getTotalTerbayar(iuranProyekList, wargaTerpilih.id, proyekTerpilih.id)
@@ -225,6 +255,15 @@ export default function PageProyekTunai() {
   const wargaHapus = modalHapus ? warga.find((w) => w.id === modalHapus.warga_id) : null;
   const proyekHapus = modalHapus ? proyekList.find((p) => p.id === modalHapus.proyek_id) : null;
 
+  // ═══ FILTER DROPDOWN ═══
+  const filteredProyek = proyekList.filter((p) => 
+    p.status === 'aktif' && p.nama.toLowerCase().includes(searchProyek.toLowerCase())
+  );
+
+  const filteredWarga = warga.filter((w) => 
+    `${w.no_rumah} ${w.nama_lengkap}`.toLowerCase().includes(searchWarga.toLowerCase())
+  );
+
   return (
     <Layout user={user} pendingCount={pendingCount}>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -236,41 +275,94 @@ export default function PageProyekTunai() {
           <h3 className="text-sm font-bold text-white">💵 Input Cicilan Tunai</h3>
           <p className="text-[10px] text-slate-500">Untuk warga yang bayar tunai. Kelebihan otomatis jadi donasi.</p>
 
-          <div>
+          {/* SEARCHABLE PROYEK */}
+          <div className="relative" ref={proyekRef}>
             <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Proyek</label>
-            <select
-              value={proyekId}
-              onChange={(e) => { setProyekId(e.target.value); setNominal(''); }}
-              required
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
-            >
-              <option value="">-- Pilih Proyek --</option>
-              {proyekList.filter((p) => p.status === 'aktif').map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nama} ({formatRupiahProyek(p.nominal_per_warga)})
-                </option>
-              ))}
-            </select>
+            <input
+              type="text"
+              placeholder="Ketik nama proyek..."
+              value={searchProyek}
+              onChange={(e) => {
+                setSearchProyek(e.target.value);
+                setIsProyekOpen(true);
+                if (e.target.value === '') { setProyekId(''); setNominal(''); }
+              }}
+              onFocus={() => setIsProyekOpen(true)}
+              required={!proyekId}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 transition"
+            />
+            {isProyekOpen && (
+              <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                {filteredProyek.length === 0 ? (
+                  <div className="p-3 text-xs text-slate-400 text-center">Proyek tidak ditemukan</div>
+                ) : (
+                  filteredProyek.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setProyekId(p.id);
+                        setSearchProyek(p.nama);
+                        setIsProyekOpen(false);
+                        setNominal('');
+                      }}
+                      className={`w-full text-left px-3 py-2.5 text-xs border-b border-slate-700/50 last:border-0 hover:bg-slate-700 transition ${
+                        proyekId === p.id ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-slate-200'
+                      }`}
+                    >
+                      <div className="font-semibold">{p.nama}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">{formatRupiahProyek(p.nominal_per_warga)}</div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
 
-          <div>
+          {/* SEARCHABLE WARGA */}
+          <div className="relative" ref={wargaRef}>
             <label className="block text-[10px] font-semibold text-slate-300 uppercase mb-1">Warga</label>
-            <select
-              value={wargaId}
-              onChange={(e) => { setWargaId(e.target.value); setNominal(''); }}
-              required
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
-            >
-              <option value="">-- Pilih Warga --</option>
-              {warga.map((w) => {
-                const s = proyekTerpilih ? getSisaWarga(iuranProyekList, w.id, proyekTerpilih) : 0;
-                return (
-                  <option key={w.id} value={w.id}>
-                    {w.no_rumah} - {w.nama_lengkap} {proyekTerpilih && s === 0 ? '✓ Lunas' : ''}
-                  </option>
-                );
-              })}
-            </select>
+            <input
+              type="text"
+              placeholder="Ketik no rumah atau nama..."
+              value={searchWarga}
+              onChange={(e) => {
+                setSearchWarga(e.target.value);
+                setIsWargaOpen(true);
+                if (e.target.value === '') { setWargaId(''); setNominal(''); }
+              }}
+              onFocus={() => setIsWargaOpen(true)}
+              required={!wargaId}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 transition"
+            />
+            {isWargaOpen && (
+              <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                {filteredWarga.length === 0 ? (
+                  <div className="p-3 text-xs text-slate-400 text-center">Warga tidak ditemukan</div>
+                ) : (
+                  filteredWarga.map((w) => {
+                    const s = proyekTerpilih ? getSisaWarga(iuranProyekList, w.id, proyekTerpilih) : 0;
+                    return (
+                      <button
+                        key={w.id}
+                        type="button"
+                        onClick={() => {
+                          setWargaId(w.id);
+                          setSearchWarga(`${w.no_rumah} - ${w.nama_lengkap}`);
+                          setIsWargaOpen(false);
+                          setNominal('');
+                        }}
+                        className={`w-full text-left px-3 py-2.5 text-xs border-b border-slate-700/50 last:border-0 hover:bg-slate-700 transition ${
+                          wargaId === w.id ? 'bg-blue-600/20 text-blue-300 font-semibold' : 'text-slate-200'
+                        }`}
+                      >
+                        <div className="font-semibold">{w.no_rumah} - {w.nama_lengkap} {proyekTerpilih && s === 0 ? '✓ Lunas' : ''}</div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
           </div>
 
           {proyekTerpilih && wargaTerpilih && (
