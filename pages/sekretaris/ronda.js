@@ -98,7 +98,7 @@ export default function SekretarisRonda() {
     return new Date() > endDateTime; 
   };
 
-  // ═══ QUERY SEDERHANA (TANPA RELASI RUMIT) ═══
+  // ═══ QUERY SEDERHANA (TANPA RELASI RUMIT) + DEBUG LOG ═══
   async function fetchVerifikasiRonda(isSilent = false) {
     if (!isSilent) setLoadingVerifikasi(true);
     try {
@@ -108,6 +108,8 @@ export default function SekretarisRonda() {
         .select('*')
         .eq('status_hadir', 'pending');
       if (errP) throw errP;
+      
+      console.log("1. DATA PETUGAS MENTAH:", petugasData?.length, petugasData);
 
       // 2. Ambil data jadwal_ronda
       const { data: jadwalData } = await supabase.from('jadwal_ronda').select('*');
@@ -145,6 +147,8 @@ export default function SekretarisRonda() {
         };
       }).filter(Boolean); // Hapus yang null
 
+      console.log("2. DATA GABUNGAN:", dataGabungan?.length, dataGabungan);
+
       // 7. Grouping berdasarkan jadwal_id
       const grouped = dataGabungan.reduce((acc, curr) => {
         if (!acc[curr.jadwal_id]) {
@@ -174,6 +178,8 @@ export default function SekretarisRonda() {
         const waktuLewat = isTimePassed(group.tanggal, group.jam_selesai);
         return adaFoto || waktuLewat;
       });
+
+      console.log("3. HASIL FILTER AKHIR:", filteredGroups?.length, filteredGroups);
 
       setVerifikasiData(filteredGroups);
 
