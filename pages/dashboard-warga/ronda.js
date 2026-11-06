@@ -18,7 +18,6 @@ export default function RondaWarga() {
   const [showRekap, setShowRekap] = useState(false);
   const [catatanMap, setCatatanMap] = useState({});
   
-  // ═══ TAMBAHAN: STATE UNTUK TIMER REALTIME ═══
   const [tick, setTick] = useState(Date.now());
 
   useEffect(() => {
@@ -31,7 +30,6 @@ export default function RondaWarga() {
     setUser(parsedUser);
     fetchData(parsedUser.id);
 
-    // ═══ REALTIME SUPABASE ═══
     const channel = supabase
       .channel('realtime-ronda-warga')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'petugas_ronda' }, () => {
@@ -42,7 +40,6 @@ export default function RondaWarga() {
       })
       .subscribe();
 
-    // ═══ TIMER (Detak Jantung) SETIAP 10 DETIK ═══
     const timer = setInterval(() => {
       setTick(Date.now()); 
     }, 10000);
@@ -121,12 +118,33 @@ export default function RondaWarga() {
       const { error } = await supabase.from('petugas_ronda').update({ status_hadir: 'pending', foto_bukti: publicUrl, waktu_absen: new Date().toISOString(), catatan: catatanTeks }).eq('jadwal_id', jadwalId); 
       if (error) throw error;
       
-      const namaWarga = user?.penghuni_data?.nama_lengkap || user?.nama_lengkap || 'Warga';
-      fetch('/api/push/notify-ronda-pending', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nama_warga: namaWarga, tanggal: tanggal })
-      }).catch(err => console.log('Gagal kirim notif', err));
+      // ═══ TAMBAHAN NOTIFIKASI (JALUR PINTAS LANGSUNG KE SMART-HANDLER) ═══
+      try {
+        const namaWarga = user?.penghuni_data?.nama_lengkap || user?.nama_lengkap || 'Warga';
+        
+        // Nembak ke Sekretaris
+        await supabase.functions.invoke('smart-handler', {
+          body: {
+            role_target: 'sekretaris',
+            title: '📸 Bukti Ronda Baru',
+            body: `${namaWarga} baru saja upload bukti ronda untuk tanggal ${formatTanggal(tanggal)}.`,
+            url: '/sekretaris/ronda'
+          }
+        });
+
+        // Nembak ke Ketua
+        await supabase.functions.invoke('smart-handler', {
+          body: {
+            role_target: 'ketua',
+            title: '📸 Bukti Ronda Baru',
+            body: `${namaWarga} baru saja upload bukti ronda untuk tanggal ${formatTanggal(tanggal)}.`,
+            url: '/sekretaris/ronda'
+          }
+        });
+      } catch (notifErr) {
+        console.log('Gagal kirim notif ronda:', notifErr);
+      }
+      // ═════════════════════════════════════════════════════════════
 
       alert('✅ Absen berhasil dikirim!');
       fetchData(user.id, true); 
@@ -145,12 +163,10 @@ export default function RondaWarga() {
 
   const formatTanggal = (dateStr) => dateStr ? new Intl.DateTimeFormat('id-ID', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(dateStr)) : '-';
   
-  // ═══ FUNGSI WAKTU (Dipanggil ulang setiap kali `tick` berubah) ═══
   const cekStatusWaktu = (tanggalJadwal, jamMulai, jamSelesai) => {
     if (!tanggalJadwal || !jamMulai || !jamSelesai) return 'closed';
     
     const dateStr = tanggalJadwal.split('T')[0]; 
-    
     const [mulaiH, mulaiM] = jamMulai.split(':');
     const [selesaiH, selesaiM] = jamSelesai.split(':');
 
@@ -161,7 +177,6 @@ export default function RondaWarga() {
       endDateTime.setDate(endDateTime.getDate() + 1);
     }
 
-    // Gunakan `new Date()` yang baru agar bergantung pada `tick`
     const now = new Date(); 
 
     if (now < startDateTime) return 'wait';
@@ -192,7 +207,6 @@ export default function RondaWarga() {
 
   return (
     <Layout warga={user} onLogout={handleLogout}>
-      
       {loading ? (
         <div className="flex flex-col items-center justify-center h-[50vh] space-y-3">
           <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
@@ -200,11 +214,8 @@ export default function RondaWarga() {
         </div>
       ) : (
         <div className="flex flex-col h-[calc(100dvh-140px)] gap-2 pb-2 animate-in fade-in">
-          
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex justify-between items-center shadow-sm shrink-0">
-            <div>
-              <h1 className="text-sm font-bold text-white">Ronda RT 38</h1>
-            </div>
+            <div><h1 className="text-sm font-bold text-white">Ronda RT 38</h1></div>
             <button onClick={() => setShowRekap(true)} className="bg-rose-500/10 text-rose-400 border border-rose-500/30 font-bold px-2.5 py-1.5 rounded-lg text-[10px] flex items-center gap-1 transition">⚠️ Daftar Alpa</button>
           </div>
 
@@ -225,7 +236,6 @@ export default function RondaWarga() {
                 jadwalFull.map((j) => {
                   const myPetugasData = jadwalSaya.find(ms => ms.jadwal_id === j.id);
                   const isMySchedule = !!myPetugasData;
-                  
                   return (
                     <div key={j.id} className={`p-2 border-b border-slate-800/50 last:border-0 flex flex-col gap-1 ${isMySchedule ? 'bg-indigo-900/10' : ''}`}>
                       <div className="flex justify-between items-center">
@@ -257,7 +267,6 @@ export default function RondaWarga() {
                 {sortedJadwalSaya.map((item) => {
                   const statusWaktu = cekStatusWaktu(item.jadwal.tanggal, item.jadwal.periode?.jam_mulai, item.jadwal.periode?.jam_selesai);
                   const isDone = !!item.foto_bukti;
-                  
                   return (
                     <div key={item.id} className="min-w-full snap-center p-3 flex flex-col gap-2 relative">
                       <div className="flex justify-between items-center">
@@ -337,16 +346,12 @@ export default function RondaWarga() {
               ) : (
                 alpaList.map((lb, index) => (
                   <div key={lb.id} className="flex items-center gap-3 bg-slate-950/50 p-2 rounded-xl border border-slate-800">
-                    <div className="w-6 h-6 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-bold text-[10px] shrink-0">
-                      {index + 1}
-                    </div>
+                    <div className="w-6 h-6 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-bold text-[10px] shrink-0">{index + 1}</div>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-bold text-white truncate">{lb.nama}</div>
                       <div className="text-[10px] text-slate-500 font-mono">{lb.no_rumah}</div>
                     </div>
-                    <div className="bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg text-[10px] font-bold text-rose-400 shrink-0">
-                      {lb.total_alpa} x Alpa
-                    </div>
+                    <div className="bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg text-[10px] font-bold text-rose-400 shrink-0">{lb.total_alpa} x Alpa</div>
                   </div>
                 ))
               )}
