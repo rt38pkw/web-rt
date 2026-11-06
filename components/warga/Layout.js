@@ -25,54 +25,64 @@ export default function Layout({ children, warga }) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-blue-500 selection:text-white antialiased">
-      <header className="px-5 py-3.5 border-b border-slate-800/60 flex justify-between items-center bg-slate-900/40 backdrop-blur-md sticky top-0 z-50">
-        <Link href="/dashboard-warga/iuran" className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700/80 flex items-center justify-center overflow-hidden shrink-0">
-            <img src="/logo-rt38.png" alt="Logo RT 38" className="w-full h-full object-cover" />
-          </div>
-          <div>
-            <h1 className="font-bold text-xs sm:text-sm text-white tracking-wide">PORTAL WARGA</h1>
-            <p className="text-[10px] text-slate-400">RT 38 Puri Kencana Wagir</p>
-          </div>
-        </Link>
-
-        <div className="flex items-center gap-2">
-          {warga && <NotifToggle userId={warga.id} userType="warga" />}
-          
-          <Link
-            href="/dashboard-warga/pengaturan"
-            className="text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-xl border border-slate-700/60 transition font-medium flex items-center gap-1"
-          >
-            ⚙️ <span className="hidden sm:inline">Pengaturan</span>
+      
+      {/* ═══ STICKY WRAPPER (HEADER + TAB MENU) ═══ */}
+      <div className="sticky top-0 z-50">
+        {/* HEADER (Bukan sticky lagi karena sudah dibungkus) */}
+        <header className="px-5 py-3.5 border-b border-slate-800/60 flex justify-between items-center bg-slate-900/95 backdrop-blur-md">
+          <Link href="/dashboard-warga/iuran" className="flex items-center space-x-3">
+            <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700/80 flex items-center justify-center overflow-hidden shrink-0">
+              <img src="/logo-rt38.png" alt="Logo RT 38" className="w-full h-full object-cover" />
+            </div>
+            <div>
+              <h1 className="font-bold text-xs sm:text-sm text-white tracking-wide">PORTAL WARGA</h1>
+              <p className="text-[10px] text-slate-400">RT 38 Puri Kencana Wagir</p>
+            </div>
           </Link>
 
-          <button
-            onClick={handleTutupAplikasi}
-            className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-xl border border-rose-500/20 transition font-medium"
-            title="Tutup Aplikasi"
-          >
-            ✕
-          </button>
-        </div>
-      </header>
-
-      <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-4 my-1">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {MENU.map((t) => (
+          <div className="flex items-center gap-2">
+            {warga && <NotifToggle userId={warga.id} userType="warga" />}
+            
             <Link
-              key={t.key}
-              href={t.path}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 flex items-center gap-2 shrink-0 ${
-                activeKey === t.key
-                  ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/20'
-                  : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
-              }`}
+              href="/dashboard-warga/pengaturan"
+              className="text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-xl border border-slate-700/60 transition font-medium flex items-center gap-1"
             >
-              <span>{t.icon}</span> {t.label}
+              ⚙️ <span className="hidden sm:inline">Pengaturan</span>
             </Link>
-          ))}
-        </div>
 
+            <button
+              onClick={handleTutupAplikasi}
+              className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-xl border border-rose-500/20 transition font-medium"
+              title="Tutup Aplikasi"
+            >
+              ✕
+            </button>
+          </div>
+        </header>
+
+        {/* TAB MENU — sekarang ikut menempel di bawah header */}
+        <div className="bg-slate-950/95 backdrop-blur-md border-b border-slate-800/60 px-4 sm:px-6 py-2">
+          <div className="max-w-4xl mx-auto flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {MENU.map((t) => (
+              <Link
+                key={t.key}
+                href={t.path}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 flex items-center gap-2 shrink-0 ${
+                  activeKey === t.key
+                    ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/20'
+                    : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
+                }`}
+              >
+                <span>{t.icon}</span> {t.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+      {/* ═══════════════════════════════════════════ */}
+
+      {/* KONTEN (hanya ini yang di-scroll) */}
+      <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 my-1">
         <div className="space-y-6">{children}</div>
       </main>
 
