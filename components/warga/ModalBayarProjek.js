@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { ALLOWED_TYPES, MAX_FILE_SIZE } from '../../lib/iuran/constants';
 import { formatRupiahProyek } from '../../lib/proyek/constants';
+import { simpanFileKeHP } from '../../lib/download-helper';
 
 export default function ModalBayarProjek({
   show, onClose, proyek, sisaWarga, sudahBayar, onSubmit, submitting,
@@ -34,64 +35,42 @@ export default function ModalBayarProjek({
   const handleFileChange = (slotIndex, e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      alert('Format file harus JPG, PNG, atau WebP');
-      return;
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      alert('Ukuran file maksimal 3 MB');
-      return;
-    }
-    const newFiles = [...fileBukti];
-    newFiles[slotIndex] = file;
-    setFileBukti(newFiles);
-
-    const newPreviews = [...previewBukti];
-    if (newPreviews[slotIndex]) URL.revokeObjectURL(newPreviews[slotIndex]);
-    newPreviews[slotIndex] = URL.createObjectURL(file);
-    setPreviewBukti(newPreviews);
+    if (!ALLOWED_TYPES.includes(file.type)) { alert('Format file harus JPG, PNG, atau WebP'); return; }
+    if (file.size > MAX_FILE_SIZE) { alert('Ukuran file maksimal 3 MB'); return; }
+    const newFiles = [...fileBukti]; newFiles[slotIndex] = file; setFileBukti(newFiles);
+    const newPreviews = [...previewBukti]; if (newPreviews[slotIndex]) URL.revokeObjectURL(newPreviews[slotIndex]);
+    newPreviews[slotIndex] = URL.createObjectURL(file); setPreviewBukti(newPreviews);
   };
 
   const handleRemoveFile = (slotIndex) => {
-    const newFiles = [...fileBukti];
-    newFiles[slotIndex] = null;
-    setFileBukti(newFiles);
-
-    const newPreviews = [...previewBukti];
-    if (newPreviews[slotIndex]) URL.revokeObjectURL(newPreviews[slotIndex]);
-    newPreviews[slotIndex] = null;
-    setPreviewBukti(newPreviews);
+    const newFiles = [...fileBukti]; newFiles[slotIndex] = null; setFileBukti(newFiles);
+    const newPreviews = [...previewBukti]; if (newPreviews[slotIndex]) URL.revokeObjectURL(newPreviews[slotIndex]);
+    newPreviews[slotIndex] = null; setPreviewBukti(newPreviews);
   };
 
   const handleSubmit = async () => {
     setError('');
-
-    if (terlaluKecil) {
-      setError('Nominal harus lebih dari 0');
-      return;
-    }
-    if (!fileBukti[0]) {
-      setError('Upload minimal 1 bukti pembayaran (slot 1)');
-      return;
-    }
-
-    await onSubmit({
-      nominal: nominalNum,
-      nominalIuran: masukIuran,
-      nominalDonasi: masukDonasi,
-      fileBukti,
-      catatan,
-    });
+    if (terlaluKecil) { setError('Nominal harus lebih dari 0'); return; }
+    if (!fileBukti[0]) { setError('Upload minimal 1 bukti pembayaran (slot 1)'); return; }
+    await onSubmit({ nominal: nominalNum, nominalIuran: masukIuran, nominalDonasi: masukDonasi, fileBukti, catatan });
   };
 
-  // ═══ FUNGSI DOWNLOAD QRIS PAKAI LINK DINAMIS ═══
-  const handleDownloadQRIS = () => {
-    const link = document.createElement('a');
-    link.href = '/qris-proyek.png';
-    link.download = 'QRIS-Proyek-RT38.png';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // ═══ FUNGSI DOWNLOAD QRIS (GANTI NAMA FILE) ═══
+  const handleDownloadQRIS = async () => {
+    try {
+      const response = await fetch('/qris-proyek.png');
+      const blob = await response.blob();
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Data = reader.result.split(',')[1];
+        // GANTI NAMA FILE JADI UNDERSCORE
+        const msg = await simpanFileKeHP(base64Data, 'QRIS_Proyek_RT38.png', 'image/png');
+        alert(msg);
+      };
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      alert('Gagal download QRIS: ' + err.message);
+    }
   };
 
   return (
@@ -102,139 +81,48 @@ export default function ModalBayarProjek({
             <h3 className="font-bold text-white text-base">🏗️ Bayar Cicilan Proyek</h3>
             <p className="text-[11px] text-slate-400">{proyek.nama}</p>
           </div>
-          <button
-            onClick={() => !submitting && onClose()}
-            disabled={submitting}
-            className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center text-sm transition disabled:opacity-40"
-          >
-            ✕
-          </button>
+          <button onClick={() => !submitting && onClose()} disabled={submitting} className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center text-sm transition disabled:opacity-40">✕</button>
         </div>
 
         <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-3 space-y-1">
-          <div className="flex justify-between text-xs">
-            <span className="text-slate-400">Target per warga:</span>
-            <strong className="text-amber-300">{formatRupiahProyek(proyek.nominal_per_warga)}</strong>
-          </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-slate-400">Sudah Anda bayar:</span>
-            <strong className="text-emerald-400">{formatRupiahProyek(sudahBayar)}</strong>
-          </div>
-          <div className="flex justify-between text-xs border-t border-amber-500/20 pt-1">
-            <span className="text-slate-400">Sisa:</span>
-            <strong className="text-white">{formatRupiahProyek(sisaWarga)}</strong>
-          </div>
+          <div className="flex justify-between text-xs"><span className="text-slate-400">Target per warga:</span><strong className="text-amber-300">{formatRupiahProyek(proyek.nominal_per_warga)}</strong></div>
+          <div className="flex justify-between text-xs"><span className="text-slate-400">Sudah Anda bayar:</span><strong className="text-emerald-400">{formatRupiahProyek(sudahBayar)}</strong></div>
+          <div className="flex justify-between text-xs border-t border-amber-500/20 pt-1"><span className="text-slate-400">Sisa:</span><strong className="text-white">{formatRupiahProyek(sisaWarga)}</strong></div>
         </div>
 
         <div className="bg-white rounded-2xl p-3 flex flex-col items-center">
           <img src="/qris-proyek.png" alt="QRIS Proyek RT 38" className="w-40 h-40 object-contain" />
           <p className="text-[10px] text-slate-600 mt-1 font-medium">Scan untuk bayar cicilan proyek</p>
-          
-          <button
-            onClick={handleDownloadQRIS}
-            className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition"
-          >
-            ⬇️ Download QRIS
-          </button>
+          <button onClick={handleDownloadQRIS} className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition">⬇️ Download QRIS</button>
         </div>
 
         <div>
-          <label className="text-xs font-semibold text-slate-300 block mb-2">
-            Nominal Bayar <span className="text-slate-500">(bebas)</span>
-          </label>
-          <input
-            type="number"
-            value={nominal}
-            onChange={(e) => setNominal(e.target.value)}
-            placeholder="0"
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white font-mono focus:border-blue-500/50 focus:outline-none"
-          />
+          <label className="text-xs font-semibold text-slate-300 block mb-2">Nominal Bayar <span className="text-slate-500">(bebas)</span></label>
+          <input type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white font-mono focus:border-blue-500/50 focus:outline-none" />
           <div className="flex gap-1.5 mt-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setNominal(String(sisaWarga))}
-              className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded"
-            >
-              Pas Sisa ({formatRupiahProyek(sisaWarga)})
-            </button>
-            <button
-              type="button"
-              onClick={() => setNominal(String(Math.ceil(sisaWarga / 2 / 1000) * 1000))}
-              className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded"
-            >
-              Setengah
-            </button>
+            <button type="button" onClick={() => setNominal(String(sisaWarga))} className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded">Pas Sisa ({formatRupiahProyek(sisaWarga)})</button>
+            <button type="button" onClick={() => setNominal(String(Math.ceil(sisaWarga / 2 / 1000) * 1000))} className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded">Setengah</button>
           </div>
         </div>
 
         {nominalNum > 0 && masukDonasi > 0 && (
           <div className="bg-purple-950/30 border border-purple-500/30 rounded-xl p-3 space-y-2">
             <div className="text-[11px] font-semibold text-purple-300">📊 Rincian:</div>
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-400">→ Cicilan Iuran</span>
-              <strong className="text-emerald-400">{formatRupiahProyek(masukIuran)}</strong>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-400">→ Donasi (kelebihan)</span>
-              <strong className="text-purple-400">+ {formatRupiahProyek(masukDonasi)}</strong>
-            </div>
-            <p className="text-[9px] text-purple-300/70 leading-relaxed border-t border-purple-500/20 pt-1.5">
-              💡 Kelebihan otomatis tercatat sebagai <strong>donasi proyek</strong>. Uang ini tidak dikembalikan kecuali ada kebijakan refund dari pengelola.
-            </p>
+            <div className="flex justify-between text-xs"><span className="text-slate-400">→ Cicilan Iuran</span><strong className="text-emerald-400">{formatRupiahProyek(masukIuran)}</strong></div>
+            <div className="flex justify-between text-xs"><span className="text-slate-400">→ Donasi (kelebihan)</span><strong className="text-purple-400">+ {formatRupiahProyek(masukDonasi)}</strong></div>
           </div>
         )}
 
         <div>
-          <label className="text-xs font-semibold text-slate-300 block mb-2">
-            Bukti Transfer <span className="text-slate-500">(slot 1 wajib)</span>
-          </label>
+          <label className="text-xs font-semibold text-slate-300 block mb-2">Bukti Transfer <span className="text-slate-500">(slot 1 wajib)</span></label>
           <div className="grid grid-cols-3 gap-2">
             {[0, 1, 2].map((slot) => (
               <div key={slot} className="relative">
-                <input
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/webp"
-                  onChange={(e) => handleFileChange(slot, e)}
-                  className="hidden"
-                  id={`projek-slot-${slot}`}
-                />
-                <label
-                  htmlFor={`projek-slot-${slot}`}
-                  className={`block aspect-square rounded-2xl border-2 border-dashed flex items-center justify-center cursor-pointer overflow-hidden transition ${
-                    previewBukti[slot]
-                      ? 'border-amber-500/60 bg-slate-950'
-                      : slot === 0
-                      ? 'border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/10'
-                      : 'border-slate-700 bg-slate-950/60 hover:bg-slate-800/40'
-                  }`}
-                >
-                  {previewBukti[slot] ? (
-                    <img
-                      src={previewBukti[slot]}
-                      alt={`Bukti ${slot + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="text-center">
-                      <div className="text-2xl">{slot === 0 ? '📸' : '➕'}</div>
-                      <div className="text-[9px] text-slate-400 mt-1">
-                        Slot {slot + 1}
-                        {slot === 0 ? ' *' : ''}
-                      </div>
-                    </div>
-                  )}
+                <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={(e) => handleFileChange(slot, e)} className="hidden" id={`projek-slot-${slot}`} />
+                <label htmlFor={`projek-slot-${slot}`} className={`block aspect-square rounded-2xl border-2 border-dashed flex items-center justify-center cursor-pointer overflow-hidden transition ${previewBukti[slot] ? 'border-amber-500/60 bg-slate-950' : slot === 0 ? 'border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/10' : 'border-slate-700 bg-slate-950/60 hover:bg-slate-800/40'}`}>
+                  {previewBukti[slot] ? (<img src={previewBukti[slot]} alt={`Bukti ${slot + 1}`} className="w-full h-full object-cover" />) : (<div className="text-center"><div className="text-2xl">{slot === 0 ? '📸' : '➕'}</div><div className="text-[9px] text-slate-400 mt-1">Slot {slot + 1}{slot === 0 ? ' *' : ''}</div></div>)}
                 </label>
-                {previewBukti[slot] && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleRemoveFile(slot);
-                    }}
-                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 hover:bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center shadow-lg"
-                  >
-                    ✕
-                  </button>
-                )}
+                {previewBukti[slot] && (<button onClick={(e) => { e.preventDefault(); handleRemoveFile(slot); }} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 hover:bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center shadow-lg">✕</button>)}
               </div>
             ))}
           </div>
@@ -242,39 +130,15 @@ export default function ModalBayarProjek({
         </div>
 
         <div>
-          <label className="text-xs font-semibold text-slate-300 block mb-2">
-            Catatan (opsional)
-          </label>
-          <textarea
-            value={catatan}
-            onChange={(e) => setCatatan(e.target.value)}
-            placeholder="Contoh: transfer dari rekening istri"
-            rows={2}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 resize-none"
-          />
+          <label className="text-xs font-semibold text-slate-300 block mb-2">Catatan (opsional)</label>
+          <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="Contoh: transfer dari rekening istri" rows={2} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 resize-none" />
         </div>
 
-        {error && (
-          <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-xs text-rose-400">
-            ⚠️ {error}
-          </div>
-        )}
+        {error && (<div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-xs text-rose-400">⚠️ {error}</div>)}
 
         <div className="flex gap-3 pt-2 border-t border-slate-800">
-          <button
-            onClick={onClose}
-            disabled={submitting}
-            className="w-1/3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs"
-          >
-            Batal
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={submitting || terlaluKecil || !fileBukti[0]}
-            className="w-2/3 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-xs"
-          >
-            {submitting ? 'Mengirim...' : `Kirim Pengajuan ${formatRupiahProyek(nominalNum)}`}
-          </button>
+          <button onClick={onClose} disabled={submitting} className="w-1/3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs">Batal</button>
+          <button onClick={handleSubmit} disabled={submitting || terlaluKecil || !fileBukti[0]} className="w-2/3 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-xs">{submitting ? 'Mengirim...' : `Kirim Pengajuan ${formatRupiahProyek(nominalNum)}`}</button>
         </div>
       </div>
     </div>
