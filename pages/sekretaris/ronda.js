@@ -43,7 +43,6 @@ export default function SekretarisRonda() {
     fetchWargaRonda(); 
     checkPendingCount(); 
 
-    // Panggil fetch saat tab verifikasi dibuka
     if (activeTab === 'verifikasi') {
       fetchVerifikasiRonda();
     }
@@ -106,39 +105,28 @@ export default function SekretarisRonda() {
   async function fetchVerifikasiRonda(isSilent = false) {
     if (!isSilent) setLoadingVerifikasi(true);
     try {
-      // 1. Ambil data petugas_ronda mentah
       const { data: petugasData, error: errP } = await supabase
         .from('petugas_ronda')
         .select('*')
         .eq('status_hadir', 'pending');
       if (errP) throw errP;
 
-      // 2. Ambil data jadwal_ronda
       const { data: jadwalData } = await supabase.from('jadwal_ronda').select('*');
-      // 3. Ambil data periode_ronda
       const { data: periodeData } = await supabase.from('periode_ronda').select('*').eq('status', 'published');
-      // 4. Ambil data penghuni
       const { data: penghuniData } = await supabase.from('penghuni').select('*, warga:warga_id(no_rumah)');
 
-      // 5. Bikin map untuk pencarian cepat
       const jadwalMap = {};
       (jadwalData || []).forEach(j => { jadwalMap[j.id] = j; });
-
       const periodeMap = {};
       (periodeData || []).forEach(p => { periodeMap[p.id] = p; });
-
       const penghuniMap = {};
       (penghuniData || []).forEach(p => { penghuniMap[p.id] = p; });
 
-      // 6. Gabungin data
       const dataGabungan = (petugasData || []).map(pr => {
         const jadwal = jadwalMap[pr.jadwal_id];
         const periode = jadwal ? periodeMap[jadwal.periode_id] : null;
         const penghuni = penghuniMap[pr.penghuni_id];
-
-        // Cuma ambil kalau periodenya published
         if (!periode) return null;
-
         return {
           ...pr,
           tanggal: jadwal.tanggal,
@@ -147,9 +135,8 @@ export default function SekretarisRonda() {
           nama_lengkap: penghuni?.nama_lengkap || 'Warga',
           no_rumah: penghuni?.warga?.no_rumah || '-'
         };
-      }).filter(Boolean); // Hapus yang null
+      }).filter(Boolean);
 
-      // 7. Grouping berdasarkan jadwal_id
       const grouped = dataGabungan.reduce((acc, curr) => {
         if (!acc[curr.jadwal_id]) {
           acc[curr.jadwal_id] = {
@@ -172,7 +159,6 @@ export default function SekretarisRonda() {
         return acc;
       }, {});
 
-      // 8. Filter grup
       const filteredGroups = Object.values(grouped).filter(group => {
         const adaFoto = group.petugas.some(p => p.foto_bukti && p.foto_bukti !== 'DIHAPUS');
         const waktuLewat = isTimePassed(group.tanggal, group.jam_selesai);
@@ -504,4 +490,38 @@ export default function SekretarisRonda() {
                                   onClick={() => setVerifikasiEdits({ ...verifikasiEdits, [p.id]: statusSekarang === 'hadir' ? 'tidak_hadir' : 'hadir' })}
                                   className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition border ${statusSekarang === 'hadir' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border-rose-500/30'}`}
                                 >
-                                 
+                                  {statusSekarang === 'hadir' ? '✅ Hadir' : '❌ Alpa'}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <button 
+                          onClick={() => handleSimpanVerifikasi(group.jadwal_id, group.petugas, group.foto_bukti)}
+                          disabled={processing}
+                          className={`w-full mt-2 text-white font-bold py-2.5 rounded-xl text-xs transition ${!hasPhoto ? 'bg-rose-600 hover:bg-rose-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}
+                        >
+                          {processing ? 'Menyimpan...' : !hasPhoto ? 'Simpan Verifikasi Manual' : 'Simpan & Hapus Foto'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <ModalBuatPeriode isOpen={showModalPeriode} onClose={() => setShowModalPeriode(false)} onSave={handleBuatPeriode} processing={processing} />
+      
+      {zoomImage && (
+        <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setZoomImage(null)}>
+          <button className="absolute top-4 right-4 text-white text-3xl font-bold" onClick={() => setZoomImage(null)}>✕</button>
+          <div className="w-full h-full overflow-auto flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+             <img src={zoomImage} alt="Zoom" className="min-w-full min-h-full object-contain" />
+          </div>
+        </div>
+      )}
+   
