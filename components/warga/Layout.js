@@ -4,7 +4,6 @@ import { useRouter } from 'next/router';
 import { useState } from 'react'; 
 import NotifToggle from '../NotifToggle';
 
-// Import komponen baru
 import PopoverPengaturan from './PopoverPengaturan';
 import ModalUbahPin from './ModalUbahPin';
 
@@ -28,10 +27,10 @@ export default function Layout({ children, warga }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-blue-500 selection:text-white antialiased relative">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-blue-500 selection:text-white antialiased">
       
       <div className="sticky top-0 z-50">
-        <header className="px-5 py-3.5 border-b border-slate-800/60 flex justify-between items-center bg-slate-900/95 backdrop-blur-md relative">
+        <header className="px-5 py-3.5 border-b border-slate-800/60 flex justify-between items-center bg-slate-900/95 backdrop-blur-md">
           <Link href="/dashboard-warga/iuran" className="flex items-center space-x-3">
             <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700/80 flex items-center justify-center overflow-hidden shrink-0">
               <img src="/logo-rt38.png" alt="Logo RT 38" className="w-full h-full object-cover" />
@@ -45,8 +44,9 @@ export default function Layout({ children, warga }) {
           <div className="flex items-center gap-2">
             {warga && <NotifToggle userId={warga.id} userType="warga" />}
             
-            {/* TOMBOL PENGATURAN (Memicu Popover) */}
+            {/* TOMBOL PENGATURAN - Beri ID khusus */}
             <button
+              id="btn-pengaturan"
               onClick={() => setShowSettings(!showSettings)}
               className={`text-xs px-3 py-1.5 rounded-xl border transition font-medium flex items-center gap-1 ${
                 showSettings 
@@ -57,15 +57,6 @@ export default function Layout({ children, warga }) {
               ⚙️ <span className="hidden sm:inline">Pengaturan</span>
             </button>
           </div>
-          
-          {/* POPOVER DITARUH DI DALAM HEADER AGAR MENEMPEL PADA TOMBOL ⚙️ */}
-          <PopoverPengaturan 
-            show={showSettings} 
-            onClose={() => setShowSettings(false)} 
-            warga={warga}
-            onOpenUbahPin={() => setShowUbahPin(true)}
-            onLogout={handleLogout}
-          />
         </header>
 
         <div className="bg-slate-950/95 backdrop-blur-md border-b border-slate-800/60 px-4 sm:px-6 py-2">
@@ -95,7 +86,15 @@ export default function Layout({ children, warga }) {
         RT 38 Puri Kencana Wagir &copy; 2026 • Portal Mandiri Warga
       </footer>
 
-      {/* MODAL UBAH PIN (TETAP ADA, MUNCUL DI ATAS POPOVER) */}
+      {/* ═══ POPOVER DIPINDAH KE SINI (DI LUAR HEADER) ═══ */}
+      <PopoverPengaturan 
+        show={showSettings} 
+        onClose={() => setShowSettings(false)} 
+        warga={warga}
+        onOpenUbahPin={() => setShowUbahPin(true)}
+        onLogout={handleLogout}
+      />
+
       <ModalUbahPin 
         show={showUbahPin} 
         onClose={() => setShowUbahPin(false)} 
