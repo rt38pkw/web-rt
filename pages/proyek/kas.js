@@ -148,15 +148,12 @@ export default function PageProyekKas() {
   const riwayatGabungan = [...riwayatIuran, ...riwayatKas]
     .sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
 
-  // Filter KHUSUS untuk Tabel Rincian Pengeluaran
   const rincianPengeluaran = riwayatGabungan.filter(r => r.tipe === 'pengeluaran');
 
-  // ═══ FUNGSI EXPORT PDF (ASYNC) ═══
   const handleExportPdf = async () => {
     if (!proyekAktif) return alert('Pilih proyek terlebih dahulu');
     await exportKasProyekToPdf(proyekAktif, kas, riwayatGabungan, warga);
   };
-  // ═════════════════════════════════
 
   return (
     <Layout user={user} pendingCount={getPendingProyekCount(iuranProyekList)}>
@@ -232,7 +229,7 @@ export default function PageProyekKas() {
           </div>
         )}
 
-        {/* ═══ BLOK RINCIAN PENGELUARAN ═══ */}
+        {/* ═══ RINCIAN PENGELUARAN (Card List + Tombol Aksi) ═══ */}
         {rincianPengeluaran.length > 0 && (
           <div className="bg-slate-900 border border-rose-500/20 rounded-2xl overflow-hidden shadow-xl">
             <div className="p-4 border-b border-slate-800 bg-rose-950/20 flex justify-between items-center">
@@ -241,123 +238,114 @@ export default function PageProyekKas() {
                 Total: {formatRupiahProyek(kas.totalPengeluaran)}
               </span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950 text-slate-400 uppercase text-[10px]">
-                  <tr>
-                    <th className="p-3">Tanggal</th>
-                    <th className="p-3">Keterangan</th>
-                    <th className="p-3 text-right">Nominal</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {rincianPengeluaran.map((k) => (
-                    <tr key={k.id} className="hover:bg-slate-800/40">
-                      <td className="p-3 text-slate-400 whitespace-nowrap text-[10px]">{formatTanggalProyek(k.tanggal)}</td>
-                      <td className="p-3 text-slate-300 text-[11px]">{k.keterangan || '-'}</td>
-                      <td className="p-3 text-right font-mono font-bold text-rose-400">- {formatRupiahProyek(k.nominal)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="p-3 space-y-2 max-h-[40vh] overflow-y-auto">
+              {rincianPengeluaran.map((k) => (
+                <div key={k.id} className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col gap-2">
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-slate-400">{formatTanggalProyek(k.tanggal)}</span>
+                    <span className="text-sm font-bold font-mono text-rose-400 whitespace-nowrap">
+                      - {formatRupiahProyek(k.nominal)}
+                    </span>
+                  </div>
+
+                  <div className="text-xs text-slate-200">
+                    {k.keterangan || '-'}
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-800/50 mt-1">
+                    <button 
+                      onClick={() => { setEditData(k); setModalMode('edit'); setShowModal(true); }} 
+                      className="text-[10px] text-blue-400 font-semibold hover:text-blue-300 bg-blue-500/10 px-2.5 py-1.5 rounded-lg border border-blue-500/20 transition active:scale-95"
+                    >
+                      ✏️ Edit
+                    </button>
+                    <button 
+                      onClick={() => handleHapusClick(k)} 
+                      className="text-[10px] text-rose-400 font-semibold hover:text-rose-300 bg-rose-500/10 px-2.5 py-1.5 rounded-lg border border-rose-500/20 transition active:scale-95"
+                    >
+                      🗑️ Hapus
+                    </button>
+                  </div>
+
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* TABEL RIWAYAT MUTASI GABUNGAN */}
+        {/* ═══ RIWAYAT MUTASI GABUNGAN (Card List) ═══ */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
           <div className="p-4 border-b border-slate-800 flex justify-between items-center">
             <h3 className="text-sm font-bold text-white">📜 Riwayat Mutasi Kas Proyek</h3>
-            <span className="text-[10px] text-slate-400 bg-slate-950 px-2 py-1 rounded border border-slate-800">Termasuk Iuran Warga</span>
+            <span className="text-[10px] text-slate-400 bg-slate-950 px-2 py-1 rounded border border-slate-800">Termasuk Iuran</span>
           </div>
-          <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] sticky top-0 z-10">
-                <tr>
-                  <th className="p-3">Tanggal</th>
-                  <th className="p-3">Tipe</th>
-                  <th className="p-3">Warga (jika ada)</th>
-                  <th className="p-3">Keterangan</th>
-                  <th className="p-3 text-right">Nominal</th>
-                  <th className="p-3 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {riwayatGabungan.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="p-6 text-center text-slate-500">Belum ada transaksi sama sekali.</td>
-                  </tr>
-                ) : (
-                  riwayatGabungan.map((k) => {
-                    const w = warga.find(x => x.id === k.warga_id);
-                    
-                    const isIuran = k.tipe === 'iuran';
-                    const isPengeluaran = k.tipe === 'pengeluaran';
-                    const isDonasi = k.tipe === 'donasi';
-                    const isRefund = k.tipe === 'refund';
-                    const isMasuk = isIuran || isDonasi;
-                    
-                    let badgeClass = 'bg-slate-500/10 text-slate-400 border-slate-500/20';
-                    let badgeText = '❓ Lainnya';
-                    let textNominal = 'text-slate-400';
+          
+          <div className="p-3 space-y-2 max-h-[60vh] overflow-y-auto">
+            {riwayatGabungan.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500">Belum ada transaksi sama sekali.</div>
+            ) : (
+              riwayatGabungan.map((k) => {
+                const w = warga.find(x => x.id === k.warga_id);
+                const isIuran = k.tipe === 'iuran';
+                const isPengeluaran = k.tipe === 'pengeluaran';
+                const isDonasi = k.tipe === 'donasi';
+                const isRefund = k.tipe === 'refund';
+                const isMasuk = isIuran || isDonasi;
 
-                    if (isIuran) {
-                      badgeClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-                      badgeText = '💵 Iuran';
-                      textNominal = 'text-emerald-400';
-                    } else if (isDonasi) {
-                      badgeClass = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
-                      badgeText = '💚 Donasi';
-                      textNominal = 'text-purple-400';
-                    } else if (isPengeluaran) {
-                      badgeClass = 'bg-rose-500/10 text-rose-400 border-rose-500/20';
-                      badgeText = '💸 Pengeluaran';
-                      textNominal = 'text-rose-400';
-                    } else if (isRefund) {
-                      badgeClass = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-                      badgeText = '↩️ Refund';
-                      textNominal = 'text-amber-400';
-                    }
+                let badgeClass = 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+                let badgeText = '❓ Lainnya';
+                let textNominal = 'text-slate-400';
 
-                    return (
-                      <tr key={k.id} className="hover:bg-slate-800/40">
-                        <td className="p-3 text-slate-400 whitespace-nowrap text-[10px]">{formatTanggalProyek(k.tanggal)}</td>
-                        <td className="p-3">
-                          <span className={`text-[10px] px-2 py-0.5 rounded border ${badgeClass}`}>
-                            {badgeText}
-                          </span>
-                        </td>
-                        <td className="p-3 text-slate-300">{w ? `${w.no_rumah} - ${w.nama_lengkap}` : '-'}</td>
-                        <td className="p-3 text-slate-400 text-[11px]">{k.keterangan || '-'}</td>
-                        <td className={`p-3 text-right font-mono font-bold ${textNominal}`}>
-                          {isMasuk ? '+ ' : '- '}{formatRupiahProyek(k.nominal)}
-                        </td>
-                        <td className="p-3 text-right">
-                          <div className="flex gap-1 justify-end">
-                            {!isIuran ? (
-                              <>
-                                <button
-                                  onClick={() => { setEditData(k); setModalMode('edit'); setShowModal(true); }}
-                                  className="text-blue-400 hover:text-blue-300 text-[10px] font-semibold px-1"
-                                >✏️</button>
-                                <button
-                                  onClick={() => handleHapusClick(k)}
-                                  className="text-rose-400 hover:text-rose-300 text-[10px] font-semibold px-1"
-                                >🗑️</button>
-                              </>
-                            ) : (
-                              <span className="text-[9px] text-slate-500 italic px-1">di menu Tunai</span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                if (isIuran) {
+                  badgeClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                  badgeText = '💵 Iuran';
+                  textNominal = 'text-emerald-400';
+                } else if (isDonasi) {
+                  badgeClass = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+                  badgeText = '💚 Donasi';
+                  textNominal = 'text-purple-400';
+                } else if (isPengeluaran) {
+                  badgeClass = 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+                  badgeText = '💸 Pengeluaran';
+                  textNominal = 'text-rose-400';
+                } else if (isRefund) {
+                  badgeClass = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                  badgeText = '↩️ Refund';
+                  textNominal = 'text-amber-400';
+                }
+
+                return (
+                  <div key={k.id} className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col gap-2">
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-slate-400">{formatTanggalProyek(k.tanggal)}</span>
+                      <span className={`text-[9px] px-2 py-0.5 rounded border font-bold ${badgeClass}`}>{badgeText}</span>
+                    </div>
+
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        {w && <div className="text-[10px] font-semibold text-slate-300">{w.no_rumah} - {w.nama_lengkap}</div>}
+                        <div className="text-[10px] text-slate-500 truncate">{k.keterangan || '-'}</div>
+                      </div>
+                      <div className={`text-sm font-bold font-mono whitespace-nowrap ${textNominal}`}>
+                        {isMasuk ? '+ ' : '- '}{formatRupiahProyek(k.nominal)}
+                      </div>
+                    </div>
+
+                    {!isIuran && (
+                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-800/50 mt-1">
+                        <button onClick={() => { setEditData(k); setModalMode('edit'); setShowModal(true); }} className="text-[10px] text-blue-400 font-semibold hover:text-blue-300">✏️ Edit</button>
+                        <button onClick={() => handleHapusClick(k)} className="text-[10px] text-rose-400 font-semibold hover:text-rose-300">🗑️ Hapus</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
+
       </div>
 
       <ModalKasProyek
