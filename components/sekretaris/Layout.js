@@ -1,11 +1,11 @@
 // components/sekretaris/Layout.js
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Capacitor } from '@capacitor/core';
-import { App } from '@capacitor/app';
+import { useState, useEffect } from 'react';
 import NotifToggle from '../NotifToggle';
 import { supabase } from '../../lib/supabase';
-import { useState, useEffect } from 'react';
+import PopoverPengaturan from '../pengurus/PopoverPengaturan';
+import ModalUbahPassword from '../pengurus/ModalUbahPassword';
 
 const MENU = [
   { key: 'dashboard', i: '🏠', l: 'Dashboard', path: '/sekretaris' },
@@ -20,6 +20,9 @@ export default function Layout({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   
+  const [showSettings, setShowSettings] = useState(false);
+  const [showUbahPass, setShowUbahPass] = useState(false);
+
   const [pendingVerifCount, setPendingVerifCount] = useState(0);
   const [pendingRondaCount, setPendingRondaCount] = useState(0);
   
@@ -96,14 +99,6 @@ export default function Layout({ children }) {
     };
   }, [user]);
 
-  const handleTutupAplikasi = () => {
-    if (Capacitor.isNativePlatform()) {
-      App.exitApp();
-    } else {
-      alert('Silakan tutup tab ini secara manual.');
-    }
-  };
-
   if (loading || !user) {
     return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-500 text-sm">Memeriksa Akses...</div>;
   }
@@ -126,12 +121,16 @@ export default function Layout({ children }) {
               </Link>
             )}
 
-            <Link href="/sekretaris/pengaturan" className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2 rounded-lg font-medium transition active:scale-95">
+            <button
+              id="btn-pengaturan"
+              onClick={() => setShowSettings(!showSettings)}
+              className={`text-xs px-3 py-2 rounded-lg border transition font-medium active:scale-95 ${
+                showSettings 
+                  ? 'bg-slate-700 text-white border-slate-600' 
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+              }`}
+            >
               ⚙️
-            </Link>
-
-            <button onClick={handleTutupAplikasi} className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-2 rounded-lg border border-rose-500/20 font-medium transition active:scale-95">
-              ✕
             </button>
           </div>
         </div>
@@ -166,6 +165,19 @@ export default function Layout({ children }) {
         </div>
         <div>{children}</div>
       </div>
+
+      <PopoverPengaturan 
+        show={showSettings} 
+        onClose={() => setShowSettings(false)} 
+        user={user}
+        onOpenUbahPassword={() => setShowUbahPass(true)}
+      />
+
+      <ModalUbahPassword 
+        show={showUbahPass} 
+        onClose={() => setShowUbahPass(false)} 
+        user={user}
+      />
     </div>
   );
 }
