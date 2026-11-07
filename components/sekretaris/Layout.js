@@ -105,11 +105,15 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
-      <div className="bg-slate-900/70 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40">
+      
+      {/* STICKY WRAPPER (Header + Tab Menu) */}
+      <div className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 shadow-sm">
+        
+        {/* HEADER */}
         <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center gap-2">
           <div className="min-w-0">
             <h1 className="text-base sm:text-lg font-bold text-white truncate">📝 Dashboard Sekretariat</h1>
-            <p className="text-[11px] text-slate-400">{user?.nama ? `${user.nama} — ${user.role}` : 'RT 38 Puri Kencana Wagir'}</p>
+            <p className="text-[11px] text-slate-400 truncate">{user?.nama ? `${user.nama} — ${user.role}` : 'RT 38 Puri Kencana Wagir'}</p>
           </div>
           
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -134,36 +138,45 @@ export default function Layout({ children }) {
             </button>
           </div>
         </div>
+
+        {/* MENU TAB (Scrollable Horizontal) */}
+        <div className="max-w-7xl mx-auto px-2 pb-2">
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-none items-center">
+            {MENU.map((t) => {
+              let showBadge = false;
+              let badgeValue = 0;
+              
+              if (t.key === 'verifikasi' && pendingVerifCount > 0) { showBadge = true; badgeValue = pendingVerifCount; }
+              if (t.key === 'ronda' && pendingRondaCount > 0) { showBadge = true; badgeValue = pendingRondaCount; }
+
+              return (
+                <Link 
+                  key={t.key} 
+                  href={t.path} 
+                  className={`relative flex flex-row items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[10px] sm:text-xs font-semibold border transition shrink-0 ${
+                    activeKey === t.key 
+                      ? 'bg-teal-600 text-white border-teal-500 shadow-md shadow-teal-600/20' 
+                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  <span className="text-sm leading-none">{t.i}</span>
+                  <span className="leading-tight">{t.l}</span>
+                  
+                  {showBadge && (
+                    <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center shadow-lg animate-pulse">
+                      {badgeValue}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
       </div>
       
-      <div className="max-w-7xl mx-auto p-4 space-y-4">
-        <div className="grid grid-cols-2 sm:flex sm:gap-2 sm:overflow-x-auto sm:pb-1 sm:scrollbar-none">
-          {MENU.map((t) => {
-            let showBadge = false;
-            let badgeValue = 0;
-            
-            if (t.key === 'verifikasi' && pendingVerifCount > 0) { showBadge = true; badgeValue = pendingVerifCount; }
-            if (t.key === 'ronda' && pendingRondaCount > 0) { showBadge = true; badgeValue = pendingRondaCount; }
-
-            return (
-              <Link 
-                key={t.key} 
-                href={t.path} 
-                className={`relative flex flex-col items-center justify-center gap-0.5 sm:flex-row sm:gap-1.5 px-4 py-2.5 sm:px-5 rounded-xl text-xs font-semibold border transition shrink-0 ${activeKey === t.key ? 'bg-teal-600 text-white border-teal-500' : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'}`}
-              >
-                <span className="text-base sm:text-sm leading-none">{t.i}</span>
-                <span className="leading-tight">{t.l}</span>
-                
-                {showBadge && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-lg animate-pulse">
-                    {badgeValue}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </div>
-        <div>{children}</div>
+      {/* KONTEN UTAMA */}
+      <div className="max-w-7xl mx-auto p-4">
+        {children}
       </div>
 
       <PopoverPengaturan 
