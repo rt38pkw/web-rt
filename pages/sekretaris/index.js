@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '../../lib/supabase';
 import Layout from '../../components/sekretaris/Layout';
-import { setupPushNotifications } from '../../lib/push-notifications'; // TAMBAHAN BARU
+import { setupPushNotifications } from '../../lib/push-notifications';
 
 export default function DashboardSekretaris() {
   const [loading, setLoading] = useState(true);
@@ -12,9 +12,9 @@ export default function DashboardSekretaris() {
   const [sisaHariRonda, setSisaHariRonda] = useState('-');
   const [namaPeriodeRonda, setNamaPeriodeRonda] = useState('');
   const [pendingVerif, setPendingVerif] = useState(0);
+  const [pendingRonda, setPendingRonda] = useState(0); // State Baru
 
   useEffect(() => {
-    // ═══ TAMBAHAN BARU: Minta Izin Notifikasi ═══
     const savedUser = localStorage.getItem('pengurusSession');
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser);
@@ -22,7 +22,6 @@ export default function DashboardSekretaris() {
         setupPushNotifications('pengurus', parsedUser.id);
       }
     }
-    // ════════════════════════════════════════════
 
     fetchDashboardData();
   }, []);
@@ -30,7 +29,7 @@ export default function DashboardSekretaris() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // 1. Hitung Total Warga Aktif di tabel penghuni
+      // 1. Hitung Total Warga Aktif
       const { count: countWarga } = await supabase
         .from('penghuni')
         .select('*', { count: 'exact', head: true })
@@ -46,8 +45,7 @@ export default function DashboardSekretaris() {
       const uniquePending = new Set((pPending || []).map(p => p.warga_id));
       setPendingVerif(uniquePending.size);
 
-      // 3. Cek Jadwal Ronda Aktif
-      // Cari periode yang published
+      // 3. Cek Jadwal Ronda & Verifikasi Absen
       const { data: periode } = await supabase
         .from('periode_ronda')
         .select('id, nama_periode')
@@ -59,7 +57,7 @@ export default function DashboardSekretaris() {
       if (periode) {
         setNamaPeriodeRonda(periode.nama_periode);
         
-        // Cari tanggal paling akhir di jadwal_ronda untuk periode ini
+        // Cek tanggal paling akhir untuk sisa hari
         const { data: maxJadwal } = await supabase
           .from('jadwal_ronda')
           .select('tanggal')
@@ -70,7 +68,6 @@ export default function DashboardSekretaris() {
           .maybeSingle();
 
         if (maxJadwal && maxJadwal.tanggal) {
-          // Hitung selisih hari
           const today = new Date();
           today.setHours(0, 0, 0, 0);
           
@@ -80,19 +77,42 @@ export default function DashboardSekretaris() {
           const diffTime = maxDate - today;
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-          if (diffDays === 0) {
-            setSisaHariRonda('Hari Terakhir');
-          } else if (diffDays < 0) {
-            setSisaHariRonda('Selesai');
-          } else {
-            setSisaHariRonda(`${diffDays} Hari Lagi`);
-          }
+          if (diffDays === 0) setSisaHariRonda('Hari Terakhir');
+          else if (diffDays < 0) setSisaHariRonda('Selesai');
+          else setSisaHariRonda(`${diffDays} Hari Lagi`);
         } else {
           setSisaHariRonda('Belum ada jadwal');
         }
+
+        // ═══ HITUNG PENDING VERIFIKASI ABSEN RONDA ═══
+        // Sama persis dengan logika di Layout.js
+        const { data: rondaData } = await supabase
+          .from('petugas_ronda')
+          .select('id, foto_bukti, jadwal:jadwal_id!inner(tanggal, periode:periode_id!inner(jam_selesai, status))')
+          .eq('status_hadir', 'pending')
+          .eq('jadwal.periode.status', 'published');
+          
+        let totalRonda = 0;
+        if (rondaData) {
+          rondaData.forEach(item => {
+            const tgl = item.jadwal?.tanggal;
+            const jamSelesai = item.jadwal?.periode?.jam_selesai;
+            if (!tgl || !jamSelesai) return;
+            const dateStr = tgl.split('T')[0];
+            const [selesaiH, selesaiM] = jamSelesai.split(':');
+            let endDateTime = new Date(`${dateStr}T${selesaiH}:${selesaiM}:00`);
+            const startDateTime = new Date(`${dateStr}T00:00:00`);
+            if (endDateTime < startDateTime || parseInt(selesaiH) < 12) endDateTime.setDate(endDateTime.getDate() + 1);
+            const isPassed = new Date() > endDateTime;
+            if (item.foto_bukti || isPassed) totalRonda++;
+          });
+        }
+        setPendingRonda(totalRonda);
+        // ══════════════════════════════════════════════
       } else {
         setNamaPeriodeRonda('Tidak ada periode aktif');
         setSisaHariRonda('-');
+        setPendingRonda(0);
       }
 
     } catch (err) {
@@ -135,21 +155,36 @@ export default function DashboardSekretaris() {
               </div>
             </Link>
 
-            {/* KARTU 2: JADWAL RONDA */}
+            {/* KARTU 2: JADWAL RONDA + VERIFIKASI ABSEN */}
             <Link href="/sekretaris/ronda" className="group block">
-              <div className="bg-slate-900 border border-slate-800 group-hover:border-amber-500/50 rounded-3xl p-6 shadow-lg transition h-full relative overflow-hidden">
+              <div className="bg-slate-900 border border-slate-800 group-hover:border-amber-500/50 rounded-3xl p-6 shadow-lg transition h-full relative overflow-hidden flex flex-col justify-between">
                 <div className="absolute -right-4 -bottom-4 text-8xl opacity-5 group-hover:opacity-10 transition">🛡️</div>
-                <div className="flex justify-between items-start mb-4">
-                  <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-2xl border border-amber-500/20">🛡️</div>
-                  <span className="bg-amber-500/10 text-amber-400 text-[10px] font-bold px-2 py-1 rounded-lg border border-amber-500/20">Jadwal Ronda →</span>
+                
+                <div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-2xl border border-amber-500/20">🛡️</div>
+                    <span className="bg-amber-500/10 text-amber-400 text-[10px] font-bold px-2 py-1 rounded-lg border border-amber-500/20">Jadwal Ronda →</span>
+                  </div>
+                  <h3 className="text-sm font-semibold text-slate-400 mb-1">Sisa Hari Ronda</h3>
+                  <div className="text-3xl font-black text-white">{sisaHariRonda}</div>
+                  <p className="text-[10px] text-amber-400/70 mt-2 truncate">Periode: {namaPeriodeRonda}</p>
                 </div>
-                <h3 className="text-sm font-semibold text-slate-400 mb-1">Sisa Hari Ronda</h3>
-                <div className="text-3xl font-black text-white">{sisaHariRonda}</div>
-                <p className="text-[10px] text-amber-400/70 mt-2 truncate">Periode: {namaPeriodeRonda}</p>
+
+                {/* ═══ INFO VERIFIKASI ABSEN RONDA ═══ */}
+                <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-[10px] font-medium text-slate-400">Verifikasi Absen:</span>
+                  {pendingRonda > 0 ? (
+                    <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-1 rounded-lg text-[10px] font-bold animate-pulse">
+                      {pendingRonda} Menunggu
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-500">Aman / Bersih</span>
+                  )}
+                </div>
               </div>
             </Link>
 
-            {/* KARTU 3: VERIFIKASI PENDING (BONUS) */}
+            {/* KARTU 3: VERIFIKASI PENDING (WARGA) */}
             <Link href="/sekretaris/verifikasi" className="group block sm:col-span-2">
               <div className={`border rounded-3xl p-6 shadow-lg transition h-full relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${pendingVerif > 0 ? 'bg-gradient-to-r from-rose-950/40 to-slate-900 border-rose-500/30' : 'bg-slate-900 border-slate-800'}`}>
                 <div className="flex items-center gap-4">
