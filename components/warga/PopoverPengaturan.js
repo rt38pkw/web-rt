@@ -10,11 +10,13 @@ export default function PopoverPengaturan({
 }) {
   const popoverRef = useRef(null);
 
-  // Menutup popover jika klik di luar area popover
   useEffect(() => {
     function handleClickOutside(event) {
+      // Jika yang diklik bukan bagian dari popover DAN bukan tombol gigi
       if (popoverRef.current && !popoverRef.current.contains(event.target)) {
-        onClose();
+        // Kita cek apakah yang diklik adalah tombol gigi (pemicu)
+        const isGearButton = event.target.closest('#btn-pengaturan');
+        if (!isGearButton) onClose();
       }
     }
     if (show) document.addEventListener('mousedown', handleClickOutside);
@@ -41,8 +43,8 @@ export default function PopoverPengaturan({
   return (
     <div 
       ref={popoverRef}
-      // Posisi absolute di bawah header, animasi scale-in dari kanan atas
-      className="absolute right-4 top-[60px] z-[90] w-64 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl p-3 space-y-2 animate-in zoom-in-95 fade-in duration-200 origin-top-right"
+      // KUNCI PERBAIKAN: Ubah 'absolute' menjadi 'fixed' dan beri z-index tinggi
+      className="fixed right-4 top-[65px] z-[100] w-64 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl p-3 space-y-2 animate-in zoom-in-95 fade-in duration-200 origin-top-right"
     >
       {/* Info Warga Singkat */}
       <div className="bg-slate-900 rounded-xl p-3 border border-slate-800 flex justify-between items-center">
@@ -101,7 +103,6 @@ export default function PopoverPengaturan({
           <span className="text-slate-500">→</span>
         </button>
       </div>
-
     </div>
   );
 }
