@@ -1,8 +1,9 @@
 // components/warga/Layout.js
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useState } from 'react'; 
+import { useState, useEffect } from 'react'; 
 import NotifToggle from '../NotifToggle';
+import { supabase } from '../../lib/supabase'; // Import supabase
 
 import PopoverPengaturan from './PopoverPengaturan';
 import ModalUbahPin from './ModalUbahPin';
@@ -19,6 +20,60 @@ export default function Layout({ children, warga }) {
   
   const [showSettings, setShowSettings] = useState(false);
   const [showUbahPin, setShowUbahPin] = useState(false);
+  
+  const [pendingRondaCount, setPendingRondaCount] = useState(0); // State Badge Ronda
+
+  // ═══ LOGIKA BADGE RONDA ═══
+  useEffect(() => {
+    if (!warga?.id) return;
+
+    const checkRondaPending = async () => {
+      try {
+        // 1. Cari ID Penghuni dari Warga ini
+        const { data: penghuniData } = await supabase
+          .from('penghuni')
+          .select('id')
+          .eq('warga_id', warga.id)
+          .eq('is_aktif', true);
+
+        const penghuniIds = (penghuniData || []).map(p => p.id);
+        if (penghuniIds.length === 0) {
+          setPendingRondaCount(0);
+          return;
+        }
+
+        // 2. Cek jadwal ronda hari ini atau yang belum diabsen
+        const today = new Date().toISOString().split('T')[0];
+        
+        const { data: jadwal } = await supabase
+          .from('petugas_ronda')
+          .select('id, jadwal:jadwal_id!inner(tanggal, status, periode:periode_id!inner(status))')
+          .in('penghuni_id', penghuniIds)
+          .eq('status_hadir', 'pending')
+          .eq('jadwal.status', 'aktif')
+          .eq('jadwal.periode.status', 'published')
+          .gte('jadwal.tanggal', today); // Hanya hitung hari ini atau ke depan
+
+        // 3. Hitung berapa yang belum diabsen
+        setPendingRondaCount(jadwal?.length || 0);
+      } catch (err) {
+        console.error('Gagal load badge ronda:', err);
+      }
+    };
+
+    checkRondaPending();
+
+    // Dengarkan perubahan secara realtime
+    const channel = supabase
+      .channel('realtime-badge-warga-ronda')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'petugas_ronda' }, () => checkRondaPending())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [warga?.id]);
+  // ═══════════════════════════
 
   const handleLogout = () => {
     if (!confirm('Yakin ingin keluar dari akun ini? Anda harus login kembali besok.')) return;
@@ -44,7 +99,6 @@ export default function Layout({ children, warga }) {
           <div className="flex items-center gap-2">
             {warga && <NotifToggle userId={warga.id} userType="warga" />}
             
-            {/* TOMBOL PENGATURAN - Beri ID khusus */}
             <button
               id="btn-pengaturan"
               onClick={() => setShowSettings(!showSettings)}
@@ -65,13 +119,20 @@ export default function Layout({ children, warga }) {
               <Link
                 key={t.key}
                 href={t.path}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 flex items-center gap-2 shrink-0 ${
+                className={`relative px-4 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 flex items-center gap-2 shrink-0 ${
                   activeKey === t.key
                     ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/20'
                     : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
                 }`}
               >
                 <span>{t.icon}</span> {t.label}
+                
+                {/* BADGE NOTIFIKASI RONDA */}
+                {t.key === 'ronda' && pendingRondaCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center shadow-lg animate-pulse">
+                    {pendingRondaCount}
+                  </span>
+                )}
               </Link>
             ))}
           </div>
@@ -86,7 +147,6 @@ export default function Layout({ children, warga }) {
         RT 38 Puri Kencana Wagir &copy; 2026 • Portal Mandiri Warga
       </footer>
 
-      {/* ═══ POPOVER DIPINDAH KE SINI (DI LUAR HEADER) ═══ */}
       <PopoverPengaturan 
         show={showSettings} 
         onClose={() => setShowSettings(false)} 
