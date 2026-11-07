@@ -1,13 +1,11 @@
 // components/warga/Layout.js
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Capacitor } from '@capacitor/core';
-import { App } from '@capacitor/app';
+import { useState } from 'react'; 
 import NotifToggle from '../NotifToggle';
-import { useState } from 'react'; // Tambahkan useState
 
-// Import Modal-modal baru
-import ModalPengaturan from './ModalPengaturan';
+// Import komponen baru
+import PopoverPengaturan from './PopoverPengaturan';
 import ModalUbahPin from './ModalUbahPin';
 
 const MENU = [
@@ -20,7 +18,6 @@ export default function Layout({ children, warga }) {
   const router = useRouter();
   const activeKey = MENU.find((m) => router.pathname.startsWith(m.path))?.key || 'iuran';
   
-  // State untuk pop-up
   const [showSettings, setShowSettings] = useState(false);
   const [showUbahPin, setShowUbahPin] = useState(false);
 
@@ -31,10 +28,10 @@ export default function Layout({ children, warga }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-blue-500 selection:text-white antialiased">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-blue-500 selection:text-white antialiased relative">
       
       <div className="sticky top-0 z-50">
-        <header className="px-5 py-3.5 border-b border-slate-800/60 flex justify-between items-center bg-slate-900/95 backdrop-blur-md">
+        <header className="px-5 py-3.5 border-b border-slate-800/60 flex justify-between items-center bg-slate-900/95 backdrop-blur-md relative">
           <Link href="/dashboard-warga/iuran" className="flex items-center space-x-3">
             <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700/80 flex items-center justify-center overflow-hidden shrink-0">
               <img src="/logo-rt38.png" alt="Logo RT 38" className="w-full h-full object-cover" />
@@ -48,25 +45,27 @@ export default function Layout({ children, warga }) {
           <div className="flex items-center gap-2">
             {warga && <NotifToggle userId={warga.id} userType="warga" />}
             
-            {/* TOMBOL PENGATURAN (Ubah dari Link ke Button) */}
+            {/* TOMBOL PENGATURAN (Memicu Popover) */}
             <button
-              onClick={() => setShowSettings(true)}
-              className="text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-xl border border-slate-700/60 transition font-medium flex items-center gap-1"
+              onClick={() => setShowSettings(!showSettings)}
+              className={`text-xs px-3 py-1.5 rounded-xl border transition font-medium flex items-center gap-1 ${
+                showSettings 
+                  ? 'bg-slate-700 text-white border-slate-600' 
+                  : 'bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-slate-700/60'
+              }`}
             >
               ⚙️ <span className="hidden sm:inline">Pengaturan</span>
             </button>
-
-            <button
-              onClick={() => {
-                if (Capacitor.isNativePlatform()) App.exitApp();
-                else alert('Silakan tutup tab ini secara manual untuk keluar dari aplikasi.');
-              }}
-              className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-xl border border-rose-500/20 transition font-medium"
-              title="Tutup Aplikasi"
-            >
-              ✕
-            </button>
           </div>
+          
+          {/* POPOVER DITARUH DI DALAM HEADER AGAR MENEMPEL PADA TOMBOL ⚙️ */}
+          <PopoverPengaturan 
+            show={showSettings} 
+            onClose={() => setShowSettings(false)} 
+            warga={warga}
+            onOpenUbahPin={() => setShowUbahPin(true)}
+            onLogout={handleLogout}
+          />
         </header>
 
         <div className="bg-slate-950/95 backdrop-blur-md border-b border-slate-800/60 px-4 sm:px-6 py-2">
@@ -96,15 +95,7 @@ export default function Layout({ children, warga }) {
         RT 38 Puri Kencana Wagir &copy; 2026 • Portal Mandiri Warga
       </footer>
 
-      {/* ═══ MODAL POP-UP DITARUH DI SINI ═══ */}
-      <ModalPengaturan 
-        show={showSettings} 
-        onClose={() => setShowSettings(false)} 
-        warga={warga}
-        onOpenUbahPin={() => setShowUbahPin(true)}
-        onLogout={handleLogout}
-      />
-
+      {/* MODAL UBAH PIN (TETAP ADA, MUNCUL DI ATAS POPOVER) */}
       <ModalUbahPin 
         show={showUbahPin} 
         onClose={() => setShowUbahPin(false)} 
