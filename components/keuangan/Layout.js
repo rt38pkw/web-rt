@@ -1,9 +1,10 @@
 // components/keuangan/Layout.js
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Capacitor } from '@capacitor/core';
-import { App } from '@capacitor/app';
+import { useState } from 'react';
 import NotifToggle from '../NotifToggle';
+import PopoverPengaturan from '../pengurus/PopoverPengaturan';
+import ModalUbahPassword from '../pengurus/ModalUbahPassword';
 
 const MENU_MAIN = [
   { key: 'dashboard', i: '📊', l: 'Dashboard', path: '/keuangan/dashboard' },
@@ -23,20 +24,14 @@ const MENU_PROYEK = [
 
 export default function Layout({ user, pendingCount = 0, children }) {
   const router = useRouter();
+  const [showSettings, setShowSettings] = useState(false);
+  const [showUbahPass, setShowUbahPass] = useState(false);
 
   const isOperatorProyek = user?.role === 'bendahara_2';
   const isKetua = user?.role === 'ketua';
 
   const MENU = isOperatorProyek ? MENU_PROYEK : MENU_MAIN;
   const activeKey = MENU.find((m) => router.pathname.startsWith(m.path))?.key;
-
-  const handleTutupAplikasi = () => {
-    if (Capacitor.isNativePlatform()) {
-      App.exitApp();
-    } else {
-      alert('Silakan tutup tab ini secara manual.');
-    }
-  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
@@ -63,18 +58,16 @@ export default function Layout({ user, pendingCount = 0, children }) {
               </Link>
             )}
 
-            <Link
-              href="/keuangan/pengaturan"
-              className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg text-slate-300 border border-slate-700"
+            <button
+              id="btn-pengaturan"
+              onClick={() => setShowSettings(!showSettings)}
+              className={`text-xs px-3 py-2 rounded-lg border transition ${
+                showSettings 
+                  ? 'bg-slate-700 text-white border-slate-600' 
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+              }`}
             >
               ⚙️
-            </Link>
-
-            <button
-              onClick={handleTutupAplikasi}
-              className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-2 rounded-lg border border-rose-500/20 font-medium"
-            >
-              ✕
             </button>
           </div>
         </div>
@@ -105,6 +98,19 @@ export default function Layout({ user, pendingCount = 0, children }) {
 
         <div>{children}</div>
       </div>
+
+      <PopoverPengaturan 
+        show={showSettings} 
+        onClose={() => setShowSettings(false)} 
+        user={user}
+        onOpenUbahPassword={() => setShowUbahPass(true)}
+      />
+
+      <ModalUbahPassword 
+        show={showUbahPass} 
+        onClose={() => setShowUbahPass(false)} 
+        user={user}
+      />
     </div>
   );
 }
