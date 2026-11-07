@@ -187,8 +187,8 @@ export default function DashboardWargaIuran() {
   });
 
   const totalDisetor = iuranList.filter((i) => i.status === 'approved').reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
+  const totalDonasi = 0; // Sementara hardcode 0 mengikuti kode asli Anda
   const saldoDeposit = depositList.reduce((s, d) => s + (d.tipe === 'masuk' ? Number(d.jumlah) : -Number(d.jumlah)), 0);
-  const estimasiBulan = tarifBulanan > 0 ? Math.floor(saldoDeposit / tarifBulanan) : 0;
 
   const adaPending = iuranList.some((i) => i.status === 'pending');
   const adaDitolak = iuranList.some((i) => i.status === 'rejected');
@@ -300,18 +300,24 @@ export default function DashboardWargaIuran() {
           </div>
         )}
 
-        {/* ═══ KARTU GABUNGAN RINGKASAN & TRANSPARANSI (COMPACT) ═══ */}
+        {/* ═══ KARTU GABUNGAN: SETOR, DONASI, DEPOSIT, TRANSPARANSI ═══ */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 flex flex-col gap-3">
-          {/* Baris 1: Angka Setor & Deposit */}
-          <div className="flex justify-between items-center px-1">
-            <div className="text-center">
+          
+          {/* Baris 1: 3 Kolom Angka */}
+          <div className="flex justify-between items-center px-1 divide-x divide-slate-700/50">
+            <div className="flex-1 text-center">
               <div className="text-[9px] text-slate-400 uppercase tracking-wider mb-0.5">Total Setor</div>
-              <div className="text-sm font-bold text-white">Rp {totalDisetor.toLocaleString('id-ID')}</div>
+              <div className="text-xs font-bold text-white">Rp {totalDisetor.toLocaleString('id-ID')}</div>
             </div>
-            <div className="w-px h-6 bg-slate-700"></div>
-            <div className="text-center">
-              <div className="text-[9px] text-purple-400 uppercase tracking-wider mb-0.5">Saldo Deposit</div>
-              <div className="text-sm font-bold text-purple-300">Rp {saldoDeposit.toLocaleString('id-ID')}</div>
+            
+            <div className="flex-1 text-center">
+              <div className="text-[9px] text-emerald-400 uppercase tracking-wider mb-0.5">Donasi 💚</div>
+              <div className="text-xs font-bold text-emerald-400">Rp {totalDonasi.toLocaleString('id-ID')}</div>
+            </div>
+
+            <div className="flex-1 text-center">
+              <div className="text-[9px] text-purple-400 uppercase tracking-wider mb-0.5">Deposit 💎</div>
+              <div className="text-xs font-bold text-purple-300">Rp {saldoDeposit.toLocaleString('id-ID')}</div>
             </div>
           </div>
 
