@@ -83,7 +83,6 @@ export default function DashboardWargaIuran() {
     const channel = supabase.channel(channelName)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'warga', filter: `id=eq.${warga.id}` }, () => refreshDataRumah(warga.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'penghuni', filter: `warga_id=eq.${warga.id}` }, () => refreshDataRumah(warga.id))
-      // ═══ OPTIMASI REALTIME: Cuma update data yang berubah ═══
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'iuran', filter: `warga_id=eq.${warga.id}` }, (payload) => {
         setIuranList(prev => [...prev, payload.new]);
       })
@@ -93,7 +92,6 @@ export default function DashboardWargaIuran() {
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'iuran', filter: `warga_id=eq.${warga.id}` }, (payload) => {
         setIuranList(prev => prev.filter(item => item.id !== payload.old.id));
       })
-      // ════════════════════════════════════════════════════════
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deposit_warga' }, () => loadDeposit(warga.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pengeluaran' }, () => { if (showKasRTModalRef.current) loadKasRT(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pemasukan_lain' }, () => { if (showKasRTModalRef.current) loadKasRT(); })
@@ -147,16 +145,14 @@ export default function DashboardWargaIuran() {
         .eq('warga_id', wargaId)
         .order('tanggal_mulai', { ascending: true });
       if (!error && data) setRiwayatList(data);
-    } catch (err) {
-      console.error('Gagal load riwayat kategori:', err);
-    }
+    } catch (err) {}
   };
 
   const loadKasRT = async () => {
     try {
       const [resIuranGlobal, resPengeluaran, resPemasukan] = await Promise.all([fetchAllIuran(), supabase.from('pengeluaran').select('*').order('tanggal', { ascending: false }), supabase.from('pemasukan_lain').select('*').order('tanggal', { ascending: false })]);
       setKasRTIuranList(resIuranGlobal || []); setPengeluaranList(resPengeluaran.data || []); setPemasukanLainList(resPemasukan.data || []);
-    } catch (err) { console.error('Gagal load kas RT:', err); }
+    } catch (err) {}
   };
 
   const handleBukaKasRT = () => { loadKasRT(); setShowKasRTModal(true); };
@@ -236,30 +232,12 @@ export default function DashboardWargaIuran() {
       try {
         const namaWarga = warga.nama_lengkap || 'Warga';
         const listBulan = bulanPilih.join(', ');
-        
         await supabase.functions.invoke('smart-handler', {
-          body: {
-            role_target: 'bendahara',
-            title: '💰 Bukti Transfer Baru',
-            body: `${namaWarga} baru upload bukti transfer untuk bulan ${listBulan}.`,
-            url: '/keuangan/verifikasi'
-          }
+          body: { role_target: 'bendahara', title: '💰 Bukti Transfer Baru', body: `${namaWarga} upload bukti transfer bulan ${listBulan}.`, url: '/keuangan/verifikasi' }
         });
-        
-        await supabase.functions.invoke('smart-handler', {
-          body: {
-            role_target: 'ketua',
-            title: '💰 Bukti Transfer Baru',
-            body: `${namaWarga} baru upload bukti transfer untuk bulan ${listBulan}.`,
-            url: '/keuangan/verifikasi'
-          }
-        });
-      } catch (notifErr) {
-        console.log('Gagal kirim notif ke pengurus:', notifErr);
-      }
+      } catch (notifErr) {}
 
       alert('✅ Pengajuan berhasil dikirim!'); setShowModalBayar(false); 
-      // Nggak perlu loadIuran lagi di sini, karena realtime udah nangkep
     } catch (err) { alert('Gagal: ' + err.message); } finally { setSubmitting(false); }
   };
 
@@ -275,6 +253,7 @@ export default function DashboardWargaIuran() {
     <>
       <Head><title>Status Iuran - Portal Warga RT 38</title></Head>
       <Layout warga={warga} onLogout={handleLogout}>
+        
         <ProfileCard 
           warga={warga} 
           penghuniData={penghuniData} 
@@ -286,76 +265,64 @@ export default function DashboardWargaIuran() {
           isProfileComplete={!isBelumLengkap} 
         />
 
+        {/* BANNER LENGKAPI DATA (DIBUAT TIPIS) */}
         {isBelumLengkap && (
-          <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border border-amber-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
-            <div className="flex items-start gap-3">
-              <span className="text-xl">⚠️</span>
-              <div>
-                <h4 className="text-sm font-bold text-amber-300">Lengkapi Data Diri & KK</h4>
-                <p className="text-xs text-amber-400 mt-0.5">Silakan lengkapi NIK dan upload Kartu Keluarga agar data Anda tervalidasi oleh Sekretaris RT.</p>
-              </div>
+          <div className="bg-amber-950/40 border border-amber-500/30 rounded-xl p-2.5 flex justify-between items-center gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">⚠️</span>
+              <p className="text-[10px] text-amber-300 leading-tight">Data Diri & KK belum lengkap. Segera validasi agar tidak terhambat.</p>
             </div>
-            <button onClick={() => setShowModalProfil(true)} className="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-xs px-4 py-2.5 rounded-xl shrink-0 transition active:scale-95">Lengkapi Sekarang</button>
+            <button onClick={() => setShowModalProfil(true)} className="bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-[10px] px-3 py-1.5 rounded-lg shrink-0 transition">Lengkapi</button>
           </div>
         )}
 
         {isPending && (
-          <div className="bg-blue-950/40 border border-blue-500/30 rounded-2xl p-4 flex items-start gap-3">
-            <span className="text-xl">⏳</span>
-            <div>
-              <h4 className="text-sm font-bold text-blue-300">Menunggu Verifikasi Sekretaris</h4>
-              <p className="text-xs text-blue-400 mt-0.5">Data Anda sudah kami terima. Mohon tunggu Sekretaris memvalidasi data dan KK Anda.</p>
-            </div>
+          <div className="bg-blue-950/40 border border-blue-500/30 rounded-xl p-2.5 flex items-center gap-2">
+            <span className="text-sm">⏳</span>
+            <p className="text-[10px] text-blue-300 leading-tight">Data sedang ditinjau Sekretaris.</p>
           </div>
         )}
 
         {isRejected && (
-          <div className="bg-gradient-to-r from-rose-950/60 to-slate-900 border border-rose-500/50 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-lg">
-            <div className="flex items-start gap-3">
-              <span className="text-xl">❌</span>
-              <div>
-                <h4 className="text-sm font-bold text-rose-300">Data Ditolak Sekretaris</h4>
-                <p className="text-xs text-rose-400 mt-0.5">Alasan: {alasanReject}</p>
-              </div>
+          <div className="bg-rose-950/40 border border-rose-500/30 rounded-xl p-2.5 flex justify-between items-center gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">❌</span>
+              <p className="text-[10px] text-rose-300 leading-tight">Ditolak: {alasanReject}</p>
             </div>
-            <button onClick={() => setShowModalProfil(true)} className="w-full sm:w-auto bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs px-4 py-2.5 rounded-xl shrink-0 transition active:scale-95">Perbaiki Sekarang</button>
+            <button onClick={() => setShowModalProfil(true)} className="bg-rose-500 hover:bg-rose-400 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg shrink-0 transition">Perbaiki</button>
           </div>
         )}
 
         {adaDitolak && (
-          <div className="bg-rose-950/40 border border-rose-500/50 rounded-2xl p-4 flex items-start gap-3">
-            <span className="text-xl">❌</span>
-            <div>
-              <h4 className="text-sm font-bold text-rose-300">Ada Pembayaran yang Ditolak</h4>
-              <p className="text-xs text-rose-400 mt-0.5">Silakan periksa bulan yang berwarna merah di bawah, lalu lakukan pembayaran ulang dengan bukti yang benar.</p>
-            </div>
+          <div className="bg-rose-950/40 border border-rose-500/30 rounded-xl p-2.5 flex items-center gap-2">
+            <span className="text-sm">❌</span>
+            <p className="text-[10px] text-rose-300 leading-tight">Ada pembayaran iuran yang ditolak. Cek bulan berwarna merah di bawah.</p>
           </div>
         )}
 
-        <div className="bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/30 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <div>
-            <h4 className="text-sm font-bold text-white flex items-center gap-2">📊 Transparansi Kas RT 38</h4>
-            <p className="text-xs text-slate-400 mt-0.5">Lihat rekapitulasi iuran dan arus kas RT secara terbuka.</p>
+        {/* ═══ KARTU GABUNGAN RINGKASAN & TRANSPARANSI (COMPACT) ═══ */}
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 flex flex-col gap-3">
+          {/* Baris 1: Angka Setor & Deposit */}
+          <div className="flex justify-between items-center px-1">
+            <div className="text-center">
+              <div className="text-[9px] text-slate-400 uppercase tracking-wider mb-0.5">Total Setor</div>
+              <div className="text-sm font-bold text-white">Rp {totalDisetor.toLocaleString('id-ID')}</div>
+            </div>
+            <div className="w-px h-6 bg-slate-700"></div>
+            <div className="text-center">
+              <div className="text-[9px] text-purple-400 uppercase tracking-wider mb-0.5">Saldo Deposit</div>
+              <div className="text-sm font-bold text-purple-300">Rp {saldoDeposit.toLocaleString('id-ID')}</div>
+            </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
-            <button onClick={loadRekap} disabled={loadingRekap} className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2">{loadingRekap ? 'Memuat...' : '📋 Rekap Warga'}</button>
-            <button onClick={handleBukaKasRT} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">💰 Saldo Kas RT</button>
-          </div>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between">
-            <span className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">Total Setor</span>
-            <span className="text-lg font-black text-white mt-1">Rp {totalDisetor.toLocaleString('id-ID')}</span>
-          </div>
-          <div className="bg-slate-900/60 border border-emerald-500/20 rounded-2xl p-4 flex flex-col justify-between">
-            <span className="text-[11px] text-emerald-400 uppercase tracking-wider font-medium">Total Donasi 💚</span>
-            <span className="text-lg font-black text-emerald-400 mt-1">Rp 0</span>
-          </div>
-          <div className="bg-gradient-to-br from-purple-950/40 to-slate-900 border border-purple-500/30 rounded-2xl p-4 flex flex-col justify-between">
-            <span className="text-[11px] text-purple-300 uppercase tracking-wider font-medium">💎 Saldo Deposit</span>
-            <span className="text-lg font-black text-purple-300 mt-1">Rp {saldoDeposit.toLocaleString('id-ID')}</span>
-            {saldoDeposit > 0 && tarifBulanan > 0 && (<span className="text-[9px] text-slate-400 mt-0.5">Cukup untuk ±{estimasiBulan} bulan</span>)}
+          {/* Baris 2: Tombol Transparansi */}
+          <div className="flex gap-2">
+            <button onClick={loadRekap} disabled={loadingRekap} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-semibold py-2 rounded-lg transition border border-slate-700 flex justify-center items-center gap-1.5">
+              {loadingRekap ? '...' : '📋 Rekap Warga'}
+            </button>
+            <button onClick={handleBukaKasRT} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-semibold py-2 rounded-lg transition border border-slate-700 flex justify-center items-center gap-1.5">
+              💰 Saldo Kas RT
+            </button>
           </div>
         </div>
 
