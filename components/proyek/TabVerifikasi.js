@@ -5,7 +5,7 @@ import { formatRupiahProyek, formatTanggalProyek } from '../../lib/proyek/consta
 export default function TabVerifikasi({ proyekList = [], iuranProyekList = [], wargaList = [], onApprove, onReject }) {
   const [filterProyek, setFilterProyek] = useState('semua');
   const [processing, setProcessing] = useState(null);
-  const [zoomImage, setZoomImage] = useState(null); // State untuk pop-up gambar
+  const [zoomImage, setZoomImage] = useState(null);
 
   const pendingList = iuranProyekList.filter((i) => i.status === 'pending').filter((i) => filterProyek === 'semua' || i.proyek_id === filterProyek).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
@@ -20,10 +20,12 @@ export default function TabVerifikasi({ proyekList = [], iuranProyekList = [], w
 
   return (
     <div className="space-y-4">
+      
+      {/* ═══ FILTER PROYEK ═══ */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
         <div className="flex items-center gap-3 flex-wrap">
           <label className="text-[10px] font-semibold text-slate-400 uppercase">Filter Proyek:</label>
-          <select value={filterProyek} onChange={(e) => setFilterProyek(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+          <select value={filterProyek} onChange={(e) => setFilterProyek(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">
             <option value="semua">Semua Proyek ({iuranProyekList.filter((i) => i.status === 'pending').length} pending)</option>
             {proyekList.map((p) => {
               const count = iuranProyekList.filter((i) => i.status === 'pending' && i.proyek_id === p.id).length;
@@ -32,59 +34,91 @@ export default function TabVerifikasi({ proyekList = [], iuranProyekList = [], w
           </select>
         </div>
       </div>
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-950 text-slate-400 uppercase text-[10px]">
-              <tr><th className="p-3">Tanggal</th><th className="p-3">Warga</th><th className="p-3">Proyek</th><th className="p-3 text-right">Nominal</th><th className="p-3">Bukti</th><th className="p-3">Catatan</th><th className="p-3 text-right">Aksi</th></tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {pendingList.length === 0 ? (
-                <tr><td colSpan="7" className="p-6 text-center text-slate-500">Tidak ada cicilan yang menunggu verifikasi.</td></tr>
-              ) : (
-                pendingList.map((item) => {
-                  const w = wargaList.find((x) => x.id === item.warga_id);
-                  const p = proyekList.find((x) => x.id === item.proyek_id);
-                  const bukti = item.bukti_urls || [];
-                  const isRevisi = String(item.catatan || '').toLowerCase().includes('revisi');
 
-                  return (
-                    <tr key={item.id} className="hover:bg-slate-800/40">
-                      <td className="p-3 text-slate-400 whitespace-nowrap text-[10px]">{formatTanggalProyek(item.tanggal)}</td>
-                      <td className="p-3"><div className="font-semibold text-white">{w?.nama_lengkap || '-'}</div><div className="text-[10px] text-slate-500">{w?.no_rumah}</div></td>
-                      <td className="p-3 text-slate-300 text-[11px]">{p?.nama || '-'}</td>
-                      <td className="p-3 text-right font-mono font-bold text-amber-400">{formatRupiahProyek(item.jumlah)}</td>
-                      <td className="p-3">
-                        {/* ═══ TOMBOL LIHAT GAMBAR BARU ═══ */}
-                        {bukti.length > 0 ? (
-                          <div className="flex gap-1">
-                            {bukti.map((u, i) => (
-                              u === 'DIHAPUS' ? (
-                                <span key={i} className="text-slate-500 italic text-[10px] px-1.5 py-0.5 bg-slate-800/50 rounded border border-slate-700">Terhapus</span>
-                              ) : (
-                                <button key={i} onClick={() => setZoomImage(u)} className="bg-blue-600/20 text-blue-400 border border-blue-500/30 px-2 py-1 rounded text-[10px] font-semibold hover:bg-blue-600/40 transition">
-                                  👁️ Lihat
-                                </button>
-                              )
-                            ))}
-                          </div>
-                        ) : (<span className="text-slate-600">-</span>)}
-                      </td>
-                      <td className="p-3 text-slate-400 text-[10px] max-w-[200px] truncate">
-                        {isRevisi ? (<span className="text-blue-300 font-semibold bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">🔄 Revisi</span>) : (item.catatan || '-')}
-                      </td>
-                      <td className="p-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => handleApprove(item)} disabled={processing === item.id} className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white text-[10px] font-semibold px-3 py-1.5 rounded-lg">{processing === item.id ? '...' : '✓ Approve'}</button>
-                          <button onClick={() => handleReject(item)} disabled={processing === item.id} className="bg-rose-600 hover:bg-rose-500 disabled:bg-slate-700 text-white text-[10px] font-semibold px-3 py-1.5 rounded-lg">{processing === item.id ? '...' : '✗ Tolak'}</button>
+      {/* ═══ LIST KARTU (Scrollable Vertikal) ═══ */}
+      <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden">
+        <div className="p-3 space-y-3 max-h-[65vh] overflow-y-auto">
+          {pendingList.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-500">Tidak ada cicilan yang menunggu verifikasi.</div>
+          ) : (
+            pendingList.map((item) => {
+              const w = wargaList.find((x) => x.id === item.warga_id);
+              const p = proyekList.find((x) => x.id === item.proyek_id);
+              const bukti = item.bukti_urls || [];
+              const isRevisi = String(item.catatan || '').toLowerCase().includes('revisi');
+
+              return (
+                <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 shadow-lg">
+                  
+                  {/* Header: Nama & Tanggal */}
+                  <div className="flex justify-between items-start mb-2 border-b border-slate-800 pb-2">
+                    <div>
+                      <div className="font-bold text-white text-sm">{w?.nama_lengkap || '-'}</div>
+                      <div className="text-[10px] text-slate-400">{w?.no_rumah}</div>
+                    </div>
+                    <div className="text-[9px] text-slate-500 bg-slate-950 px-2 py-1 rounded">
+                      📅 {formatTanggalProyek(item.tanggal)}
+                    </div>
+                  </div>
+
+                  {/* Info Grid */}
+                  <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                    <div>
+                      <span className="text-slate-500 block text-[9px]">Proyek</span>
+                      <span className="text-slate-200 font-semibold truncate block">{p?.nama || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[9px]">Nominal</span>
+                      <span className="text-amber-400 font-bold font-mono">{formatRupiahProyek(item.jumlah)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[9px]">Bukti</span>
+                      {bukti.length > 0 ? (
+                        <div className="flex gap-1 mt-0.5">
+                          {bukti.map((u, i) => (
+                            u === 'DIHAPUS' ? (
+                              <span key={i} className="text-slate-500 italic text-[9px]">Terhapus</span>
+                            ) : (
+                              <button key={i} onClick={() => setZoomImage(u)} className="text-blue-400 hover:text-blue-300 text-[10px] font-semibold underline decoration-blue-500/30">
+                                👁️ Lihat Foto
+                              </button>
+                            )
+                          ))}
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                      ) : <span className="text-slate-600 text-[10px]">-</span>}
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[9px]">Catatan</span>
+                      {isRevisi ? (
+                        <span className="text-blue-300 font-semibold bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 text-[9px] inline-block mt-0.5">🔄 Revisi</span>
+                      ) : (
+                        <span className="text-slate-300 truncate block">{item.catatan || '-'}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tombol Aksi */}
+                  <div className="flex gap-2 pt-2 border-t border-slate-800">
+                    <button 
+                      onClick={() => handleApprove(item)} 
+                      disabled={processing === item.id} 
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white text-xs py-2 rounded-lg font-bold transition active:scale-95 shadow-lg shadow-emerald-600/20"
+                    >
+                      {processing === item.id ? '...' : '✓ Approve'}
+                    </button>
+                    <button 
+                      onClick={() => handleReject(item)} 
+                      disabled={processing === item.id} 
+                      className="flex-1 bg-rose-600 hover:bg-rose-500 disabled:bg-slate-700 text-white text-xs py-2 rounded-lg font-bold transition active:scale-95 shadow-lg shadow-rose-600/20"
+                    >
+                      {processing === item.id ? '...' : '✗ Tolak'}
+                    </button>
+                  </div>
+
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
