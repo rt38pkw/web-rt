@@ -6,10 +6,12 @@ import Link from 'next/link';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import Layout from '../../components/warga/Layout';
+import ModalUbahPin from '../../components/warga/ModalUbahPin';
 
 export default function PengaturanWarga() {
   const router = useRouter();
   const [warga, setWarga] = useState(null);
+  const [showModalUbahPin, setShowModalUbahPin] = useState(false);
 
   useEffect(() => {
     const savedSession = localStorage.getItem('warga_session');
@@ -36,13 +38,21 @@ export default function PengaturanWarga() {
 
   if (!warga) return null;
 
+  // Cek kelengkapan profil
+  const isPenyewa = warga.role_login === 'penyewa';
+  const penghuniData = warga.penghuni_data;
+  const statusPenghuni = penghuniData?.status_verifikasi;
+  const punyaNik = !!penghuniData?.nik && penghuniData.nik !== '0';
+  const punyaKK = !!penghuniData?.url_kk;
+  const isProfileComplete = statusPenghuni === 'approved' && punyaNik && punyaKK;
+
   return (
     <>
       <Head><title>Pengaturan Akun - Portal Warga RT 38</title></Head>
       <Layout warga={warga}>
         <div className="max-w-md mx-auto space-y-4">
 
-          {/* HEADER HALAMAN — dengan tombol Kembali */}
+          {/* HEADER HALAMAN */}
           <div className="bg-gradient-to-r from-slate-900 to-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -50,7 +60,7 @@ export default function PengaturanWarga() {
                 <p className="text-xs text-slate-400 mt-1">Kelola sesi dan akses aplikasi Anda.</p>
               </div>
               <Link
-                href="/dashboard-warga"
+                href="/dashboard-warga/iuran"
                 className="shrink-0 text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg text-slate-300 border border-slate-700 transition active:scale-95"
               >
                 ← Kembali
@@ -72,6 +82,34 @@ export default function PengaturanWarga() {
 
           {/* AKSI */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+            
+            {/* TOMBOL UBAH PIN */}
+            {/* Jika Penyewa: Sembunyikan total. Jika Pemilik: Tampilkan, tapi cek status profile */}
+            {!isPenyewa && (
+              <button
+                onClick={() => isProfileComplete && setShowModalUbahPin(true)}
+                disabled={!isProfileComplete}
+                className={`w-full text-left p-4 transition flex items-center justify-between border-b border-slate-800 ${
+                  isProfileComplete 
+                    ? 'hover:bg-slate-800/60 cursor-pointer' 
+                    : 'bg-slate-900/40 opacity-70 cursor-not-allowed'
+                }`}
+              >
+                <div>
+                  <div className={`text-sm font-bold ${isProfileComplete ? 'text-indigo-400' : 'text-slate-500'}`}>
+                    🔐 Ubah PIN
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    {isProfileComplete 
+                      ? 'Ganti PIN keamanan akun Anda.' 
+                      : 'Fitur aktif setelah verifikasi Profil (NIK & KK) disetujui Sekretaris.'}
+                  </div>
+                </div>
+                <span className="text-slate-600">{isProfileComplete ? '→' : '🔒'}</span>
+              </button>
+            )}
+
+            {/* TOMBOL LOGOUT */}
             <button
               onClick={handleLogout}
               className="w-full text-left p-4 hover:bg-slate-800/60 transition flex items-center justify-between border-b border-slate-800"
@@ -83,6 +121,7 @@ export default function PengaturanWarga() {
               <span className="text-slate-600">&rarr;</span>
             </button>
 
+            {/* TOMBOL TUTUP APLIKASI */}
             <button
               onClick={handleTutupAplikasi}
               className="w-full text-left p-4 hover:bg-slate-800/60 transition flex items-center justify-between"
@@ -96,10 +135,17 @@ export default function PengaturanWarga() {
           </div>
 
           <p className="text-center text-[10px] text-slate-600 mt-4">
-            Fitur Ubah PIN ada di halaman Status Iuran (Profil Anda).
+            RT 38 Puri Kencana Wagir
           </p>
         </div>
       </Layout>
+
+      {/* MODAL UBAH PIN */}
+      <ModalUbahPin 
+        show={showModalUbahPin} 
+        onClose={() => setShowModalUbahPin(false)} 
+        wargaId={warga.id} 
+      />
     </>
   );
 }
