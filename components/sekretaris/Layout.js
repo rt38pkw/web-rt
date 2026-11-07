@@ -11,8 +11,8 @@ const MENU = [
   { key: 'dashboard', i: '🏠', l: 'Dashboard', path: '/sekretaris' },
   { key: 'data-warga', i: '👥', l: 'Data Warga', path: '/sekretaris/data-warga' },
   { key: 'verifikasi', i: '✅', l: 'Verifikasi', path: '/sekretaris/verifikasi' },
-  { key: 'surat', i: '📄', l: 'Surat', path: '/sekretaris/surat' },
-  { key: 'ronda', i: '🛡️', l: 'Ronda', path: '/sekretaris/ronda' },
+  { key: 'ronda', i: '🛡️', l: 'Ronda', path: '/sekretaris/ronda' }, // Dipindah ke atas
+  { key: 'surat', i: '📄', l: 'Surat', path: '/sekretaris/surat' }, // Pindah ke bawah
 ];
 
 export default function Layout({ children }) {
