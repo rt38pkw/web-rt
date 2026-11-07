@@ -204,36 +204,36 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
           <div className="space-y-3 animate-in fade-in">
             <h4 className="text-sm font-semibold text-white mb-2">1. Identitas Kepala Keluarga</h4>
             
-            <div><label className="block text-xs text-slate-300 mb-1">Nama Lengkap *</label><input type="text" value={namaLengkap} onChange={(e) => setNamaLengkap(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" /></div>
+            <div><label className="block text-xs text-slate-300 mb-1">Nama Lengkap *</label><input type="text" autoComplete="off" value={namaLengkap} onChange={(e) => setNamaLengkap(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" /></div>
             
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="block text-xs text-slate-300 mb-1">NIK (Wajib)</label><input type="text" inputMode="numeric" value={nik} onChange={(e) => handleNumberChange(e, setNik)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" /></div>
-              <div><label className="block text-xs text-slate-300 mb-1">No. KK (Wajib)</label><input type="text" inputMode="numeric" value={noKk} onChange={(e) => handleNumberChange(e, setNoKk)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" /></div>
+              <div><label className="block text-xs text-slate-300 mb-1">NIK (Wajib)</label><input type="text" autoComplete="off" inputMode="numeric" value={nik} onChange={(e) => handleNumberChange(e, setNik)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" /></div>
+              <div><label className="block text-xs text-slate-300 mb-1">No. KK (Wajib)</label><input type="text" autoComplete="off" inputMode="numeric" value={noKk} onChange={(e) => handleNumberChange(e, setNoKk)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" /></div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="block text-xs text-slate-300 mb-1">No WhatsApp</label><input type="text" inputMode="tel" value={noWa} onChange={(e) => setNoWa(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" /></div>
-              <div><label className="block text-xs text-slate-300 mb-1">Tanggal Lahir</label><input type="date" value={tglLahir} onChange={(e) => setTglLahir(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" /></div>
+              <div><label className="block text-xs text-slate-300 mb-1">No WhatsApp</label><input type="text" autoComplete="off" inputMode="tel" value={noWa} onChange={(e) => setNoWa(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" /></div>
+              <div><label className="block text-xs text-slate-300 mb-1">Tanggal Lahir</label><input type="date" autoComplete="off" value={tglLahir} onChange={(e) => setTglLahir(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" /></div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-slate-300 mb-1">Jenis Kelamin</label>
-                <select value={jenisKelamin} onChange={(e) => setJenisKelamin(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+                <select autoComplete="off" value={jenisKelamin} onChange={(e) => setJenisKelamin(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
                   <option value="L">Laki-laki</option>
                   <option value="P">Perempuan</option>
                 </select>
               </div>
-              <div><label className="block text-xs text-slate-300 mb-1">Pekerjaan (Opsional)</label><input type="text" value={pekerjaan} onChange={(e) => setPekerjaan(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="Karyawan, dll" /></div>
+              <div><label className="block text-xs text-slate-300 mb-1">Pekerjaan (Opsional)</label><input type="text" autoComplete="off" value={pekerjaan} onChange={(e) => setPekerjaan(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="Karyawan, dll" /></div>
             </div>
             
             {!isPenyewa && (
               <div className="pt-3 border-t border-slate-800 bg-slate-900/50 p-3 rounded-xl border border-indigo-500/20">
                 <label className="block text-xs text-indigo-300 font-semibold mb-1">Password Baru (Wajib) *</label>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white mb-2" placeholder="Minimal 6 karakter" />
+                <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white mb-2" placeholder="Minimal 6 karakter" />
                 {password.length > 0 && (
                   <div>
-                    <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="Ulangi password baru" />
+                    <input type="password" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white" placeholder="Ulangi password baru" />
                     {confirmPassword && confirmPassword !== password && <p className="text-[10px] text-rose-400 mt-1">Password tidak cocok!</p>}
                   </div>
                 )}
@@ -247,10 +247,10 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
           <div className="space-y-3 animate-in fade-in">
             <h4 className="text-sm font-semibold text-white mb-2">2. Anggota Keluarga</h4>
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
-              <input type="text" placeholder="Nama Lengkap" value={newNama} onChange={(e) => setNewNama(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" />
+              <input type="text" autoComplete="off" placeholder="Nama Lengkap" value={newNama} onChange={(e) => setNewNama(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" />
               <div className="flex gap-2">
-                <input type="text" inputMode="numeric" placeholder="16 digit NIK" value={newNik} onChange={(e) => handleNumberChange(e, setNewNik)} className="w-1/2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" />
-                <select value={newHubungan} onChange={(e) => setNewHubungan(e.target.value)} className="w-1/2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white">
+                <input type="text" autoComplete="off" inputMode="numeric" placeholder="16 digit NIK" value={newNik} onChange={(e) => handleNumberChange(e, setNewNik)} className="w-1/2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" />
+                <select autoComplete="off" value={newHubungan} onChange={(e) => setNewHubungan(e.target.value)} className="w-1/2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white">
                   <option value="Istri">Istri</option>
                   <option value="Anak">Anak</option>
                   <option value="Saudara">Saudara</option>
@@ -258,12 +258,12 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
                 </select>
               </div>
               <div className="flex gap-2">
-                <input type="date" value={newTglLahir} onChange={(e) => setNewTglLahir(e.target.value)} className="w-1/3 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" />
-                <select value={newJenisKelamin} onChange={(e) => setNewJenisKelamin(e.target.value)} className="w-1/3 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white">
+                <input type="date" autoComplete="off" value={newTglLahir} onChange={(e) => setNewTglLahir(e.target.value)} className="w-1/3 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" />
+                <select autoComplete="off" value={newJenisKelamin} onChange={(e) => setNewJenisKelamin(e.target.value)} className="w-1/3 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white">
                   <option value="L">Laki-laki</option>
                   <option value="P">Perempuan</option>
                 </select>
-                <input type="text" placeholder="Pekerjaan (Opsi)" value={newPekerjaan} onChange={(e) => setNewPekerjaan(e.target.value)} className="w-1/3 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" />
+                <input type="text" autoComplete="off" placeholder="Pekerjaan (Opsi)" value={newPekerjaan} onChange={(e) => setNewPekerjaan(e.target.value)} className="w-1/3 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white" />
               </div>
               <button type="button" onClick={handleTambahAnggota} className="w-full bg-slate-800 hover:bg-slate-700 text-white text-xs py-1.5 rounded-lg mt-1 font-semibold">+ Tambahkan</button>
             </div>
