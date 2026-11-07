@@ -3,9 +3,11 @@
 @tailwind utilities;
 
 /* ═════════════════════════════════════════════════════════════════
-   OPSI 1: TEMA CERAH (LIGHT MODE) GLOBAL — AKTIF SAAT INI
+   OPSI 1: TEMA CERAH (LIGHT MODE) GLOBAL
+   Hapus tanda komentar (/* ... */) di bawah ini jika ingin mencoba.
    ═════════════════════════════════════════════════════════════════ */
 
+/* 
 @layer base {
   body {
     background-color: #f8fafc !important;
@@ -38,28 +40,37 @@
     border-color: #cbd5e1 !important;
   }
 }
-
+*/
 
 /* ═════════════════════════════════════════════════════════════════
-   OPSI 2: TEMA GELAP (DARK MODE) — Simpan sebagai cadangan
-   Hapus komentar di bawah dan hapus Opsi 1 jika ingin kembali gelap.
+   OPSI 2: TEMA GELAP (DARK MODE) — Sesuai aslinya (Aktif saat ini)
    ═════════════════════════════════════════════════════════════════ */
-
-/*
 @layer base {
   body {
-    background-color: #020617;
-    color: #f8fafc;
+    background-color: #020617; /* slate-950 */
+    color: #f8fafc; /* slate-50 */
+    
+    /* Opsional: Efek pola titik-titik halus di background gelap */
     background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
     background-size: 24px 24px;
+    
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background-color: #334155; border-radius: 10px; }
+  /* Kustomisasi Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: #334155; 
+    border-radius: 10px;
+  }
 }
-*/
 
 /* Class bantuan untuk menyembunyikan scrollbar */
 .scrollbar-none::-webkit-scrollbar {
