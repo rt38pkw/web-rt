@@ -1,8 +1,9 @@
+// pages/index.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { createClient } from '@supabase/supabase-js';
 import Head from 'next/head';
-import InstallButton from '../components/InstallButton';
+// InstallButton dihapus
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -141,9 +142,7 @@ export default function Home() {
             <p className="text-[10px] sm:text-xs text-slate-400">Rukun • Peduli • Bersama</p>
           </div>
         </div>
-        <div>
-          <InstallButton />
-        </div>
+        {/* Tombol InstallButton dihapus dari sini */}
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center p-4 my-6">
