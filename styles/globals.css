@@ -1,3 +1,71 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ═════════════════════════════════════════════════════════════════
+   OPSI 1: TEMA CERAH (LIGHT MODE) GLOBAL — AKTIF SAAT INI
+   ═════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  body {
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
+  }
+
+  /* Memutar balik background gelap menjadi terang */
+  .bg-slate-950, .bg-slate-900, .bg-slate-900\/70, .bg-slate-900\/80, .bg-slate-900\/95 {
+    background-color: #ffffff !important;
+  }
+  
+  .bg-slate-800, .bg-slate-800\/80 {
+    background-color: #f1f5f9 !important; /* abu-abu sangat terang */
+  }
+
+  /* Memutar balik teks putih menjadi gelap */
+  .text-white, .text-slate-100, .text-slate-200, .text-slate-300 {
+    color: #0f172a !important;
+  }
+
+  /* Warna border disesuaikan agar tidak terlalu gelap */
+  .border-slate-800, .border-slate-700, .border-slate-800\/60 {
+    border-color: #e2e8f0 !important;
+  }
+
+  /* Input form dibuat lebih cerah */
+  input, select, textarea {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+  }
+}
+
+
+/* ═════════════════════════════════════════════════════════════════
+   OPSI 2: TEMA GELAP (DARK MODE) — Simpan sebagai cadangan
+   Hapus komentar di bawah dan hapus Opsi 1 jika ingin kembali gelap.
+   ═════════════════════════════════════════════════════════════════ */
+
+/*
+@layer base {
+  body {
+    background-color: #020617;
+    color: #f8fafc;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 24px 24px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background-color: #334155; border-radius: 10px; }
+}
+*/
+
+/* Class bantuan untuk menyembunyikan scrollbar */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
