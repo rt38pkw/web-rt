@@ -1,14 +1,9 @@
 // components/warga/ProfileCard.js
-export default function ProfileCard({ warga, penghuniData, roleLogin, modeAkses, tarifBulanan, isUsaha, onUbahPin }) {
+export default function ProfileCard({ warga, penghuniData, roleLogin, modeAkses, tarifBulanan, isUsaha }) {
   if (!warga) return null;
 
   const isPenyewa = roleLogin === 'penyewa';
   const isModePantau = modeAkses === 'pantau';
-  
-  const statusPenghuni = penghuniData?.status_verifikasi;
-  const punyaNik = !!penghuniData?.nik && penghuniData.nik !== '0';
-  const punyaKK = !!penghuniData?.url_kk;
-  const isProfileComplete = statusPenghuni === 'approved' && punyaNik && punyaKK;
 
   let namaTampil = warga.nama_lengkap;
   let subNama = null;
@@ -78,15 +73,6 @@ export default function ProfileCard({ warga, penghuniData, roleLogin, modeAkses,
         <div className={`px-2 py-1 rounded-md font-bold border shrink-0 ${badgeClass}`}>
           {badgeText}
         </div>
-
-        {!isPenyewa && isProfileComplete && onUbahPin && (
-          <button 
-            onClick={onUbahPin} 
-            className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2 py-1 rounded-md font-medium flex items-center gap-1 transition active:scale-95 shadow-lg shadow-black/20 shrink-0"
-          >
-            🔐 PIN
-          </button>
-        )}
       </div>
     </section>
   );
