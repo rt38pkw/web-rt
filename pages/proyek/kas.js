@@ -333,12 +333,19 @@ export default function PageProyekKas() {
                       </div>
                     </div>
 
-                    {!isIuran && (
-                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-800/50 mt-1">
-                        <button onClick={() => { setEditData(k); setModalMode('edit'); setShowModal(true); }} className="text-[10px] text-blue-400 font-semibold hover:text-blue-300">✏️ Edit</button>
-                        <button onClick={() => handleHapusClick(k)} className="text-[10px] text-rose-400 font-semibold hover:text-rose-300">🗑️ Hapus</button>
-                      </div>
-                    )}
+                    {/* Logika Tombol Aksi: Iuran -> Teks, Pengeluaran -> Teks, Lainnya -> Tombol */}
+                    <div className="flex justify-end gap-2 pt-2 border-t border-slate-800/50 mt-1">
+                      {isIuran ? (
+                        <span className="text-[9px] text-slate-500 italic">di menu Tunai</span>
+                      ) : isPengeluaran ? (
+                        <span className="text-[9px] text-slate-500 italic">di Rincian Atas</span>
+                      ) : (
+                        <>
+                          <button onClick={() => { setEditData(k); setModalMode('edit'); setShowModal(true); }} className="text-[10px] text-blue-400 font-semibold hover:text-blue-300">✏️ Edit</button>
+                          <button onClick={() => handleHapusClick(k)} className="text-[10px] text-rose-400 font-semibold hover:text-rose-300">🗑️ Hapus</button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 );
               })
