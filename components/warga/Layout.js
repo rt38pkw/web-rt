@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react'; 
 import NotifToggle from '../NotifToggle';
-import { supabase } from '../../lib/supabase'; // Import supabase
+import { supabase } from '../../lib/supabase';
 
 import PopoverPengaturan from './PopoverPengaturan';
 import ModalUbahPin from './ModalUbahPin';
@@ -21,9 +21,8 @@ export default function Layout({ children, warga }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showUbahPin, setShowUbahPin] = useState(false);
   
-  const [pendingRondaCount, setPendingRondaCount] = useState(0); // State Badge Ronda
+  const [pendingRondaCount, setPendingRondaCount] = useState(0);
 
-  // ═══ LOGIKA BADGE RONDA ═══
   useEffect(() => {
     if (!warga?.id) return;
 
@@ -42,8 +41,9 @@ export default function Layout({ children, warga }) {
           return;
         }
 
-        // 2. Cek jadwal ronda hari ini atau yang belum diabsen
-        const today = new Date().toISOString().split('T')[0];
+        // 2. Cek jadwal ronda HANYA UNTUK HARI INI
+        // Menggunakan toLocaleDateString agar sesuai dengan zona waktu lokal (bukan UTC)
+        const today = new Date().toLocaleDateString('en-CA'); // Format: YYYY-MM-DD
         
         const { data: jadwal } = await supabase
           .from('petugas_ronda')
@@ -52,9 +52,8 @@ export default function Layout({ children, warga }) {
           .eq('status_hadir', 'pending')
           .eq('jadwal.status', 'aktif')
           .eq('jadwal.periode.status', 'published')
-          .gte('jadwal.tanggal', today); // Hanya hitung hari ini atau ke depan
+          .eq('jadwal.tanggal', today); // PERBAIKAN: HANYA HARI INI
 
-        // 3. Hitung berapa yang belum diabsen
         setPendingRondaCount(jadwal?.length || 0);
       } catch (err) {
         console.error('Gagal load badge ronda:', err);
@@ -63,7 +62,6 @@ export default function Layout({ children, warga }) {
 
     checkRondaPending();
 
-    // Dengarkan perubahan secara realtime
     const channel = supabase
       .channel('realtime-badge-warga-ronda')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'petugas_ronda' }, () => checkRondaPending())
@@ -73,7 +71,6 @@ export default function Layout({ children, warga }) {
       supabase.removeChannel(channel);
     };
   }, [warga?.id]);
-  // ═══════════════════════════
 
   const handleLogout = () => {
     if (!confirm('Yakin ingin keluar dari akun ini? Anda harus login kembali besok.')) return;
@@ -127,7 +124,6 @@ export default function Layout({ children, warga }) {
               >
                 <span>{t.icon}</span> {t.label}
                 
-                {/* BADGE NOTIFIKASI RONDA */}
                 {t.key === 'ronda' && pendingRondaCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center shadow-lg animate-pulse">
                     {pendingRondaCount}
