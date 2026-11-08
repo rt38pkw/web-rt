@@ -1,24 +1,32 @@
+// components/proyek/ModalRekapProjek.js
 import { formatRupiahProyek } from '../../lib/proyek/constants';
 import { getTotalTerbayar } from '../../lib/proyek/calculations';
 
-export default function ModalRekapProjek({ show, onClose, proyek, wargaList, iuranProyekList }) {
-  // ═══ GUARD UTAMA ═══
+export default function ModalRekapProjek({ 
+  show, onClose, proyek, 
+  wargaList, 
+  iuranProyekList = [], 
+  kasProyekList = [] 
+}) {
   if (!show || !proyek) return null;
 
   const wargaSafe = Array.isArray(wargaList) ? wargaList : [];
   const iuranSafe = Array.isArray(iuranProyekList) ? iuranProyekList : [];
+  const kasSafe = Array.isArray(kasProyekList) ? kasProyekList : [];
   const target = Number(proyek.nominal_per_warga || 0);
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl h-[85vh] rounded-3xl flex flex-col shadow-2xl overflow-hidden">
-        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/60">
+      <div className="bg-slate-900 border border-slate-800 w-full max-w-md h-[85vh] rounded-3xl flex flex-col shadow-2xl overflow-hidden">
+        
+        {/* Header */}
+        <div className="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-950/60">
           <div className="min-w-0">
-            <h3 className="font-bold text-white text-sm sm:text-base truncate">
-              📋 Rekap Warga: {proyek.nama}
+            <h3 className="font-bold text-white text-sm truncate">
+              📋 Rekap: {proyek.nama}
             </h3>
-            <p className="text-[10px] sm:text-[11px] text-slate-400">
-              Target: {formatRupiahProyek(target)} / warga
+            <p className="text-[10px] text-slate-400">
+              Target: {formatRupiahProyek(target)}
             </p>
           </div>
           <button
@@ -29,14 +37,15 @@ export default function ModalRekapProjek({ show, onClose, proyek, wargaList, iur
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto">
-          <table className="w-full border-collapse text-left text-xs">
-            <thead className="sticky top-0 z-30 bg-slate-950 text-slate-400 uppercase text-[10px]">
-              <tr className="border-b border-slate-800">
-                <th className="p-2 sm:p-3 sticky left-0 bg-slate-950 z-30 w-[60px] border-r border-slate-800/80">Rumah</th>
-                <th className="p-2 sm:p-3 sticky left-[60px] bg-slate-950 z-30 w-[150px] border-r border-slate-800/80">Nama</th>
-                <th className="p-2 sm:p-3 text-right">Terbayar</th>
-                <th className="p-2 sm:p-3 text-center">Status</th>
+        {/* Tabel Compact */}
+        <div className="flex-1 overflow-auto bg-slate-900">
+          <table className="w-full text-left text-xs table-fixed">
+            <thead className="sticky top-0 z-30 bg-slate-950 text-slate-400 uppercase text-[9px] border-b border-slate-800">
+              <tr>
+                <th className="p-2 w-[80px]">Rumah</th>
+                <th className="p-2 text-right w-[90px]">Bayar</th>
+                <th className="p-2 text-right w-[80px]">Donasi</th>
+                <th className="p-2 text-center w-[60px]">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -44,30 +53,46 @@ export default function ModalRekapProjek({ show, onClose, proyek, wargaList, iur
                 const terbayar = getTotalTerbayar(iuranSafe, w.id, proyek.id);
                 const lunas = terbayar >= target;
                 const kurang = target - terbayar;
+                
+                const donasiWarga = kasSafe
+                  .filter(k => k.warga_id === w.id && k.proyek_id === proyek.id && k.tipe === 'donasi')
+                  .reduce((sum, k) => sum + Number(k.nominal || 0), 0);
 
                 return (
                   <tr key={w.id} className="hover:bg-slate-800/30 transition">
-                    <td className="p-2 sm:p-3 sticky left-0 bg-slate-900 z-20 font-mono text-[10px] text-white border-r border-slate-800/80">
-                      {w.no_rumah?.replace(/\s/g, '')}
+                    {/* Kolom Rumah + Nama Singkat di bawahnya */}
+                    <td className="p-2">
+                      <div className="font-mono font-bold text-white text-[11px]">
+                        {w.no_rumah?.replace(/\s/g, '')}
+                      </div>
+                      <div className="text-[8px] text-slate-400 truncate w-[75px]">
+                        {w.nama_lengkap?.split(' ')[0]}
+                      </div>
                     </td>
-                    <td className="p-2 sm:p-3 sticky left-[60px] bg-slate-900 z-20 truncate max-w-[150px] text-slate-300 border-r border-slate-800/80">
-                      {w.nama_lengkap}
-                    </td>
-                    <td className="p-2 sm:p-3 text-right font-mono text-[10px] text-slate-300">
+
+                    {/* Kolom Bayar */}
+                    <td className="p-2 text-right font-mono text-[10px] text-slate-300">
                       {formatRupiahProyek(Math.min(terbayar, target))}
                     </td>
-                    <td className="p-2 sm:p-3 text-center">
+
+                    {/* Kolom Donasi */}
+                    <td className="p-2 text-right font-mono text-[10px] text-purple-400 font-semibold">
+                      {donasiWarga > 0 ? `+${donasiWarga / 1000}rb` : '-'}
+                    </td>
+
+                    {/* Kolom Status (Ikon Saja) */}
+                    <td className="p-2 text-center">
                       {lunas ? (
-                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          ✓ Lunas
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          ✓
                         </span>
                       ) : terbayar > 0 ? (
-                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                          🟡 Kurang {formatRupiahProyek(kurang)}
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          🟡
                         </span>
                       ) : (
-                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">
-                          - Belum
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                          -
                         </span>
                       )}
                     </td>
@@ -78,8 +103,9 @@ export default function ModalRekapProjek({ show, onClose, proyek, wargaList, iur
           </table>
         </div>
 
-        <div className="px-4 sm:px-6 py-3 border-t border-slate-800 bg-slate-950/60 flex justify-between items-center text-xs text-slate-400">
-          <span>{wargaSafe.length} warga total</span>
+        {/* Footer */}
+        <div className="px-4 py-3 border-t border-slate-800 bg-slate-950/60 flex justify-between items-center text-xs text-slate-400">
+          <span>{wargaSafe.length} warga</span>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition"
