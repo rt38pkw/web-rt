@@ -1,5 +1,6 @@
 // components/warga/ModalLengkapiProfil.js
 import { useState, useEffect } from 'react';
+import imageCompression from 'browser-image-compression';
 import { supabase } from '../../lib/supabase';
 import { uploadKK } from '../../lib/iuran/storage';
 
@@ -32,6 +33,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
   // State Step 3
   const [fileKK, setFileKK] = useState(null);
   const [previewKK, setPreviewKK] = useState(null);
+  const [isCompressing, setIsCompressing] = useState(false);
 
   const sanitizeNik = (val) => {
     const str = String(val || '');
@@ -77,15 +79,12 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
       if (!nik || nik.length !== 16) { alert('NIK wajib diisi 16 digit!'); return; }
       if (!noKk || noKk.length !== 16) { alert('No. KK wajib diisi 16 digit!'); return; }
       if (!noWa.trim()) { alert('No WhatsApp wajib diisi!'); return; }
-      
-      // ═══ VALIDASI PASSWORD WAJIB (HANYA PEMILIK) ═══
       if (!isPenyewa) {
-        if (!password.trim()) { alert('Password Baru wajib diisi untuk keamanan akun!'); return; }
+        if (!password.trim()) { alert('Password Baru wajib diisi!'); return; }
         if (password.length < 6) { alert('Password minimal 6 karakter!'); return; }
-        if (password === '123456') { alert('Password tidak boleh 123456 (default).'); return; }
+        if (password === '123456') { alert('Password tidak boleh 123456.'); return; }
         if (password !== confirmPassword) { alert('Konfirmasi Password tidak cocok!'); return; }
       }
-      
       setStep(2);
     } else if (step === 2) {
       if (newNama.trim() !== '' || newNik.trim() !== '') {
@@ -100,30 +99,44 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
     if (!newNama.trim()) { alert('Nama wajib diisi!'); return; }
     if (!newNik || newNik.length !== 16) { alert('NIK wajib 16 digit!'); return; }
     setAnggotaKeluarga([...anggotaKeluarga, { 
-      nama: newNama, 
-      nik: newNik, 
-      hubungan: newHubungan,
-      tanggal_lahir: newTglLahir || null,
-      jenis_kelamin: newJenisKelamin,
-      pekerjaan: newPekerjaan.trim() || null
+      nama: newNama, nik: newNik, hubungan: newHubungan,
+      tanggal_lahir: newTglLahir || null, jenis_kelamin: newJenisKelamin, pekerjaan: newPekerjaan.trim() || null
     }]);
     setNewNama(''); setNewNik(''); setNewTglLahir(''); setNewJenisKelamin('L'); setNewPekerjaan(''); setNewHubungan('Istri');
   };
 
   const handleHapusAnggota = (index) => setAnggotaKeluarga(anggotaKeluarga.filter((_, i) => i !== index));
 
-  const handleFileKKChange = (e) => {
+  // ═══ KOMPRESI GAMBAR ═══
+  const handleFileKKChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setFileKK(file);
-    setPreviewKK(URL.createObjectURL(file));
+
+    setIsCompressing(true);
+    try {
+      const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+      const compressedFile = await imageCompression(file, options);
+      
+      setFileKK(compressedFile);
+      setPreviewKK(URL.createObjectURL(compressedFile));
+    } catch (error) {
+      console.error('Gagal kompres gambar:', error);
+      setFileKK(file);
+      setPreviewKK(URL.createObjectURL(file));
+    } finally {
+      setIsCompressing(false);
+    }
   };
+  // ═════════════════════════
 
   const handleSubmit = async () => {
     if (!fileKK) { alert('Foto KK wajib diunggah!'); return; }
 
     setLoading(true);
     try {
+      // Jeda aman untuk WebView
+      await new Promise(r => setTimeout(r, 500));
+
       const urlKK = await uploadKK(fileKK, warga.id);
       const tipe = isPenyewa ? 'penyewa' : 'pemilik';
 
@@ -137,9 +150,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
 
       const dataPenghuni = {
         warga_id: warga.id, nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_kk: noKk.trim(), no_hp: noWa.trim(),
-        tanggal_lahir: tglLahir || null,
-        jenis_kelamin: jenisKelamin,
-        pekerjaan: pekerjaan.trim() || null,
+        tanggal_lahir: tglLahir || null, jenis_kelamin: jenisKelamin, pekerjaan: pekerjaan.trim() || null,
         hubungan: 'Kepala Keluarga', tipe_penghuni: tipe, is_aktif: true, status_verifikasi: 'pending', url_kk: urlKK, alasan_reject: null
       };
 
@@ -152,8 +163,7 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
       // 2. Update data warga (Pemilik)
       if (!isPenyewa) {
         const updateWarga = {
-          nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_kk: noKk.trim(), no_wa: noWa.trim(),
-          password_pending: password.trim() // Selalu simpan ke pending
+          nama_lengkap: namaLengkap.trim(), nik: nik.trim(), no_kk: noKk.trim(), no_wa: noWa.trim(), password_pending: password.trim()
         };
         await supabase.from('warga').update(updateWarga).eq('id', warga.id);
       }
@@ -167,6 +177,32 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
         }));
         await supabase.from('penghuni').insert(records);
       }
+
+      // ═══ SMART HANDLER (NOTIFIKASI) ═══
+      try {
+        const namaWarga = isPenyewa ? (warga?.nama_lengkap || 'Penyewa') : namaLengkap.trim();
+        
+        await supabase.functions.invoke('smart-handler', {
+          body: {
+            role_target: 'sekretaris',
+            title: '📝 Pengajuan Profil Baru',
+            body: `${namaWarga} telah melengkapi data diri & KK.`,
+            url: '/sekretaris/verifikasi'
+          }
+        });
+
+        await supabase.functions.invoke('smart-handler', {
+          body: {
+            role_target: 'ketua',
+            title: '📝 Pengajuan Profil Baru',
+            body: `${namaWarga} telah melengkapi data diri & KK.`,
+            url: '/sekretaris/verifikasi'
+          }
+        });
+      } catch (notifErr) {
+        console.log('Gagal kirim notif verifikasi profil:', notifErr);
+      }
+      // ══════════════════════════════════
 
       alert('✅ Data berhasil diajukan!');
       if (onSuccess) onSuccess();
@@ -287,14 +323,29 @@ export default function ModalLengkapiProfil({ show, onClose, warga, role, dataPe
             <h4 className="text-sm font-semibold text-white mb-2">3. Upload Kartu Keluarga</h4>
             <input type="file" accept="image/*" onChange={handleFileKKChange} id="upload-kk" className="hidden" />
             <label htmlFor="upload-kk" className="border-2 border-dashed border-slate-700 rounded-2xl p-6 text-center hover:bg-slate-800/50 cursor-pointer flex flex-col items-center justify-center min-h-[150px]">
-              {previewKK ? (<img src={previewKK} alt="Preview" className="max-h-40 object-contain rounded-lg" />) : (<><div className="text-3xl mb-2">📸</div><p className="text-xs text-slate-400">Upload Foto KK</p></>)}
+              {isCompressing ? (
+                <div className="flex flex-col items-center text-slate-400">
+                  <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                  <p className="text-xs">Memproses gambar...</p>
+                </div>
+              ) : previewKK ? (
+                <img src={previewKK} alt="Preview" className="max-h-40 object-contain rounded-lg" />
+              ) : (
+                <><div className="text-3xl mb-2">📸</div><p className="text-xs text-slate-400">Upload Foto KK</p></>
+              )}
             </label>
           </div>
         )}
 
         <div className="flex gap-2 pt-3 border-t border-slate-800">
           {step > 1 && (<button onClick={() => setStep(step - 1)} className="w-1/3 bg-slate-800 text-slate-300 font-semibold py-2.5 rounded-xl text-xs">Kembali</button>)}
-          {step < 3 ? (<button onClick={handleNextStep} className={`${step > 1 ? 'w-2/3' : 'w-full'} bg-blue-600 text-white font-semibold py-2.5 rounded-xl text-xs`}>Lanjut →</button>) : (<button onClick={handleSubmit} disabled={loading} className="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-xl text-xs">{loading ? 'Mengirim...' : 'Kirim Pengajuan'}</button>)}
+          {step < 3 ? (
+            <button onClick={handleNextStep} className={`${step > 1 ? 'w-2/3' : 'w-full'} bg-blue-600 text-white font-semibold py-2.5 rounded-xl text-xs`}>Lanjut →</button>
+          ) : (
+            <button onClick={handleSubmit} disabled={loading || isCompressing} className="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-xl text-xs">
+              {loading ? 'Mengirim...' : 'Kirim Pengajuan'}
+            </button>
+          )}
         </div>
       </div>
     </div>
