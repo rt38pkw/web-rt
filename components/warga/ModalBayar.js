@@ -152,4 +152,29 @@ export default function ModalBayar({
 
         <div>
           <label className="text-xs font-semibold text-slate-300 block mb-2">Catatan (opsional)</label>
-          <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="Contoh: transfer dari rekening istri" rows={2} className="w-full bg-slate-950 border border-slate-800
+          <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="Contoh: transfer dari rekening istri" rows={2} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 resize-none" />
+        </div>
+
+        <div className="flex items-center justify-between border-t border-slate-800 pt-3">
+          <div>
+            <div className="text-[10px] text-slate-400 uppercase">Total Bayar</div>
+            <div className="text-lg font-black text-white">Rp {totalBayar.toLocaleString('id-ID')}</div>
+            <div className="text-[10px] text-slate-500">{bulanDipilih.length} bulan dipilih</div>
+          </div>
+          <button onClick={handleSubmit} disabled={submitting || bulanDipilih.length === 0 || !fileBukti[0] || compressingSlot !== null} className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white text-xs font-semibold px-5 py-3 rounded-xl transition shadow-lg shadow-blue-600/20">
+            {submitting ? 'Mengirim...' : 'Kirim Pengajuan'}
+          </button>
+        </div>
+      </div>
+
+      {zoomImage && (
+        <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setZoomImage(null)}>
+          <button className="absolute top-4 right-4 text-white text-3xl font-bold z-10" onClick={() => setZoomImage(null)}>✕</button>
+          <div className="w-full h-full overflow-auto flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+             <img src={zoomImage} alt="Zoom QRIS" className="min-w-full min-h-full object-contain" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
