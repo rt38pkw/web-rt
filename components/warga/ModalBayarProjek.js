@@ -1,5 +1,6 @@
 // components/warga/ModalBayarProjek.js
 import { useState, useEffect } from 'react';
+import imageCompression from 'browser-image-compression';
 import { ALLOWED_TYPES, MAX_FILE_SIZE } from '../../lib/iuran/constants';
 import { formatRupiahProyek } from '../../lib/proyek/constants';
 
@@ -11,7 +12,8 @@ export default function ModalBayarProjek({
   const [previewBukti, setPreviewBukti] = useState([null, null, null]);
   const [catatan, setCatatan] = useState('');
   const [error, setError] = useState('');
-  const [zoomImage, setZoomImage] = useState(null); // State untuk Zoom QRIS
+  const [zoomImage, setZoomImage] = useState(null);
+  const [compressingSlot, setCompressingSlot] = useState(null);
 
   useEffect(() => {
     if (show && proyek) {
@@ -21,6 +23,7 @@ export default function ModalBayarProjek({
       setCatatan('');
       setError('');
       setZoomImage(null);
+      setCompressingSlot(null);
     }
   }, [show, proyek, sisaWarga]);
 
@@ -33,14 +36,29 @@ export default function ModalBayarProjek({
   const masukIuran = Math.min(nominalNum, sisaWarga);
   const masukDonasi = Math.max(0, kelebihan);
 
-  const handleFileChange = (slotIndex, e) => {
+  const handleFileChange = async (slotIndex, e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!ALLOWED_TYPES.includes(file.type)) { alert('Format file harus JPG, PNG, atau WebP'); return; }
     if (file.size > MAX_FILE_SIZE) { alert('Ukuran file maksimal 3 MB'); return; }
-    const newFiles = [...fileBukti]; newFiles[slotIndex] = file; setFileBukti(newFiles);
-    const newPreviews = [...previewBukti]; if (newPreviews[slotIndex]) URL.revokeObjectURL(newPreviews[slotIndex]);
-    newPreviews[slotIndex] = URL.createObjectURL(file); setPreviewBukti(newPreviews);
+
+    setCompressingSlot(slotIndex);
+    try {
+      const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+      const compressedFile = await imageCompression(file, options);
+
+      const newFiles = [...fileBukti]; newFiles[slotIndex] = compressedFile; setFileBukti(newFiles);
+      
+      const newPreviews = [...previewBukti]; 
+      if (newPreviews[slotIndex]) URL.revokeObjectURL(newPreviews[slotIndex]);
+      newPreviews[slotIndex] = URL.createObjectURL(compressedFile); 
+      setPreviewBukti(newPreviews);
+    } catch (error) {
+      console.error('Gagal kompres gambar:', error);
+      alert('Gagal memproses gambar. Coba pilih foto lain.');
+    } finally {
+      setCompressingSlot(null);
+    }
   };
 
   const handleRemoveFile = (slotIndex) => {
@@ -53,6 +71,8 @@ export default function ModalBayarProjek({
     setError('');
     if (terlaluKecil) { setError('Nominal harus lebih dari 0'); return; }
     if (!fileBukti[0]) { setError('Upload minimal 1 bukti pembayaran (slot 1)'); return; }
+    
+    await new Promise(r => setTimeout(r, 300));
     await onSubmit({ nominal: nominalNum, nominalIuran: masukIuran, nominalDonasi: masukDonasi, fileBukti, catatan });
   };
 
@@ -108,9 +128,23 @@ export default function ModalBayarProjek({
               <div key={slot} className="relative">
                 <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={(e) => handleFileChange(slot, e)} className="hidden" id={`projek-slot-${slot}`} />
                 <label htmlFor={`projek-slot-${slot}`} className={`block aspect-square rounded-2xl border-2 border-dashed flex items-center justify-center cursor-pointer overflow-hidden transition ${previewBukti[slot] ? 'border-amber-500/60 bg-slate-950' : slot === 0 ? 'border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/10' : 'border-slate-700 bg-slate-950/60 hover:bg-slate-800/40'}`}>
-                  {previewBukti[slot] ? (<img src={previewBukti[slot]} alt={`Bukti ${slot + 1}`} className="w-full h-full object-cover" />) : (<div className="text-center"><div className="text-2xl">{slot === 0 ? '📸' : '➕'}</div><div className="text-[9px] text-slate-400 mt-1">Slot {slot + 1}{slot === 0 ? ' *' : ''}</div></div>)}
+                  {compressingSlot === slot ? (
+                    <div className="flex flex-col items-center text-slate-400">
+                      <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mb-1"></div>
+                      <div className="text-[8px]">Memproses...</div>
+                    </div>
+                  ) : previewBukti[slot] ? (
+                    <img src={previewBukti[slot]} alt={`Bukti ${slot + 1}`} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-center">
+                      <div className="text-2xl">{slot === 0 ? '📸' : '➕'}</div>
+                      <div className="text-[9px] text-slate-400 mt-1">Slot {slot + 1}{slot === 0 ? ' *' : ''}</div>
+                    </div>
+                  )}
                 </label>
-                {previewBukti[slot] && (<button onClick={(e) => { e.preventDefault(); handleRemoveFile(slot); }} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 hover:bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center shadow-lg">✕</button>)}
+                {previewBukti[slot] && compressingSlot !== slot && (
+                  <button onClick={(e) => { e.preventDefault(); handleRemoveFile(slot); }} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 hover:bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center shadow-lg">✕</button>
+                )}
               </div>
             ))}
           </div>
@@ -126,11 +160,10 @@ export default function ModalBayarProjek({
 
         <div className="flex gap-3 pt-2 border-t border-slate-800">
           <button onClick={onClose} disabled={submitting} className="w-1/3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs">Batal</button>
-          <button onClick={handleSubmit} disabled={submitting || terlaluKecil || !fileBukti[0]} className="w-2/3 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-xs">{submitting ? 'Mengirim...' : `Kirim Pengajuan ${formatRupiahProyek(nominalNum)}`}</button>
+          <button onClick={handleSubmit} disabled={submitting || terlaluKecil || !fileBukti[0] || compressingSlot !== null} className="w-2/3 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-xs">{submitting ? 'Mengirim...' : `Kirim Pengajuan ${formatRupiahProyek(nominalNum)}`}</button>
         </div>
       </div>
 
-      {/* MODAL ZOOM QRIS */}
       {zoomImage && (
         <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setZoomImage(null)}>
           <button className="absolute top-4 right-4 text-white text-3xl font-bold z-10" onClick={() => setZoomImage(null)}>✕</button>
