@@ -17,6 +17,7 @@ export default function AdminDashboard() {
     saldoKasBebas: 0,
     pendingIuran: 0,
     pendingProyek: 0,
+    pendingSekretariat: 0, // State Baru
   });
 
   const [showPassModal, setShowPassModal] = useState(false);
@@ -31,12 +32,10 @@ export default function AdminDashboard() {
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
-    // CEK SAVE LOGIN (LOCALSTORAGE)
     const savedUser = localStorage.getItem('pengurusSession');
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser);
 
-      // Panggil notifikasi di paling atas sebelum ngecek role
       setupPushNotifications('pengurus', parsedUser.id);
 
       if (parsedUser.role === 'bendahara') {
@@ -79,7 +78,6 @@ export default function AdminDashboard() {
     setUser(profilAman);
     localStorage.setItem('pengurusSession', JSON.stringify(profilAman));
     
-    // Panggil notifikasi di sini sebelum redirect
     setupPushNotifications('pengurus', data.id); 
 
     if (data.role === 'bendahara') {
@@ -113,32 +111,62 @@ export default function AdminDashboard() {
         { data: pengeluaranData },
         { count: pendingIuranCount },
         { count: pendingProyekCount },
+        // ═══ TAMBAHAN BARU: Query Sekretariat ═══
+        { data: pendingPenghuni },
+        { data: pendingRondaData }
       ] = await Promise.all([
-        // 1. Hitung Warga dari tabel PENGHUNI (Aktif)
         supabase.from('penghuni').select('*', { count: 'exact', head: true }).eq('is_aktif', true),
         
-        // 2. Ambil Data Keuangan untuk Saldo Kas Bebas
         supabase.from('iuran').select('jumlah').eq('status', 'approved'),
         supabase.from('pemasukan_lain').select('nominal'),
         supabase.from('pengeluaran').select('nominal'),
 
-        // 3. Hitung Pending Iuran & Proyek
         supabase.from('iuran').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('iuran_proyek').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        
+        // Query Penghuni Pending (Verifikasi Warga)
+        supabase.from('penghuni').select('warga_id').eq('status_verifikasi', 'pending').eq('is_aktif', true),
+        
+        // Query Ronda Pending (Verifikasi Ronda)
+        supabase.from('petugas_ronda')
+          .select('id, foto_bukti, jadwal:jadwal_id!inner(tanggal, periode:periode_id!inner(jam_selesai, status))')
+          .eq('status_hadir', 'pending')
+          .eq('jadwal.periode.status', 'published')
       ]);
 
       // Hitung Saldo Kas Bebas
       const totalIuran = (iuranData || []).reduce((acc, curr) => acc + Number(curr.jumlah || 0), 0);
       const totalPemasukanLain = (pemasukanLainData || []).reduce((acc, curr) => acc + Number(curr.nominal || 0), 0);
       const totalPengeluaran = (pengeluaranData || []).reduce((acc, curr) => acc + Number(curr.nominal || 0), 0);
-      
       const saldoKasBebas = (totalIuran + totalPemasukanLain) - totalPengeluaran;
+
+      // Hitung Pending Sekretariat (Warga + Ronda)
+      const uniquePending = new Set((pendingPenghuni || []).map(p => p.warga_id));
+      
+      let totalRonda = 0;
+      if (pendingRondaData) {
+        pendingRondaData.forEach(item => {
+          const tgl = item.jadwal?.tanggal;
+          const jamSelesai = item.jadwal?.periode?.jam_selesai;
+          if (!tgl || !jamSelesai) return;
+          const dateStr = tgl.split('T')[0];
+          const [selesaiH, selesaiM] = jamSelesai.split(':');
+          let endDateTime = new Date(`${dateStr}T${selesaiH}:${selesaiM}:00`);
+          const startDateTime = new Date(`${dateStr}T00:00:00`);
+          if (endDateTime < startDateTime || parseInt(selesaiH) < 12) endDateTime.setDate(endDateTime.getDate() + 1);
+          const isPassed = new Date() > endDateTime;
+          if (item.foto_bukti || isPassed) totalRonda++;
+        });
+      }
+      
+      const totalSekretariat = uniquePending.size + totalRonda;
 
       setStats({
         warga: wargaCount || 0,
         saldoKasBebas: saldoKasBebas,
         pendingIuran: pendingIuranCount || 0,
         pendingProyek: pendingProyekCount || 0,
+        pendingSekretariat: totalSekretariat, // Set State Baru
       });
     } catch (err) {
       console.error('Gagal memuat stats:', err);
@@ -335,7 +363,7 @@ export default function AdminDashboard() {
             <p className="text-[11px] text-slate-500 mt-1 relative z-10">Terdaftar aktif sebagai penghuni</p>
           </div>
 
-          {/* Kartu 2: Saldo Kas Bebas (Baru) */}
+          {/* Kartu 2: Saldo Kas Bebas */}
           <div className="bg-slate-900/80 border border-emerald-500/30 rounded-2xl p-5 shadow-lg relative overflow-hidden">
             <div className="absolute -right-4 -bottom-4 text-7xl opacity-5">💰</div>
             <div className="flex items-center justify-between mb-3 relative z-10">
@@ -375,7 +403,13 @@ export default function AdminDashboard() {
           )}
 
           {canAccessSekretariat ? (
-            <Link href="/sekretaris" className="group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-teal-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
+            <Link href="/sekretaris" className="relative group bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-teal-500/50 rounded-2xl p-6 transition duration-300 shadow-lg flex flex-col justify-between">
+              {/* ═══ BADGE SEKREATARIAT ═══ */}
+              {stats.pendingSekretariat > 0 && (
+                <span className="absolute top-3 right-3 inline-flex items-center justify-center bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
+                  {stats.pendingSekretariat}
+                </span>
+              )}
               <div>
                 <div className="w-12 h-12 bg-teal-500/10 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition mb-4 text-teal-400">📝</div>
                 <h4 className="text-lg font-bold text-white group-hover:text-teal-400 transition">Sekretariat</h4>
