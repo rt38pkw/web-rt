@@ -1,6 +1,6 @@
 // components/proyek/ModalRekapProjek.js
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase'; // Pastikan path ini benar
+import { supabase } from '../../lib/supabase';
 import { formatRupiahProyek } from '../../lib/proyek/constants';
 import { getTotalTerbayar } from '../../lib/proyek/calculations';
 
@@ -13,7 +13,7 @@ export default function ModalRekapProjek({
   const [penghuniList, setPenghuniList] = useState([]);
   const [loadingPenghuni, setLoadingPenghuni] = useState(false);
 
-  // Fetch data penyewa secara mandiri saat modal dibuka
+  // Fetch data penghuni secara mandiri saat modal dibuka
   useEffect(() => {
     if (!show) return;
 
@@ -55,7 +55,7 @@ export default function ModalRekapProjek({
             </h3>
             <p className="text-[10px] text-slate-400 flex items-center gap-2">
               Target: {formatRupiahProyek(target)} / KK
-              {loadingPenghuni && <span className="text-amber-400 animate-pulse">(Memuat penyewa...)</span>}
+              {loadingPenghuni && <span className="text-amber-400 animate-pulse">(Memuat...)</span>}
             </p>
           </div>
           <button onClick={onClose} className="w-8 h-8 bg-slate-800 text-slate-400 hover:text-white rounded-full flex items-center justify-center text-sm transition shrink-0">
@@ -68,7 +68,7 @@ export default function ModalRekapProjek({
           <table className="w-full text-left text-xs table-fixed">
             <thead className="sticky top-0 z-30 bg-slate-950 text-slate-400 uppercase text-[9px] border-b border-slate-800">
               <tr>
-                <th className="p-2 w-[100px]">Rumah</th>
+                <th className="p-2 w-[110px]">Rumah / KK</th>
                 <th className="p-2 text-right w-[80px]">Bayar</th>
                 <th className="p-2 text-right w-[70px]">Donasi</th>
                 <th className="p-2 text-center w-[45px]">Status</th>
@@ -88,24 +88,20 @@ export default function ModalRekapProjek({
                     .filter(k => k.warga_id === w.id && k.proyek_id === proyek.id && k.tipe === 'donasi')
                     .reduce((sum, k) => sum + Number(k.nominal || 0), 0);
 
-                  // Cari data penyewa dari state lokal
-                  const penyewa = penghuniList.find(p => p.warga_id === w.id && p.hubungan === 'Kepala Keluarga');
+                  // Cari data Kepala Keluarga
+                  const kkPenghuni = penghuniList.find(p => p.warga_id === w.id && p.hubungan === 'Kepala Keluarga');
+                  const namaKK = kkPenghuni ? kkPenghuni.nama_lengkap : 'Belum didata';
 
                   return (
                     <tr key={w.id} className="hover:bg-slate-800/30 transition">
-                      {/* Kolom Rumah + Nama */}
+                      {/* Kolom Rumah + Nama KK */}
                       <td className="p-2">
                         <div className="font-mono font-bold text-white text-[11px]">
                           {w.no_rumah?.replace(/\s/g, '')}
                         </div>
-                        <div className="text-[9px] text-slate-300 truncate w-[85px]">
-                          {w.nama_lengkap?.split(' ')[0]}
+                        <div className="text-[9px] text-slate-300 truncate w-[95px] mt-0.5">
+                          {namaKK}
                         </div>
-                        {penyewa && (
-                          <div className="text-[8px] font-semibold text-orange-400 truncate w-[85px] flex items-center gap-0.5 mt-0.5">
-                            <span>🔑</span> {penyewa.nama_lengkap?.split(' ')[0]}
-                          </div>
-                        )}
                       </td>
 
                       {/* Kolom Bayar */}
