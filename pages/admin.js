@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import Link from 'next/link';
 import InstallButton from '../components/InstallButton';
 import { setupPushNotifications } from '../lib/push-notifications';
+import PopoverPengaturan from '../components/pengurus/PopoverPengaturan';
+import ModalUbahPassword from '../components/pengurus/ModalUbahPassword';
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
@@ -11,25 +13,20 @@ export default function AdminDashboard() {
   const [passwordInput, setPasswordInput] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // State untuk Popover Pengaturan
+  const [showSettings, setShowSettings] = useState(false);
+  const [showUbahPass, setShowUbahPass] = useState(false);
+
   // State Data Ringkasan
   const [stats, setStats] = useState({
     warga: 0,
     saldoKasBebas: 0,
     pendingIuran: 0,
     pendingProyek: 0,
-    pendingSekretariat: 0, // State Baru
+    pendingSekretariat: 0,
   });
 
-  const [showPassModal, setShowPassModal] = useState(false);
-  const [newUsername, setNewUsername] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-
   const [showLoginPassword, setShowLoginPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('pengurusSession');
@@ -96,12 +93,6 @@ export default function AdminDashboard() {
     fetchStats();
   };
 
-  const handleLogout = () => {
-    if (!confirm('Keluar dari akun pengurus?')) return;
-    localStorage.removeItem('pengurusSession');
-    window.location.replace('/admin');
-  };
-
   async function fetchStats() {
     try {
       const [
@@ -111,23 +102,16 @@ export default function AdminDashboard() {
         { data: pengeluaranData },
         { count: pendingIuranCount },
         { count: pendingProyekCount },
-        // ═══ TAMBAHAN BARU: Query Sekretariat ═══
         { data: pendingPenghuni },
         { data: pendingRondaData }
       ] = await Promise.all([
         supabase.from('penghuni').select('*', { count: 'exact', head: true }).eq('is_aktif', true),
-        
         supabase.from('iuran').select('jumlah').eq('status', 'approved'),
         supabase.from('pemasukan_lain').select('nominal'),
         supabase.from('pengeluaran').select('nominal'),
-
         supabase.from('iuran').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('iuran_proyek').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        
-        // Query Penghuni Pending (Verifikasi Warga)
         supabase.from('penghuni').select('warga_id').eq('status_verifikasi', 'pending').eq('is_aktif', true),
-        
-        // Query Ronda Pending (Verifikasi Ronda)
         supabase.from('petugas_ronda')
           .select('id, foto_bukti, jadwal:jadwal_id!inner(tanggal, periode:periode_id!inner(jam_selesai, status))')
           .eq('status_hadir', 'pending')
@@ -140,9 +124,8 @@ export default function AdminDashboard() {
       const totalPengeluaran = (pengeluaranData || []).reduce((acc, curr) => acc + Number(curr.nominal || 0), 0);
       const saldoKasBebas = (totalIuran + totalPemasukanLain) - totalPengeluaran;
 
-      // Hitung Pending Sekretariat (Warga + Ronda)
+      // Hitung Pending Sekretariat
       const uniquePending = new Set((pendingPenghuni || []).map(p => p.warga_id));
-      
       let totalRonda = 0;
       if (pendingRondaData) {
         pendingRondaData.forEach(item => {
@@ -158,7 +141,6 @@ export default function AdminDashboard() {
           if (item.foto_bukti || isPassed) totalRonda++;
         });
       }
-      
       const totalSekretariat = uniquePending.size + totalRonda;
 
       setStats({
@@ -166,60 +148,12 @@ export default function AdminDashboard() {
         saldoKasBebas: saldoKasBebas,
         pendingIuran: pendingIuranCount || 0,
         pendingProyek: pendingProyekCount || 0,
-        pendingSekretariat: totalSekretariat, // Set State Baru
+        pendingSekretariat: totalSekretariat,
       });
     } catch (err) {
       console.error('Gagal memuat stats:', err);
     }
   }
-
-  const handleUpdateProfil = async (e) => {
-    e.preventDefault();
-
-    if (newPassword && newPassword !== confirmPassword) {
-      alert('Password baru dan Konfirmasi Password tidak cocok!');
-      return;
-    }
-
-    setIsUpdating(true);
-
-    const updateData = {};
-    if (newUsername.trim() && newUsername.trim() !== user.username) {
-      updateData.username = newUsername.trim();
-    }
-    if (newPassword.trim()) {
-      updateData.password = newPassword.trim();
-    }
-
-    if (Object.keys(updateData).length === 0) {
-      alert('Tidak ada perubahan data.');
-      setIsUpdating(false);
-      return;
-    }
-
-    const { error } = await supabase
-      .from('pengurus')
-      .update(updateData)
-      .eq('id', user.id);
-
-    setIsUpdating(false);
-
-    if (error) {
-      alert(`Gagal memperbarui profil: ${error.message}`);
-    } else {
-      alert('Profil/Password berhasil diperbarui! Gunakan kredensial baru saat login berikutnya.');
-      
-      const updatedUser = { ...user };
-      if (updateData.username) updatedUser.username = updateData.username;
-      
-      setUser(updatedUser);
-      localStorage.setItem('pengurusSession', JSON.stringify(updatedUser));
-      
-      setShowPassModal(false);
-      setNewPassword('');
-      setConfirmPassword('');
-    }
-  };
 
   if (!user) {
     return (
@@ -316,29 +250,24 @@ export default function AdminDashboard() {
               </span>
             </div>
 
+            {/* TOMBOL PENGATURAN (MEMICU POPOVER) */}
             <button
-              onClick={() => {
-                setNewUsername(user.username);
-                setNewPassword('');
-                setConfirmPassword('');
-                setShowPassModal(true);
-              }}
-              className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-medium transition active:scale-95 flex items-center gap-1"
+              id="btn-pengaturan"
+              onClick={() => setShowSettings(!showSettings)}
+              className={`text-xs px-3 py-2 rounded-lg border transition font-medium flex items-center gap-1 ${
+                showSettings 
+                  ? 'bg-slate-700 text-white border-slate-600' 
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+              }`}
             >
-              🔑 <span className="hidden sm:inline">Edit Akun</span>
-            </button>
-
-            <button
-              onClick={handleLogout}
-              className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-lg text-xs font-medium transition active:scale-95"
-            >
-              Keluar
+              ⚙️ <span className="hidden sm:inline">Pengaturan</span>
             </button>
           </div>
         </div>
       </header>
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* ... (Bagian Main, Kartu Ringkasan, dan Daftar Layanan Admin tetap sama persis) ... */}
         <div className="mb-8 bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-slate-900 border border-blue-500/20 rounded-2xl p-6 relative overflow-hidden">
           <div className="relative z-10">
             <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">
@@ -449,98 +378,19 @@ export default function AdminDashboard() {
         </div>
       </main>
 
-      {showPassModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-5">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <span>🔑</span> Ubah Username & Password
-              </h3>
-              <button onClick={() => setShowPassModal(false)} className="text-slate-400 hover:text-white text-sm font-bold p-1">✕</button>
-            </div>
+      {/* ═══ POPOVER PENGATURAN ═══ */}
+      <PopoverPengaturan 
+        show={showSettings} 
+        onClose={() => setShowSettings(false)} 
+        user={user}
+        onOpenUbahPassword={() => setShowUbahPass(true)}
+      />
 
-            <form onSubmit={handleUpdateProfil} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Username Login</label>
-                <input
-                  type="text"
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  value={newUsername}
-                  onChange={(e) => setNewUsername(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Password Baru</label>
-                <div className="relative">
-                  <input
-                    type={showNewPassword ? 'text' : 'password'}
-                    placeholder="Kosongkan jika tidak ubah password"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 pr-12 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-sm px-2 py-1"
-                  >
-                    {showNewPassword ? '👁️' : '🙈'}
-                  </button>
-                </div>
-              </div>
-
-              {newPassword.length > 0 && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Ulangi Password Baru</label>
-                  <div className="relative">
-                    <input
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      placeholder="Ketik ulang password baru di atas"
-                      required
-                      className={`w-full bg-slate-950 border rounded-xl px-4 py-2.5 pr-12 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-2 ${
-                        confirmPassword.length > 0 && confirmPassword !== newPassword
-                          ? 'border-rose-500 focus:ring-rose-500'
-                          : 'border-slate-800 focus:ring-amber-500'
-                      }`}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-sm px-2 py-1"
-                    >
-                      {showConfirmPassword ? '👁️' : '🙈'}
-                    </button>
-                  </div>
-                  {confirmPassword.length > 0 && confirmPassword !== newPassword && (
-                    <p className="text-[10px] text-rose-400 mt-1">⚠️ Password tidak cocok!</p>
-                  )}
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowPassModal(false)}
-                  className="w-1/2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs transition"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={isUpdating}
-                  className="w-1/2 bg-amber-600 hover:bg-amber-500 text-white font-semibold py-2.5 rounded-xl text-xs transition shadow-lg shadow-amber-600/20"
-                >
-                  {isUpdating ? 'Simpan...' : 'Simpan Perubahan'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ModalUbahPassword 
+        show={showUbahPass} 
+        onClose={() => setShowUbahPass(false)} 
+        user={user}
+      />
     </div>
   );
 }
