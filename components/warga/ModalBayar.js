@@ -1,5 +1,6 @@
 // components/warga/ModalBayar.js
 import { useState, useEffect } from 'react';
+import imageCompression from 'browser-image-compression';
 import { getInfoBulan } from '../../lib/iuran/calculations';
 import { ALLOWED_TYPES, MAX_FILE_SIZE } from '../../lib/iuran/constants';
 
@@ -9,7 +10,8 @@ export default function ModalBayar({
   const [fileBukti, setFileBukti] = useState([null, null, null]);
   const [previewBukti, setPreviewBukti] = useState([null, null, null]);
   const [catatan, setCatatan] = useState('');
-  const [zoomImage, setZoomImage] = useState(null); // State untuk Zoom QRIS
+  const [zoomImage, setZoomImage] = useState(null); 
+  const [compressingSlot, setCompressingSlot] = useState(null);
 
   useEffect(() => {
     if (show) {
@@ -17,6 +19,7 @@ export default function ModalBayar({
       setPreviewBukti([null, null, null]);
       setCatatan('');
       setZoomImage(null);
+      setCompressingSlot(null);
     }
   }, [show]);
 
@@ -30,14 +33,29 @@ export default function ModalBayar({
     return total + info.kurang;
   }, 0);
 
-  const handleFileChange = (slotIndex, e) => {
+  const handleFileChange = async (slotIndex, e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!ALLOWED_TYPES.includes(file.type)) { alert('Format file harus JPG, PNG, atau WebP'); return; }
     if (file.size > MAX_FILE_SIZE) { alert('Ukuran file maksimal 3 MB'); return; }
-    const newFiles = [...fileBukti]; newFiles[slotIndex] = file; setFileBukti(newFiles);
-    const newPreviews = [...previewBukti]; if (newPreviews[slotIndex]) URL.revokeObjectURL(newPreviews[slotIndex]);
-    newPreviews[slotIndex] = URL.createObjectURL(file); setPreviewBukti(newPreviews);
+
+    setCompressingSlot(slotIndex);
+    try {
+      const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+      const compressedFile = await imageCompression(file, options);
+
+      const newFiles = [...fileBukti]; newFiles[slotIndex] = compressedFile; setFileBukti(newFiles);
+      
+      const newPreviews = [...previewBukti]; 
+      if (newPreviews[slotIndex]) URL.revokeObjectURL(newPreviews[slotIndex]);
+      newPreviews[slotIndex] = URL.createObjectURL(compressedFile); 
+      setPreviewBukti(newPreviews);
+    } catch (error) {
+      console.error('Gagal kompres gambar:', error);
+      alert('Gagal memproses gambar. Coba pilih foto lain.');
+    } finally {
+      setCompressingSlot(null);
+    }
   };
 
   const handleRemoveFile = (slotIndex) => {
@@ -49,6 +67,8 @@ export default function ModalBayar({
   const handleSubmit = async () => {
     if (bulanDipilih.length === 0) { alert('Pilih minimal 1 bulan'); return; }
     if (!fileBukti[0]) { alert('Upload minimal 1 bukti pembayaran (slot 1)'); return; }
+    
+    await new Promise(r => setTimeout(r, 300));
     await onSubmit({ fileBukti, catatan, bulanDipilih });
   };
 
@@ -71,9 +91,7 @@ export default function ModalBayar({
             onClick={() => setZoomImage('/qris.png')}
           />
           <p className="text-[10px] text-slate-600 mt-2 font-medium">Scan dengan aplikasi bank / e-wallet</p>
-          
           <button onClick={() => setZoomImage('/qris.png')} className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition">🔍 Perbesar QRIS</button>
-          
           <button onClick={() => { navigator.clipboard.writeText(String(totalBayar)); alert('Total Rp ' + totalBayar.toLocaleString('id-ID') + ' disalin'); }} className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition">📋 Salin Total: Rp {totalBayar.toLocaleString('id-ID')}</button>
         </div>
 
@@ -109,7 +127,12 @@ export default function ModalBayar({
               <div key={slot} className="relative">
                 <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={(e) => handleFileChange(slot, e)} className="hidden" id={`file-slot-${slot}`} />
                 <label htmlFor={`file-slot-${slot}`} className={`block aspect-square rounded-2xl border-2 border-dashed flex items-center justify-center cursor-pointer overflow-hidden transition ${previewBukti[slot] ? 'border-blue-500/60 bg-slate-950' : slot === 0 ? 'border-blue-500/40 bg-blue-500/5 hover:bg-blue-500/10' : 'border-slate-700 bg-slate-950/60 hover:bg-slate-800/40'}`}>
-                  {previewBukti[slot] ? (
+                  {compressingSlot === slot ? (
+                    <div className="flex flex-col items-center text-slate-400">
+                      <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-1"></div>
+                      <div className="text-[8px]">Memproses...</div>
+                    </div>
+                  ) : previewBukti[slot] ? (
                     <img src={previewBukti[slot]} alt={`Bukti ${slot + 1}`} className="w-full h-full object-cover" />
                   ) : (
                     <div className="text-center">
@@ -118,7 +141,7 @@ export default function ModalBayar({
                     </div>
                   )}
                 </label>
-                {previewBukti[slot] && (
+                {previewBukti[slot] && compressingSlot !== slot && (
                   <button onClick={(e) => { e.preventDefault(); handleRemoveFile(slot); }} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 hover:bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center shadow-lg">✕</button>
                 )}
               </div>
@@ -129,30 +152,4 @@ export default function ModalBayar({
 
         <div>
           <label className="text-xs font-semibold text-slate-300 block mb-2">Catatan (opsional)</label>
-          <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="Contoh: transfer dari rekening istri" rows={2} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 resize-none" />
-        </div>
-
-        <div className="flex items-center justify-between border-t border-slate-800 pt-3">
-          <div>
-            <div className="text-[10px] text-slate-400 uppercase">Total Bayar</div>
-            <div className="text-lg font-black text-white">Rp {totalBayar.toLocaleString('id-ID')}</div>
-            <div className="text-[10px] text-slate-500">{bulanDipilih.length} bulan dipilih</div>
-          </div>
-          <button onClick={handleSubmit} disabled={submitting || bulanDipilih.length === 0 || !fileBukti[0]} className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white text-xs font-semibold px-5 py-3 rounded-xl transition shadow-lg shadow-blue-600/20">
-            {submitting ? 'Mengirim...' : 'Kirim Pengajuan'}
-          </button>
-        </div>
-      </div>
-
-      {/* MODAL ZOOM QRIS */}
-      {zoomImage && (
-        <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setZoomImage(null)}>
-          <button className="absolute top-4 right-4 text-white text-3xl font-bold z-10" onClick={() => setZoomImage(null)}>✕</button>
-          <div className="w-full h-full overflow-auto flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-             <img src={zoomImage} alt="Zoom QRIS" className="min-w-full min-h-full object-contain" />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+          <textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="Contoh: transfer dari rekening istri" rows={2} className="w-full bg-slate-950 border border-slate-800
